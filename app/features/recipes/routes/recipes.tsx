@@ -1,20 +1,18 @@
 import { useState } from "react";
-import { data, Form, useLoaderData, useActionData, redirect, useSubmit } from "react-router";
+import { data, Form, useLoaderData, useActionData, Link, useSearchParams } from "react-router";
 import type { Route } from "./+types/recipes";
 import { listRecipes, getAllTags, deleteRecipesByPattern } from "../queries/recipes";
-import { createRecipeSchema } from "../schemas/recipe";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Badge } from "~/components/ui/badge";
-import { Link } from "react-router";
 import { LayoutGrid, List, Trash2 } from "lucide-react";
 
 export async function loader({ request }: Route.LoaderArgs) {
   const url = new URL(request.url);
   const search = url.searchParams.get("search") || undefined;
   const tagsParam = url.searchParams.get("tags");
-  const tags = tagsParam ? tagsParam.split(",") : undefined;
+  const tags = tagsParam ? tagsParam.split(",").filter(Boolean) : undefined;
   const view = url.searchParams.get("view") || "cards";
 
   const [recipes, allTags] = await Promise.all([
@@ -44,15 +42,29 @@ export async function action({ request }: Route.ActionArgs) {
 export default function RecipesPage() {
   const { recipes, allTags, filters, view } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
-  const submit = useSubmit();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [showCleanup, setShowCleanup] = useState(false);
   const [cleanupPattern, setCleanupPattern] = useState("Test Recipe");
 
+  const toggleTag = (tagName: string) => {
+    const currentTags = searchParams.get("tags")?.split(",").filter(Boolean) || [];
+    const newTags = currentTags.includes(tagName)
+      ? currentTags.filter((t) => t !== tagName)
+      : [...currentTags, tagName];
+
+    const newParams = new URLSearchParams(searchParams);
+    if (newTags.length > 0) {
+      newParams.set("tags", newTags.join(","));
+    } else {
+      newParams.delete("tags");
+    }
+    setSearchParams(newParams);
+  };
+
   const setView = (newView: string) => {
-    const params = new URLSearchParams(window.location.search);
-    params.set("view", newView);
-    window.history.replaceState({}, "", `?${params.toString()}`);
-    submit(null, { method: "get", action: `?${params.toString()}` });
+    const newParams = new URLSearchParams(searchParams);
+    newParams.set("view", newView);
+    setSearchParams(newParams);
   };
 
   return (
@@ -61,10 +73,12 @@ export default function RecipesPage() {
         <h1 className="text-3xl font-bold">Recipes</h1>
         <div className="flex items-center gap-2">
           <Button
+            type="button"
             variant="ghost"
             size="icon"
             onClick={() => setShowCleanup(!showCleanup)}
             title="Clean up test recipes"
+            data-testid="cleanup-toggle"
           >
             <Trash2 className="h-4 w-4" />
           </Button>
@@ -76,7 +90,7 @@ export default function RecipesPage() {
 
       {/* Cleanup Panel */}
       {showCleanup && (
-        <div className="mb-6 p-4 bg-muted rounded-lg border">
+        <div className="mb-6 p-4 bg-muted rounded-lg border" data-testid="cleanup-panel">
           <h3 className="font-semibold mb-2">Clean Up Test Recipes</h3>
           <p className="text-sm text-muted-foreground mb-3">
             Delete all recipes matching a pattern. Use with caution.
@@ -89,19 +103,20 @@ export default function RecipesPage() {
                 value={cleanupPattern}
                 onChange={(e) => setCleanupPattern(e.target.value)}
                 placeholder="Pattern to match (e.g., Test Recipe)"
+                data-testid="cleanup-pattern"
               />
             </div>
-            <Button type="submit" variant="destructive">
+            <Button type="submit" variant="destructive" data-testid="cleanup-submit">
               Delete Matching
             </Button>
           </Form>
           {actionData && "deletedCount" in actionData && (
-            <p className="mt-2 text-sm text-green-600">
+            <p className="mt-2 text-sm text-green-600" data-testid="cleanup-success">
               Deleted {actionData.deletedCount} recipe(s)
             </p>
           )}
           {actionData && "error" in actionData && (
-            <p className="mt-2 text-sm text-red-600">{actionData.error}</p>
+            <p className="mt-2 text-sm text-red-600" data-testid="cleanup-error">{actionData.error}</p>
           )}
         </div>
       )}
@@ -109,44 +124,56 @@ export default function RecipesPage() {
       {/* Search and Filter */}
       <Form method="get" className="mb-6">
         <input type="hidden" name="view" value={view} />
+        {filters.tags?.map((tag) => (
+          <input key={tag} type="hidden" name="tags" value={filters.tags?.join(",")} />
+        ))}
         <div className="flex gap-4">
           <Input
             name="search"
             placeholder="Search recipes..."
             defaultValue={filters.search}
             className="max-w-sm"
+            data-testid="search-input"
           />
-          <Button type="submit">Search</Button>
+          <Button type="submit" data-testid="search-submit">Search</Button>
         </div>
-        {allTags.length > 0 && (
-          <div className="mt-4 flex gap-2 flex-wrap">
-            {allTags.map((tag) => (
-              <Badge
-                key={tag.id}
-                variant={filters.tags?.includes(tag.name) ? "default" : "outline"}
-                className="cursor-pointer"
-              >
-                {tag.name}
-              </Badge>
-            ))}
-          </div>
-        )}
       </Form>
+
+      {/* Tag Filter */}
+      {allTags.length > 0 && (
+        <div className="mb-6 flex gap-2 flex-wrap" data-testid="tag-filter">
+          {allTags.map((tag) => (
+            <Badge
+              key={tag.id}
+              variant={filters.tags?.includes(tag.name) ? "default" : "outline"}
+              className="cursor-pointer select-none"
+              onClick={() => toggleTag(tag.name)}
+              data-testid={`tag-${tag.name}`}
+            >
+              {tag.name}
+            </Badge>
+          ))}
+        </div>
+      )}
 
       {/* View Toggle */}
       <div className="flex justify-end mb-4">
-        <div className="flex border rounded-md overflow-hidden">
+        <div className="flex border rounded-md overflow-hidden" data-testid="view-toggle">
           <button
+            type="button"
             onClick={() => setView("cards")}
-            className={`p-2 ${view === "cards" ? "bg-primary text-primary-foreground" : "bg-background hover:bg-muted"}`}
+            className={`p-2 transition-colors ${view === "cards" ? "bg-primary text-primary-foreground" : "bg-background hover:bg-muted"}`}
             title="Card view"
+            data-testid="view-cards"
           >
             <LayoutGrid className="h-4 w-4" />
           </button>
           <button
+            type="button"
             onClick={() => setView("table")}
-            className={`p-2 ${view === "table" ? "bg-primary text-primary-foreground" : "bg-background hover:bg-muted"}`}
+            className={`p-2 transition-colors ${view === "table" ? "bg-primary text-primary-foreground" : "bg-background hover:bg-muted"}`}
             title="Table view"
+            data-testid="view-table"
           >
             <List className="h-4 w-4" />
           </button>
@@ -155,9 +182,9 @@ export default function RecipesPage() {
 
       {/* Recipe List */}
       {recipes.length === 0 ? (
-        <p className="text-muted-foreground">No recipes found. Add your first recipe!</p>
+        <p className="text-muted-foreground" data-testid="no-recipes">No recipes found. Add your first recipe!</p>
       ) : view === "cards" ? (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3" data-testid="recipe-cards">
           {recipes.map((recipe) => (
             <Link key={recipe.id} to={`/recipes/${recipe.id}`}>
               <Card className="hover:shadow-lg transition-shadow cursor-pointer h-full">
@@ -180,7 +207,7 @@ export default function RecipesPage() {
           ))}
         </div>
       ) : (
-        <div className="border rounded-lg overflow-hidden">
+        <div className="border rounded-lg overflow-hidden" data-testid="recipe-table">
           <table className="w-full">
             <thead className="bg-muted">
               <tr>
