@@ -137,3 +137,10 @@ dist
 # Vite logs files
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
+
+# React Router
+/.react-router/
+/build/
+
+# macOS
+.DS_Store
