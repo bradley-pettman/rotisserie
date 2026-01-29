@@ -297,3 +297,11 @@ export interface Unit {
 export async function getAllUnits(): Promise<Unit[]> {
   return query(`SELECT id, name, abbreviation, category FROM units ORDER BY category, name`);
 }
+
+export async function deleteRecipesByPattern(pattern: string): Promise<number> {
+  const result = await query(
+    `DELETE FROM recipes WHERE name ILIKE $1 RETURNING id`,
+    [`%${pattern}%`]
+  );
+  return result.length;
+}
