@@ -1,19 +1,20 @@
-import type { Route } from "./+types/home";
+import { Link } from "react-router";
 import { Button } from "~/components/ui/button";
-
-export function meta({}: Route.MetaArgs) {
-  return [
-    { title: "Rotisserie" },
-    { name: "description", content: "Plan meals. Shop smarter. Cook. Repeat." },
-  ];
-}
 
 export default function Home() {
   return (
-    <div className="p-8">
-      <h1 className="text-3xl font-bold">Rotisserie</h1>
-      <p className="mt-2 text-gray-600">Plan meals. Shop smarter. Cook. Repeat.</p>
-      <Button className="mt-4">Get Started</Button>
+    <div className="min-h-screen flex flex-col items-center justify-center p-8">
+      <h1 className="text-4xl font-bold mb-2">Rotisserie</h1>
+      <p className="text-gray-600 mb-8">Plan meals. Shop smarter. Cook. Repeat.</p>
+
+      <div className="flex gap-4">
+        <Link to="/recipes">
+          <Button size="lg">View Recipes</Button>
+        </Link>
+        <Link to="/recipes/new">
+          <Button size="lg" variant="outline">Add Recipe</Button>
+        </Link>
+      </div>
     </div>
   );
 }
