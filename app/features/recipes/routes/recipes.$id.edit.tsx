@@ -66,7 +66,8 @@ export default function EditRecipePage() {
   const [ingredients, setIngredients] = useState<RecipeIngredient[]>(
     recipe.ingredients.map((ing) => ({
       ingredientName: ing.name,
-      quantity: ing.quantity,
+      // Convert quantity to number in case it comes as a string from the database
+      quantity: ing.quantity != null ? Number(ing.quantity) : null,
       unit: ing.unit,
       notes: ing.notes,
     }))
