@@ -2,11 +2,14 @@ import { test, expect } from "@playwright/test";
 
 // Helper function to add an ingredient using the combobox
 async function addIngredient(page: any, ingredientName: string, quantity?: string, unit?: string) {
-  const ingredientCombobox = page.getByRole("combobox").first();
-  await ingredientCombobox.click();
+  // Get all comboboxes - first is ingredient, second is unit
+  const comboboxes = page.getByRole("combobox");
+
+  // Click ingredient combobox (first one)
+  await comboboxes.first().click();
 
   // Type the ingredient name in the search input
-  const searchInput = page.getByPlaceholder("Search or type new...");
+  const searchInput = page.getByPlaceholder("Search or type new...").first();
   await searchInput.fill(ingredientName);
 
   // Wait for the dropdown to update
@@ -20,12 +23,30 @@ async function addIngredient(page: any, ingredientName: string, quantity?: strin
   // Wait for the popover to close
   await page.waitForTimeout(200);
 
-  // Fill in quantity and unit if provided
+  // Fill in quantity if provided
   if (quantity) {
     await page.getByPlaceholder("Qty").first().fill(quantity);
   }
+
+  // Select unit using the unit combobox if provided
   if (unit) {
-    await page.getByPlaceholder("Unit").first().fill(unit);
+    // Click unit combobox (second combobox in the first ingredient row)
+    const unitCombobox = comboboxes.nth(1);
+    await unitCombobox.click();
+
+    // Type the unit in the search input
+    const unitSearchInput = page.getByPlaceholder("Search or type new...").first();
+    await unitSearchInput.fill(unit);
+
+    // Wait for the dropdown to update
+    await page.waitForTimeout(300);
+
+    // Select the first match or create custom unit
+    await unitSearchInput.press("ArrowDown");
+    await unitSearchInput.press("Enter");
+
+    // Wait for the popover to close
+    await page.waitForTimeout(200);
   }
 }
 

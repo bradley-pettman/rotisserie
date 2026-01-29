@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Form, redirect, useActionData, useLoaderData, useNavigate } from "react-router";
 import type { Route } from "./+types/recipes.$id.edit";
-import { getRecipeById, updateRecipe, getAllIngredients } from "../queries/recipes";
+import { getRecipeById, updateRecipe, getAllIngredients, getAllUnits } from "../queries/recipes";
 import { createRecipeSchema, type RecipeIngredient } from "../schemas/recipe";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
@@ -9,6 +9,7 @@ import { Label } from "~/components/ui/label";
 import { Textarea } from "~/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { IngredientCombobox } from "../components/ingredient-combobox";
+import { UnitCombobox } from "../components/unit-combobox";
 import { data } from "react-router";
 
 export async function loader({ params }: Route.LoaderArgs) {
@@ -18,9 +19,12 @@ export async function loader({ params }: Route.LoaderArgs) {
     throw new Response("Recipe not found", { status: 404 });
   }
 
-  const allIngredients = await getAllIngredients();
+  const [allIngredients, allUnits] = await Promise.all([
+    getAllIngredients(),
+    getAllUnits(),
+  ]);
 
-  return { recipe, allIngredients };
+  return { recipe, allIngredients, allUnits };
 }
 
 export async function action({ params, request }: Route.ActionArgs) {
@@ -59,7 +63,7 @@ export async function action({ params, request }: Route.ActionArgs) {
 }
 
 export default function EditRecipePage() {
-  const { recipe, allIngredients } = useLoaderData<typeof loader>();
+  const { recipe, allIngredients, allUnits } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
   const navigate = useNavigate();
 
@@ -194,16 +198,18 @@ export default function EditRecipePage() {
                   <Input
                     placeholder="Qty"
                     type="number"
-                    step="0.01"
+                    min="0"
+                    step="any"
                     value={ing.quantity ?? ""}
                     onChange={(e) => updateIngredient(index, "quantity", e.target.value ? Number(e.target.value) : null)}
                   />
                 </div>
-                <div className="w-24">
-                  <Input
+                <div className="w-28">
+                  <UnitCombobox
+                    units={allUnits}
+                    value={ing.unit}
+                    onChange={(value) => updateIngredient(index, "unit", value)}
                     placeholder="Unit"
-                    value={ing.unit ?? ""}
-                    onChange={(e) => updateIngredient(index, "unit", e.target.value || null)}
                   />
                 </div>
                 <Button

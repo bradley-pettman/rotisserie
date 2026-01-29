@@ -50,12 +50,14 @@ export async function createRecipe(input: CreateRecipeInput): Promise<Recipe> {
   for (let i = 0; i < input.ingredients.length; i++) {
     const ing = input.ingredients[i];
 
-    // Upsert ingredient
+    // Upsert ingredient with proper capitalization
+    const trimmedName = ing.ingredientName.trim();
+    const capitalizedName = trimmedName.charAt(0).toUpperCase() + trimmedName.slice(1).toLowerCase();
     const ingredient = await queryOne<{ id: string }>(
       `INSERT INTO ingredients (name) VALUES ($1)
        ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name
        RETURNING id`,
-      [ing.ingredientName.toLowerCase().trim()]
+      [capitalizedName]
     );
 
     if (ingredient) {
@@ -224,11 +226,14 @@ export async function updateRecipe(
 
     for (let i = 0; i < input.ingredients.length; i++) {
       const ing = input.ingredients[i];
+      // Capitalize ingredient name
+      const trimmedName = ing.ingredientName.trim();
+      const capitalizedName = trimmedName.charAt(0).toUpperCase() + trimmedName.slice(1).toLowerCase();
       const ingredient = await queryOne<{ id: string }>(
         `INSERT INTO ingredients (name) VALUES ($1)
          ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name
          RETURNING id`,
-        [ing.ingredientName.toLowerCase().trim()]
+        [capitalizedName]
       );
 
       if (ingredient) {
@@ -280,4 +285,15 @@ export async function getAllTags(): Promise<{ id: string; name: string }[]> {
 
 export async function getAllIngredients(): Promise<{ id: string; name: string }[]> {
   return query(`SELECT id, name FROM ingredients ORDER BY name`);
+}
+
+export interface Unit {
+  id: string;
+  name: string;
+  abbreviation: string | null;
+  category: string | null;
+}
+
+export async function getAllUnits(): Promise<Unit[]> {
+  return query(`SELECT id, name, abbreviation, category FROM units ORDER BY category, name`);
 }

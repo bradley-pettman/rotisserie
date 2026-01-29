@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Form, redirect, useActionData, useLoaderData, useNavigate } from "react-router";
 import type { Route } from "./+types/recipes.new";
-import { createRecipe, getAllIngredients } from "../queries/recipes";
+import { createRecipe, getAllIngredients, getAllUnits } from "../queries/recipes";
 import { createRecipeSchema, type RecipeIngredient } from "../schemas/recipe";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
@@ -9,11 +9,15 @@ import { Label } from "~/components/ui/label";
 import { Textarea } from "~/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { IngredientCombobox } from "../components/ingredient-combobox";
+import { UnitCombobox } from "../components/unit-combobox";
 import { data } from "react-router";
 
 export async function loader() {
-  const allIngredients = await getAllIngredients();
-  return { allIngredients };
+  const [allIngredients, allUnits] = await Promise.all([
+    getAllIngredients(),
+    getAllUnits(),
+  ]);
+  return { allIngredients, allUnits };
 }
 
 export async function action({ request }: Route.ActionArgs) {
@@ -52,7 +56,7 @@ export async function action({ request }: Route.ActionArgs) {
 }
 
 export default function NewRecipePage() {
-  const { allIngredients } = useLoaderData<typeof loader>();
+  const { allIngredients, allUnits } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
   const navigate = useNavigate();
 
@@ -172,16 +176,18 @@ export default function NewRecipePage() {
                   <Input
                     placeholder="Qty"
                     type="number"
-                    step="0.01"
+                    min="0"
+                    step="any"
                     value={ing.quantity ?? ""}
                     onChange={(e) => updateIngredient(index, "quantity", e.target.value ? Number(e.target.value) : null)}
                   />
                 </div>
-                <div className="w-24">
-                  <Input
+                <div className="w-28">
+                  <UnitCombobox
+                    units={allUnits}
+                    value={ing.unit}
+                    onChange={(value) => updateIngredient(index, "unit", value)}
                     placeholder="Unit"
-                    value={ing.unit ?? ""}
-                    onChange={(e) => updateIngredient(index, "unit", e.target.value || null)}
                   />
                 </div>
                 <Button
