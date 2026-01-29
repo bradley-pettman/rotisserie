@@ -1,13 +1,14 @@
 import { useState } from "react";
 import { Form, redirect, useActionData, useLoaderData, useNavigate } from "react-router";
 import type { Route } from "./+types/recipes.$id.edit";
-import { getRecipeById, updateRecipe } from "../queries/recipes";
+import { getRecipeById, updateRecipe, getAllIngredients } from "../queries/recipes";
 import { createRecipeSchema, type RecipeIngredient } from "../schemas/recipe";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { Textarea } from "~/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
+import { IngredientCombobox } from "../components/ingredient-combobox";
 import { data } from "react-router";
 
 export async function loader({ params }: Route.LoaderArgs) {
@@ -17,7 +18,9 @@ export async function loader({ params }: Route.LoaderArgs) {
     throw new Response("Recipe not found", { status: 404 });
   }
 
-  return { recipe };
+  const allIngredients = await getAllIngredients();
+
+  return { recipe, allIngredients };
 }
 
 export async function action({ params, request }: Route.ActionArgs) {
@@ -56,7 +59,7 @@ export async function action({ params, request }: Route.ActionArgs) {
 }
 
 export default function EditRecipePage() {
-  const { recipe } = useLoaderData<typeof loader>();
+  const { recipe, allIngredients } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
   const navigate = useNavigate();
 
@@ -179,11 +182,11 @@ export default function EditRecipePage() {
             {ingredients.map((ing, index) => (
               <div key={index} className="flex gap-2 items-start">
                 <div className="flex-1">
-                  <Input
-                    placeholder="Ingredient name"
+                  <IngredientCombobox
+                    ingredients={allIngredients}
                     value={ing.ingredientName}
-                    onChange={(e) => updateIngredient(index, "ingredientName", e.target.value)}
-                    required
+                    onChange={(value) => updateIngredient(index, "ingredientName", value)}
+                    placeholder="Select ingredient..."
                   />
                 </div>
                 <div className="w-20">

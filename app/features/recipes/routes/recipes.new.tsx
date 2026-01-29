@@ -1,14 +1,20 @@
 import { useState } from "react";
-import { Form, redirect, useActionData, useNavigate } from "react-router";
+import { Form, redirect, useActionData, useLoaderData, useNavigate } from "react-router";
 import type { Route } from "./+types/recipes.new";
-import { createRecipe } from "../queries/recipes";
+import { createRecipe, getAllIngredients } from "../queries/recipes";
 import { createRecipeSchema, type RecipeIngredient } from "../schemas/recipe";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { Textarea } from "~/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
+import { IngredientCombobox } from "../components/ingredient-combobox";
 import { data } from "react-router";
+
+export async function loader() {
+  const allIngredients = await getAllIngredients();
+  return { allIngredients };
+}
 
 export async function action({ request }: Route.ActionArgs) {
   const formData = await request.formData();
@@ -46,6 +52,7 @@ export async function action({ request }: Route.ActionArgs) {
 }
 
 export default function NewRecipePage() {
+  const { allIngredients } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
   const navigate = useNavigate();
 
@@ -154,11 +161,11 @@ export default function NewRecipePage() {
             {ingredients.map((ing, index) => (
               <div key={index} className="flex gap-2 items-start">
                 <div className="flex-1">
-                  <Input
-                    placeholder="Ingredient name"
+                  <IngredientCombobox
+                    ingredients={allIngredients}
                     value={ing.ingredientName}
-                    onChange={(e) => updateIngredient(index, "ingredientName", e.target.value)}
-                    required
+                    onChange={(value) => updateIngredient(index, "ingredientName", value)}
+                    placeholder="Select ingredient..."
                   />
                 </div>
                 <div className="w-20">
