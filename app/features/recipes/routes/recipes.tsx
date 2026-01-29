@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { data, Form, useLoaderData, useActionData, Link, useSearchParams } from "react-router";
+import { data, Form, useLoaderData, useActionData, Link, useNavigate, useSearchParams } from "react-router";
 import type { Route } from "./+types/recipes";
 import { listRecipes, getAllTags, deleteRecipesByPattern } from "../queries/recipes";
 import { Button } from "~/components/ui/button";
@@ -42,29 +42,30 @@ export async function action({ request }: Route.ActionArgs) {
 export default function RecipesPage() {
   const { recipes, allTags, filters, view } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
-  const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [showCleanup, setShowCleanup] = useState(false);
   const [cleanupPattern, setCleanupPattern] = useState("Test Recipe");
 
   const toggleTag = (tagName: string) => {
-    const currentTags = searchParams.get("tags")?.split(",").filter(Boolean) || [];
+    const currentTags = filters.tags || [];
     const newTags = currentTags.includes(tagName)
       ? currentTags.filter((t) => t !== tagName)
       : [...currentTags, tagName];
 
-    const newParams = new URLSearchParams(searchParams);
+    const params = new URLSearchParams(searchParams);
     if (newTags.length > 0) {
-      newParams.set("tags", newTags.join(","));
+      params.set("tags", newTags.join(","));
     } else {
-      newParams.delete("tags");
+      params.delete("tags");
     }
-    setSearchParams(newParams);
+    navigate(`/recipes?${params.toString()}`);
   };
 
-  const setView = (newView: string) => {
-    const newParams = new URLSearchParams(searchParams);
-    newParams.set("view", newView);
-    setSearchParams(newParams);
+  const changeView = (newView: string) => {
+    const params = new URLSearchParams(searchParams);
+    params.set("view", newView);
+    navigate(`/recipes?${params.toString()}`);
   };
 
   return (
@@ -124,9 +125,9 @@ export default function RecipesPage() {
       {/* Search and Filter */}
       <Form method="get" className="mb-6">
         <input type="hidden" name="view" value={view} />
-        {filters.tags?.map((tag) => (
-          <input key={tag} type="hidden" name="tags" value={filters.tags?.join(",")} />
-        ))}
+        {filters.tags && filters.tags.length > 0 && (
+          <input type="hidden" name="tags" value={filters.tags.join(",")} />
+        )}
         <div className="flex gap-4">
           <Input
             name="search"
@@ -143,15 +144,20 @@ export default function RecipesPage() {
       {allTags.length > 0 && (
         <div className="mb-6 flex gap-2 flex-wrap" data-testid="tag-filter">
           {allTags.map((tag) => (
-            <Badge
+            <button
               key={tag.id}
-              variant={filters.tags?.includes(tag.name) ? "default" : "outline"}
-              className="cursor-pointer select-none"
+              type="button"
               onClick={() => toggleTag(tag.name)}
               data-testid={`tag-${tag.name}`}
+              className="focus:outline-none"
             >
-              {tag.name}
-            </Badge>
+              <Badge
+                variant={filters.tags?.includes(tag.name) ? "default" : "outline"}
+                className="cursor-pointer select-none hover:opacity-80"
+              >
+                {tag.name}
+              </Badge>
+            </button>
           ))}
         </div>
       )}
@@ -161,7 +167,7 @@ export default function RecipesPage() {
         <div className="flex border rounded-md overflow-hidden" data-testid="view-toggle">
           <button
             type="button"
-            onClick={() => setView("cards")}
+            onClick={() => changeView("cards")}
             className={`p-2 transition-colors ${view === "cards" ? "bg-primary text-primary-foreground" : "bg-background hover:bg-muted"}`}
             title="Card view"
             data-testid="view-cards"
@@ -170,7 +176,7 @@ export default function RecipesPage() {
           </button>
           <button
             type="button"
-            onClick={() => setView("table")}
+            onClick={() => changeView("table")}
             className={`p-2 transition-colors ${view === "table" ? "bg-primary text-primary-foreground" : "bg-background hover:bg-muted"}`}
             title="Table view"
             data-testid="view-table"
