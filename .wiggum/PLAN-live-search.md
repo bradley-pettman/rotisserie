@@ -6,7 +6,7 @@ spec: ../SPEC-live-search.md
 
 ## Tasks
 
-- [ ] <!-- id:debounced-search priority:1 deps: -->
+- [x] <!-- id:debounced-search priority:1 deps: -->
   **Replace search form with debounced controlled input and loading indicator**
   Modify `app/features/recipes/routes/recipes.tsx` to replace the submit-to-search pattern with live filtering. All changes are in this one file:
 
@@ -19,7 +19,7 @@ spec: ../SPEC-live-search.md
 
   The loader, queries, and schemas must NOT be changed. Follow the same patterns as `toggleTag` and `changeView` for building URL params.
 
-- [ ] <!-- id:e2e-tests priority:2 deps:debounced-search -->
+- [x] <!-- id:e2e-tests priority:2 deps:debounced-search -->
   **Write Playwright E2E tests for live search**
   Add a new `test.describe("Live Search")` block in `tests/recipes.spec.ts`. Use the existing `createRecipe` and `createRecipeWithTag` helpers. Tests to write:
 

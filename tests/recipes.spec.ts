@@ -400,3 +400,148 @@ test.describe("Ingredient and Unit Comboboxes", () => {
     await expect(ingredientComboboxes.nth(1)).toContainText(/garlic/i);
   });
 });
+
+test.describe("Live Search", () => {
+  test("Filters as you type", async ({ page }) => {
+    const timestamp = Date.now();
+    const recipe1 = `LiveSearch Alpha ${timestamp}`;
+    const recipe2 = `LiveSearch Beta ${timestamp}`;
+
+    // Create two recipes with distinct names
+    await createRecipe(page, recipe1, "Instructions for Alpha", "onion");
+    await createRecipe(page, recipe2, "Instructions for Beta", "garlic");
+
+    // Go to recipes list
+    await page.goto("/recipes");
+
+    // Both recipes should be visible initially
+    await expect(page.getByText(recipe1)).toBeVisible();
+    await expect(page.getByText(recipe2)).toBeVisible();
+
+    // Type "Alpha" into search input
+    await page.getByTestId("search-input").fill("Alpha");
+
+    // Wait for the URL to update with the search parameter
+    await page.waitForURL(/\?.*search=Alpha/);
+
+    // Wait for the navigation to complete (loading state to finish)
+    await page.waitForLoadState('networkidle');
+
+    // Additionally wait for the list container to not be in loading state
+    await page.waitForSelector('[aria-busy="false"]', { timeout: 5000 });
+
+    // Only Alpha recipe should be visible
+    await expect(page.getByText(recipe1)).toBeVisible();
+    await expect(page.getByText(recipe2)).not.toBeVisible();
+  });
+
+  test("URL updates", async ({ page }) => {
+    const timestamp = Date.now();
+    const recipeName = `Search URL Test ${timestamp}`;
+
+    // Create a recipe to search for
+    await createRecipe(page, recipeName, "Instructions", "tomato");
+
+    // Go to recipes list
+    await page.goto("/recipes");
+
+    // Type a search term
+    await page.getByTestId("search-input").fill("Search URL");
+
+    // Wait for URL to update with search parameter
+    await page.waitForURL(/\?.*search=Search\+URL/, { timeout: 5000 });
+
+    // Verify URL contains search parameter
+    await expect(page).toHaveURL(/\?.*search=Search\+URL/);
+  });
+
+  test("Clear restores all", async ({ page }) => {
+    const timestamp = Date.now();
+    const recipe1 = `Clear Test First ${timestamp}`;
+    const recipe2 = `Clear Test Second ${timestamp}`;
+
+    // Create two recipes
+    await createRecipe(page, recipe1, "Instructions 1", "onion");
+    await createRecipe(page, recipe2, "Instructions 2", "garlic");
+
+    // Go to recipes list
+    await page.goto("/recipes");
+
+    // Type a search term that matches only one recipe
+    await page.getByTestId("search-input").fill("First");
+
+    // Wait for URL to update with search parameter
+    await page.waitForURL(/\?.*search=First/, { timeout: 5000 });
+
+    // Wait for the recipe list to update
+    await page.waitForSelector('[aria-busy="false"]', { timeout: 5000 });
+
+    // Verify only one recipe is visible
+    await expect(page.getByText(recipe1)).toBeVisible();
+    await expect(page.getByText(recipe2)).not.toBeVisible();
+
+    // Clear the search input
+    await page.getByTestId("search-input").fill("");
+
+    // Wait for URL to remove search parameter (goes back to base URL)
+    await page.waitForURL('/recipes', { timeout: 5000 });
+
+    // Wait for the recipe list to update
+    await page.waitForSelector('[aria-busy="false"]', { timeout: 5000 });
+
+    // Both recipes should be visible again
+    await expect(page.getByText(recipe1)).toBeVisible();
+    await expect(page.getByText(recipe2)).toBeVisible();
+
+    // URL should not contain search parameter
+    await expect(page).not.toHaveURL(/search=/);
+  });
+
+  test("Works with tag filter", async ({ page }) => {
+    const timestamp = Date.now();
+    const tag = `searchtag${timestamp}`;
+    const recipe1 = `Tagged Chicken Recipe ${timestamp}`;
+    const recipe2 = `Tagged Beef Recipe ${timestamp}`;
+    const recipe3 = `Untagged Chicken Recipe ${timestamp}`;
+
+    // Create recipes with different combinations
+    await createRecipeWithTag(page, recipe1, "Instructions 1", "onion", tag);
+    await createRecipeWithTag(page, recipe2, "Instructions 2", "garlic", tag);
+    await createRecipe(page, recipe3, "Instructions 3", "tomato");
+
+    // Go to recipes list
+    await page.goto("/recipes");
+
+    // First, apply tag filter
+    await page.getByTestId(`tag-${tag}`).click();
+
+    // Wait for URL to update with tag parameter
+    await page.waitForURL(/\?.*tags=/, { timeout: 5000 });
+
+    // Wait for the recipe list to update
+    await page.waitForSelector('[aria-busy="false"]', { timeout: 5000 });
+
+    // Verify only tagged recipes are visible
+    await expect(page.getByText(recipe1, { exact: true })).toBeVisible();
+    await expect(page.getByText(recipe2, { exact: true })).toBeVisible();
+    await expect(page.getByText(recipe3, { exact: true })).not.toBeVisible();
+
+    // Now add search filter for "Chicken"
+    await page.getByTestId("search-input").fill("Chicken");
+
+    // Wait for URL to update with both parameters
+    await page.waitForURL(/\?.*tags=.*search=Chicken/, { timeout: 5000 });
+
+    // Wait for the recipe list to update
+    await page.waitForSelector('[aria-busy="false"]', { timeout: 5000 });
+
+    // Only recipe1 should be visible (has tag AND matches "Chicken")
+    await expect(page.getByText(recipe1, { exact: true })).toBeVisible();
+    await expect(page.getByText(recipe2, { exact: true })).not.toBeVisible();
+    await expect(page.getByText(recipe3, { exact: true })).not.toBeVisible();
+
+    // Verify URL has both parameters
+    await expect(page).toHaveURL(/tags=/);
+    await expect(page).toHaveURL(/search=/);
+  });
+});
