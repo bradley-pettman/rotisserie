@@ -6,7 +6,7 @@ spec: ../SPEC-live-search.md
 
 ## Tasks
 
-- [x] <!-- id:debounced-search priority:1 deps: -->
+- [ ] <!-- id:debounced-search priority:1 deps: -->
   **Replace search form with debounced controlled input and loading indicator**
   Modify `app/features/recipes/routes/recipes.tsx` to replace the submit-to-search pattern with live filtering. All changes are in this one file:
 
