@@ -1,0 +1,16 @@
+name: "live-search"
+
+loop:
+  mode: bounded
+  maxIterations: 8
+  budgetUsd: 5
+  model: claude-sonnet-4-20250514
+
+backpressure:
+  checks:
+    - name: "typecheck"
+      command: "npm run typecheck"
+      trigger: each_iteration
+    - name: "tests"
+      command: "npm run test"
+      trigger: each_task
