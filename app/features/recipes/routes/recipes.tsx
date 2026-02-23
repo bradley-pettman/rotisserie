@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { data, Form, useLoaderData, useActionData, Link, useNavigate, useSearchParams } from "react-router";
+import { useState, useEffect, useCallback } from "react";
+import { data, Form, useLoaderData, useActionData, Link, useNavigate, useSearchParams, useNavigation } from "react-router";
 import type { Route } from "./+types/recipes";
 import { listRecipes, getAllTags, deleteRecipesByPattern } from "../queries/recipes";
 import { Button } from "~/components/ui/button";
@@ -43,9 +43,33 @@ export default function RecipesPage() {
   const { recipes, allTags, filters, view } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
   const navigate = useNavigate();
+  const navigation = useNavigation();
   const [searchParams] = useSearchParams();
   const [showCleanup, setShowCleanup] = useState(false);
   const [cleanupPattern, setCleanupPattern] = useState("Test Recipe");
+  const [searchTerm, setSearchTerm] = useState(filters.search ?? "");
+
+  const isSearching = navigation.state === "loading";
+
+  // Sync searchTerm with URL changes (browser back/forward)
+  useEffect(() => {
+    setSearchTerm(filters.search ?? "");
+  }, [filters.search]);
+
+  // Debounced navigation effect for live search
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      const params = new URLSearchParams(searchParams);
+      if (searchTerm) {
+        params.set("search", searchTerm);
+      } else {
+        params.delete("search");
+      }
+      navigate(`/recipes?${params.toString()}`, { replace: true });
+    }, 300);
+
+    return () => clearTimeout(timeout);
+  }, [searchTerm]);
 
   const toggleTag = (tagName: string) => {
     const currentTags = filters.tags || [];
@@ -132,11 +156,12 @@ export default function RecipesPage() {
           <Input
             name="search"
             placeholder="Search recipes..."
-            defaultValue={filters.search}
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
             className="max-w-sm"
             data-testid="search-input"
           />
-          <Button type="submit" data-testid="search-submit">Search</Button>
+          <button type="submit" className="sr-only">Search</button>
         </div>
       </Form>
 
@@ -187,9 +212,10 @@ export default function RecipesPage() {
       </div>
 
       {/* Recipe List */}
-      {recipes.length === 0 ? (
-        <p className="text-muted-foreground" data-testid="no-recipes">No recipes found. Add your first recipe!</p>
-      ) : view === "cards" ? (
+      <div aria-busy={isSearching} className={isSearching ? "opacity-50 transition-opacity" : "transition-opacity"}>
+        {recipes.length === 0 ? (
+          <p className="text-muted-foreground" data-testid="no-recipes">No recipes found. Add your first recipe!</p>
+        ) : view === "cards" ? (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3" data-testid="recipe-cards">
           {recipes.map((recipe) => (
             <Link key={recipe.id} to={`/recipes/${recipe.id}`}>
@@ -252,6 +278,7 @@ export default function RecipesPage() {
           </table>
         </div>
       )}
+      </div>
     </div>
   );
 }
