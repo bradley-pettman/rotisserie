@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Form, redirect, useActionData, useLoaderData, useNavigate } from "react-router";
+import { useState, useEffect, useRef } from "react";
+import { Form, redirect, useActionData, useFetcher, useLoaderData, useNavigate } from "react-router";
 import type { Route } from "./+types/recipes.new";
 import { createRecipe, getAllIngredients, getAllUnits } from "../queries/recipes";
 import { createRecipeSchema, type RecipeIngredient } from "../schemas/recipe";
@@ -11,6 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { IngredientCombobox } from "../components/ingredient-combobox";
 import { UnitCombobox } from "../components/unit-combobox";
 import { data } from "react-router";
+import type { ScrapedRecipe } from "../lib/scrape-recipe";
 
 export async function loader() {
   const [allIngredients, allUnits] = await Promise.all([
@@ -59,12 +60,43 @@ export default function NewRecipePage() {
   const { allIngredients, allUnits } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
   const navigate = useNavigate();
+  const importFetcher = useFetcher<{ error: string | null; recipe: ScrapedRecipe | null }>();
 
+  const [name, setName] = useState(actionData?.input?.name ?? "");
+  const [prepTimeMinutes, setPrepTimeMinutes] = useState<string>("");
+  const [cookTimeMinutes, setCookTimeMinutes] = useState<string>("");
+  const [servings, setServings] = useState<string>("");
+  const [sourceUrl, setSourceUrl] = useState("");
+  const [instructions, setInstructions] = useState(actionData?.input?.instructions ?? "");
+  const [notes, setNotes] = useState("");
   const [ingredients, setIngredients] = useState<RecipeIngredient[]>([
     { ingredientName: "", quantity: null, unit: null, notes: null },
   ]);
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState("");
+  const [importUrl, setImportUrl] = useState("");
+
+  const isImporting = importFetcher.state !== "idle";
+  const prevImportState = useRef(importFetcher.state);
+
+  // Populate form when import completes
+  useEffect(() => {
+    if (prevImportState.current !== "idle" && importFetcher.state === "idle" && importFetcher.data?.recipe) {
+      const recipe = importFetcher.data.recipe;
+      setName(recipe.name ?? "");
+      setPrepTimeMinutes(recipe.prepTimeMinutes?.toString() ?? "");
+      setCookTimeMinutes(recipe.cookTimeMinutes?.toString() ?? "");
+      setServings(recipe.servings?.toString() ?? "");
+      setSourceUrl(recipe.sourceUrl ?? "");
+      setInstructions(recipe.instructions ?? "");
+      setNotes(recipe.notes ?? "");
+      setTags(recipe.tags ?? []);
+      if (recipe.ingredients.length > 0) {
+        setIngredients(recipe.ingredients);
+      }
+    }
+    prevImportState.current = importFetcher.state;
+  }, [importFetcher.state, importFetcher.data]);
 
   const addIngredient = () => {
     setIngredients([
@@ -94,9 +126,56 @@ export default function NewRecipePage() {
     setTags(tags.filter((t) => t !== tag));
   };
 
+  const handleImport = () => {
+    if (!importUrl.trim()) return;
+    importFetcher.submit(
+      { url: importUrl },
+      { method: "post", action: "/recipes/import" }
+    );
+  };
+
   return (
     <div className="container mx-auto p-6 max-w-2xl">
       <h1 className="text-3xl font-bold mb-6">New Recipe</h1>
+
+      <Card className="mb-6 border-dashed">
+        <CardHeader>
+          <CardTitle>Import from URL</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground mb-3">
+            Paste a recipe URL to auto-fill the form. You can review and edit before saving.
+          </p>
+          <div className="flex gap-2">
+            <Input
+              placeholder="https://www.example.com/recipe/..."
+              value={importUrl}
+              onChange={(e) => setImportUrl(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  handleImport();
+                }
+              }}
+              disabled={isImporting}
+            />
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={handleImport}
+              disabled={isImporting || !importUrl.trim()}
+            >
+              {isImporting ? "Importing..." : "Import"}
+            </Button>
+          </div>
+          {importFetcher.data?.error && (
+            <p className="text-red-500 text-sm mt-2">{importFetcher.data.error}</p>
+          )}
+          {importFetcher.data?.recipe && !importFetcher.data?.error && (
+            <p className="text-green-600 text-sm mt-2">Recipe imported! Review the details below and click Save when ready.</p>
+          )}
+        </CardContent>
+      </Card>
 
       <Form method="post">
         <input type="hidden" name="ingredients" value={JSON.stringify(ingredients)} />
@@ -113,7 +192,8 @@ export default function NewRecipePage() {
                 id="name"
                 name="name"
                 required
-                defaultValue={actionData?.input?.name}
+                value={name}
+                onChange={(e) => setName(e.target.value)}
               />
               {actionData?.errors?.name && (
                 <p className="text-red-500 text-sm mt-1">{actionData.errors.name[0]}</p>
@@ -128,6 +208,8 @@ export default function NewRecipePage() {
                   name="prepTimeMinutes"
                   type="number"
                   min="0"
+                  value={prepTimeMinutes}
+                  onChange={(e) => setPrepTimeMinutes(e.target.value)}
                 />
               </div>
               <div>
@@ -137,11 +219,20 @@ export default function NewRecipePage() {
                   name="cookTimeMinutes"
                   type="number"
                   min="0"
+                  value={cookTimeMinutes}
+                  onChange={(e) => setCookTimeMinutes(e.target.value)}
                 />
               </div>
               <div>
                 <Label htmlFor="servings">Servings</Label>
-                <Input id="servings" name="servings" type="number" min="1" />
+                <Input
+                  id="servings"
+                  name="servings"
+                  type="number"
+                  min="1"
+                  value={servings}
+                  onChange={(e) => setServings(e.target.value)}
+                />
               </div>
             </div>
 
@@ -152,6 +243,8 @@ export default function NewRecipePage() {
                 name="sourceUrl"
                 type="url"
                 placeholder="https://..."
+                value={sourceUrl}
+                onChange={(e) => setSourceUrl(e.target.value)}
               />
             </div>
           </CardContent>
@@ -257,7 +350,8 @@ export default function NewRecipePage() {
               rows={10}
               placeholder="Enter cooking instructions..."
               required
-              defaultValue={actionData?.input?.instructions}
+              value={instructions}
+              onChange={(e) => setInstructions(e.target.value)}
             />
             {actionData?.errors?.instructions && (
               <p className="text-red-500 text-sm mt-1">{actionData.errors.instructions[0]}</p>
@@ -274,6 +368,8 @@ export default function NewRecipePage() {
               name="notes"
               rows={4}
               placeholder="Personal notes about this recipe..."
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
             />
           </CardContent>
         </Card>
