@@ -75,3 +75,9 @@ npx shadcn-ui@latest add <component>
 ```
 
 Path alias `~/` maps to `/app/` (e.g., `import { Button } from "~/components/ui/button"`)
+
+## Code Style Preferences
+
+- **Avoid `useEffect`**: Prefer React Router's data-loading patterns (loaders, actions, `useFetcher`) over `useEffect` for data fetching and side effects. When data needs to populate a form, load it in the loader and use `defaultValue` on uncontrolled inputs rather than syncing state with `useEffect`.
+- **Minimize `useState`**: Only use `useState` for genuinely interactive client-side state (e.g., dynamic lists with add/remove). For form fields backed by loader data, prefer uncontrolled inputs with `defaultValue`.
+- **Loaders over fetchers for page data**: When a user action results in new data that fills a page, navigate with search params and handle it in the loader rather than using `useFetcher` + `useEffect` to sync state.
