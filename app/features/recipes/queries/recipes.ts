@@ -1,4 +1,5 @@
-import { query, queryOne } from "~/db/connection";
+import { DB } from "~/db/connection";
+import type { QueryFns } from "~/db/connection";
 import type { CreateRecipeInput, RecipeFilter } from "../schemas/recipe";
 
 export interface Recipe {
@@ -27,33 +28,45 @@ export interface RecipeWithDetails extends Recipe {
 }
 
 export async function createRecipe(input: CreateRecipeInput): Promise<Recipe> {
-  const recipe = await queryOne<Recipe>(
-    `INSERT INTO recipes (name, instructions, prep_time_minutes, cook_time_minutes, servings, source_url, notes)
-     VALUES ($1, $2, $3, $4, $5, $6, $7)
-     RETURNING id, name, instructions, prep_time_minutes as "prepTimeMinutes",
-               cook_time_minutes as "cookTimeMinutes", servings, source_url as "sourceUrl",
-               notes, created_at as "createdAt", updated_at as "updatedAt"`,
-    [
-      input.name,
-      input.instructions,
-      input.prepTimeMinutes,
-      input.cookTimeMinutes,
-      input.servings,
-      input.sourceUrl || null,
-      input.notes,
-    ]
-  );
+  return DB.withTransaction(async (tx) => {
+    const recipe = await tx.queryOne<Recipe>(
+      `INSERT INTO recipes (name, instructions, prep_time_minutes, cook_time_minutes, servings, source_url, notes)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       RETURNING id, name, instructions, prep_time_minutes as "prepTimeMinutes",
+                 cook_time_minutes as "cookTimeMinutes", servings, source_url as "sourceUrl",
+                 notes, created_at as "createdAt", updated_at as "updatedAt"`,
+      [
+        input.name,
+        input.instructions,
+        input.prepTimeMinutes,
+        input.cookTimeMinutes,
+        input.servings,
+        input.sourceUrl || null,
+        input.notes,
+      ]
+    );
 
-  if (!recipe) throw new Error("Failed to create recipe");
+    if (!recipe) throw new Error("Failed to create recipe");
 
-  // Insert ingredients
-  for (let i = 0; i < input.ingredients.length; i++) {
-    const ing = input.ingredients[i];
+    await insertIngredients(tx, recipe.id, input.ingredients);
+    await insertTags(tx, recipe.id, input.tags);
 
-    // Upsert ingredient with proper capitalization
+    return recipe;
+  });
+}
+
+async function insertIngredients(
+  tx: QueryFns,
+  recipeId: string,
+  ingredients: CreateRecipeInput["ingredients"]
+): Promise<void> {
+  for (let i = 0; i < ingredients.length; i++) {
+    const ing = ingredients[i];
     const trimmedName = ing.ingredientName.trim();
-    const capitalizedName = trimmedName.charAt(0).toUpperCase() + trimmedName.slice(1).toLowerCase();
-    const ingredient = await queryOne<{ id: string }>(
+    const capitalizedName =
+      trimmedName.charAt(0).toUpperCase() + trimmedName.slice(1).toLowerCase();
+
+    const ingredient = await tx.queryOne<{ id: string }>(
       `INSERT INTO ingredients (name) VALUES ($1)
        ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name
        RETURNING id`,
@@ -61,17 +74,22 @@ export async function createRecipe(input: CreateRecipeInput): Promise<Recipe> {
     );
 
     if (ingredient) {
-      await query(
+      await tx.query(
         `INSERT INTO recipe_ingredients (recipe_id, ingredient_id, quantity, unit, notes, sort_order)
          VALUES ($1, $2, $3, $4, $5, $6)`,
-        [recipe.id, ingredient.id, ing.quantity, ing.unit, ing.notes, i]
+        [recipeId, ingredient.id, ing.quantity, ing.unit, ing.notes, i]
       );
     }
   }
+}
 
-  // Insert tags
-  for (const tagName of input.tags) {
-    const tag = await queryOne<{ id: string }>(
+async function insertTags(
+  tx: QueryFns,
+  recipeId: string,
+  tags: string[]
+): Promise<void> {
+  for (const tagName of tags) {
+    const tag = await tx.queryOne<{ id: string }>(
       `INSERT INTO tags (name) VALUES ($1)
        ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name
        RETURNING id`,
@@ -79,19 +97,17 @@ export async function createRecipe(input: CreateRecipeInput): Promise<Recipe> {
     );
 
     if (tag) {
-      await query(
+      await tx.query(
         `INSERT INTO recipe_tags (recipe_id, tag_id) VALUES ($1, $2)
          ON CONFLICT DO NOTHING`,
-        [recipe.id, tag.id]
+        [recipeId, tag.id]
       );
     }
   }
-
-  return recipe;
 }
 
 export async function getRecipeById(id: string): Promise<RecipeWithDetails | null> {
-  const recipe = await queryOne<Recipe>(
+  const recipe = await DB.queryOne<Recipe>(
     `SELECT id, name, instructions, prep_time_minutes as "prepTimeMinutes",
             cook_time_minutes as "cookTimeMinutes", servings, source_url as "sourceUrl",
             notes, created_at as "createdAt", updated_at as "updatedAt"
@@ -101,7 +117,7 @@ export async function getRecipeById(id: string): Promise<RecipeWithDetails | nul
 
   if (!recipe) return null;
 
-  const ingredients = await query<{
+  const ingredients = await DB.query<{
     id: string;
     name: string;
     quantity: number | null;
@@ -117,7 +133,7 @@ export async function getRecipeById(id: string): Promise<RecipeWithDetails | nul
     [id]
   );
 
-  const tags = await query<{ id: string; name: string }>(
+  const tags = await DB.query<{ id: string; name: string }>(
     `SELECT t.id, t.name
      FROM recipe_tags rt
      JOIN tags t ON t.id = rt.tag_id
@@ -167,112 +183,76 @@ export async function listRecipes(filter?: RecipeFilter): Promise<Recipe[]> {
 
   sql += ` ORDER BY r.created_at DESC`;
 
-  return query<Recipe>(sql, params);
+  return DB.query<Recipe>(sql, params);
 }
 
 export async function updateRecipe(
   id: string,
   input: Partial<CreateRecipeInput>
 ): Promise<Recipe | null> {
-  const fields: string[] = [];
-  const values: (string | number | null)[] = [];
-  let paramIndex = 1;
+  return DB.withTransaction(async (tx) => {
+    const fields: string[] = [];
+    const values: (string | number | null)[] = [];
+    let paramIndex = 1;
 
-  if (input.name !== undefined) {
-    fields.push(`name = $${paramIndex++}`);
-    values.push(input.name);
-  }
-  if (input.instructions !== undefined) {
-    fields.push(`instructions = $${paramIndex++}`);
-    values.push(input.instructions);
-  }
-  if (input.prepTimeMinutes !== undefined) {
-    fields.push(`prep_time_minutes = $${paramIndex++}`);
-    values.push(input.prepTimeMinutes);
-  }
-  if (input.cookTimeMinutes !== undefined) {
-    fields.push(`cook_time_minutes = $${paramIndex++}`);
-    values.push(input.cookTimeMinutes);
-  }
-  if (input.servings !== undefined) {
-    fields.push(`servings = $${paramIndex++}`);
-    values.push(input.servings);
-  }
-  if (input.sourceUrl !== undefined) {
-    fields.push(`source_url = $${paramIndex++}`);
-    values.push(input.sourceUrl || null);
-  }
-  if (input.notes !== undefined) {
-    fields.push(`notes = $${paramIndex++}`);
-    values.push(input.notes);
-  }
-
-  fields.push(`updated_at = NOW()`);
-  values.push(id);
-
-  const recipe = await queryOne<Recipe>(
-    `UPDATE recipes SET ${fields.join(", ")} WHERE id = $${paramIndex}
-     RETURNING id, name, instructions, prep_time_minutes as "prepTimeMinutes",
-               cook_time_minutes as "cookTimeMinutes", servings, source_url as "sourceUrl",
-               notes, created_at as "createdAt", updated_at as "updatedAt"`,
-    values
-  );
-
-  if (!recipe) return null;
-
-  // Update ingredients if provided
-  if (input.ingredients !== undefined) {
-    await query(`DELETE FROM recipe_ingredients WHERE recipe_id = $1`, [id]);
-
-    for (let i = 0; i < input.ingredients.length; i++) {
-      const ing = input.ingredients[i];
-      // Capitalize ingredient name
-      const trimmedName = ing.ingredientName.trim();
-      const capitalizedName = trimmedName.charAt(0).toUpperCase() + trimmedName.slice(1).toLowerCase();
-      const ingredient = await queryOne<{ id: string }>(
-        `INSERT INTO ingredients (name) VALUES ($1)
-         ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name
-         RETURNING id`,
-        [capitalizedName]
-      );
-
-      if (ingredient) {
-        await query(
-          `INSERT INTO recipe_ingredients (recipe_id, ingredient_id, quantity, unit, notes, sort_order)
-           VALUES ($1, $2, $3, $4, $5, $6)`,
-          [id, ingredient.id, ing.quantity, ing.unit, ing.notes, i]
-        );
-      }
+    if (input.name !== undefined) {
+      fields.push(`name = $${paramIndex++}`);
+      values.push(input.name);
     }
-  }
-
-  // Update tags if provided
-  if (input.tags !== undefined) {
-    await query(`DELETE FROM recipe_tags WHERE recipe_id = $1`, [id]);
-
-    for (const tagName of input.tags) {
-      const tag = await queryOne<{ id: string }>(
-        `INSERT INTO tags (name) VALUES ($1)
-         ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name
-         RETURNING id`,
-        [tagName.toLowerCase().trim()]
-      );
-
-      if (tag) {
-        await query(
-          `INSERT INTO recipe_tags (recipe_id, tag_id) VALUES ($1, $2)
-           ON CONFLICT DO NOTHING`,
-          [id, tag.id]
-        );
-      }
+    if (input.instructions !== undefined) {
+      fields.push(`instructions = $${paramIndex++}`);
+      values.push(input.instructions);
     }
-  }
+    if (input.prepTimeMinutes !== undefined) {
+      fields.push(`prep_time_minutes = $${paramIndex++}`);
+      values.push(input.prepTimeMinutes);
+    }
+    if (input.cookTimeMinutes !== undefined) {
+      fields.push(`cook_time_minutes = $${paramIndex++}`);
+      values.push(input.cookTimeMinutes);
+    }
+    if (input.servings !== undefined) {
+      fields.push(`servings = $${paramIndex++}`);
+      values.push(input.servings);
+    }
+    if (input.sourceUrl !== undefined) {
+      fields.push(`source_url = $${paramIndex++}`);
+      values.push(input.sourceUrl || null);
+    }
+    if (input.notes !== undefined) {
+      fields.push(`notes = $${paramIndex++}`);
+      values.push(input.notes);
+    }
 
-  return recipe;
+    fields.push(`updated_at = NOW()`);
+    values.push(id);
+
+    const recipe = await tx.queryOne<Recipe>(
+      `UPDATE recipes SET ${fields.join(", ")} WHERE id = $${paramIndex}
+       RETURNING id, name, instructions, prep_time_minutes as "prepTimeMinutes",
+                 cook_time_minutes as "cookTimeMinutes", servings, source_url as "sourceUrl",
+                 notes, created_at as "createdAt", updated_at as "updatedAt"`,
+      values
+    );
+
+    if (!recipe) return null;
+
+    if (input.ingredients !== undefined) {
+      await tx.query(`DELETE FROM recipe_ingredients WHERE recipe_id = $1`, [id]);
+      await insertIngredients(tx, id, input.ingredients);
+    }
+
+    if (input.tags !== undefined) {
+      await tx.query(`DELETE FROM recipe_tags WHERE recipe_id = $1`, [id]);
+      await insertTags(tx, id, input.tags);
+    }
+
+    return recipe;
+  });
 }
 
 export async function deleteRecipe(id: string): Promise<boolean> {
-  const result = await query(
+  const result = await DB.query(
     `DELETE FROM recipes WHERE id = $1 RETURNING id`,
     [id]
   );
@@ -280,11 +260,11 @@ export async function deleteRecipe(id: string): Promise<boolean> {
 }
 
 export async function getAllTags(): Promise<{ id: string; name: string }[]> {
-  return query(`SELECT id, name FROM tags ORDER BY name`);
+  return DB.query(`SELECT id, name FROM tags ORDER BY name`);
 }
 
 export async function getAllIngredients(): Promise<{ id: string; name: string }[]> {
-  return query(`SELECT id, name FROM ingredients ORDER BY name`);
+  return DB.query(`SELECT id, name FROM ingredients ORDER BY name`);
 }
 
 export interface Unit {
@@ -295,11 +275,11 @@ export interface Unit {
 }
 
 export async function getAllUnits(): Promise<Unit[]> {
-  return query(`SELECT id, name, abbreviation, category FROM units ORDER BY category, name`);
+  return DB.query(`SELECT id, name, abbreviation, category FROM units ORDER BY category, name`);
 }
 
 export async function deleteRecipesByPattern(pattern: string): Promise<number> {
-  const result = await query(
+  const result = await DB.query(
     `DELETE FROM recipes WHERE name ILIKE $1 RETURNING id`,
     [`%${pattern}%`]
   );
