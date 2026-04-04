@@ -27,6 +27,8 @@ export const recipeFilterSchema = z.object({
   search: z.string().optional(),
   tags: z.array(z.string()).optional(),
   ingredientIds: z.array(z.string().uuid()).optional(),
+  page: z.number().int().positive().default(1),
+  pageSize: z.number().int().positive().max(100).default(20),
 });
 
 export type CreateRecipeInput = z.infer<typeof createRecipeSchema>;
