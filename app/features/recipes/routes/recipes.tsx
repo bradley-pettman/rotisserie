@@ -6,7 +6,7 @@ import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Badge } from "~/components/ui/badge";
-import { LayoutGrid, List, Trash2 } from "lucide-react";
+import { LayoutGrid, List, Trash2, ChevronLeft, ChevronRight } from "lucide-react";
 
 export async function loader({ request }: Route.LoaderArgs) {
   const url = new URL(request.url);
@@ -14,13 +14,24 @@ export async function loader({ request }: Route.LoaderArgs) {
   const tagsParam = url.searchParams.get("tags");
   const tags = tagsParam ? tagsParam.split(",").filter(Boolean) : undefined;
   const view = url.searchParams.get("view") || "cards";
+  const page = Math.max(1, parseInt(url.searchParams.get("page") || "1", 10) || 1);
+  const pageSize = Math.min(100, Math.max(1, parseInt(url.searchParams.get("pageSize") || "20", 10) || 20));
 
-  const [recipes, allTags] = await Promise.all([
-    listRecipes({ search, tags }),
+  const [result, allTags] = await Promise.all([
+    listRecipes({ search, tags, page, pageSize }),
     getAllTags(),
   ]);
 
-  return { recipes, allTags, filters: { search, tags }, view };
+  return {
+    recipes: result.data,
+    totalCount: result.totalCount,
+    page: result.page,
+    pageSize: result.pageSize,
+    totalPages: result.totalPages,
+    allTags,
+    filters: { search, tags },
+    view,
+  };
 }
 
 export async function action({ request }: Route.ActionArgs) {
@@ -40,7 +51,7 @@ export async function action({ request }: Route.ActionArgs) {
 }
 
 export default function RecipesPage() {
-  const { recipes, allTags, filters, view } = useLoaderData<typeof loader>();
+  const { recipes, allTags, filters, view, totalCount, page, pageSize, totalPages } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
   const navigate = useNavigate();
   const navigation = useNavigation();
@@ -65,6 +76,7 @@ export default function RecipesPage() {
       } else {
         params.delete("search");
       }
+      params.delete("page");
       navigate(`/recipes?${params.toString()}`, { replace: true });
     }, 300);
 
@@ -83,12 +95,23 @@ export default function RecipesPage() {
     } else {
       params.delete("tags");
     }
+    params.delete("page");
     navigate(`/recipes?${params.toString()}`);
   };
 
   const changeView = (newView: string) => {
     const params = new URLSearchParams(searchParams);
     params.set("view", newView);
+    navigate(`/recipes?${params.toString()}`);
+  };
+
+  const goToPage = (newPage: number) => {
+    const params = new URLSearchParams(searchParams);
+    if (newPage <= 1) {
+      params.delete("page");
+    } else {
+      params.set("page", String(newPage));
+    }
     navigate(`/recipes?${params.toString()}`);
   };
 
@@ -279,6 +302,77 @@ export default function RecipesPage() {
         </div>
       )}
       </div>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="mt-6 flex items-center justify-between" data-testid="pagination">
+          <p className="text-sm text-muted-foreground" data-testid="pagination-info">
+            Showing {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, totalCount)} of {totalCount} recipes
+          </p>
+          <div className="flex items-center gap-1">
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => goToPage(page - 1)}
+              disabled={page <= 1}
+              data-testid="pagination-prev"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            {getPageNumbers(page, totalPages).map((p, i) =>
+              p === "..." ? (
+                <span key={`ellipsis-${i}`} className="px-2 text-muted-foreground">…</span>
+              ) : (
+                <Button
+                  key={p}
+                  variant={p === page ? "default" : "outline"}
+                  size="icon"
+                  onClick={() => goToPage(p as number)}
+                  data-testid={`pagination-page-${p}`}
+                >
+                  {p}
+                </Button>
+              )
+            )}
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => goToPage(page + 1)}
+              disabled={page >= totalPages}
+              data-testid="pagination-next"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
+}
+
+function getPageNumbers(current: number, total: number): (number | "...")[] {
+  if (total <= 7) {
+    return Array.from({ length: total }, (_, i) => i + 1);
+  }
+
+  const pages: (number | "...")[] = [1];
+
+  if (current > 3) {
+    pages.push("...");
+  }
+
+  const start = Math.max(2, current - 1);
+  const end = Math.min(total - 1, current + 1);
+
+  for (let i = start; i <= end; i++) {
+    pages.push(i);
+  }
+
+  if (current < total - 2) {
+    pages.push("...");
+  }
+
+  pages.push(total);
+
+  return pages;
 }

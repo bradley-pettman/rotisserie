@@ -145,16 +145,21 @@ export async function getRecipeById(id: string): Promise<RecipeWithDetails | nul
   return { ...recipe, ingredients, tags };
 }
 
-export async function listRecipes(filter?: RecipeFilter): Promise<Recipe[]> {
-  let sql = `
-    SELECT DISTINCT r.id, r.name, r.instructions, r.prep_time_minutes as "prepTimeMinutes",
-           r.cook_time_minutes as "cookTimeMinutes", r.servings, r.source_url as "sourceUrl",
-           r.notes, r.created_at as "createdAt", r.updated_at as "updatedAt"
-    FROM recipes r
-  `;
+export interface PaginatedResult<T> {
+  data: T[];
+  totalCount: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+}
 
+export async function listRecipes(filter?: RecipeFilter): Promise<PaginatedResult<Recipe>> {
+  const page = filter?.page ?? 1;
+  const pageSize = filter?.pageSize ?? 20;
+
+  let fromClause = ` FROM recipes r`;
   const conditions: string[] = [];
-  const params: (string | string[])[] = [];
+  const params: (string | string[] | number)[] = [];
   let paramIndex = 1;
 
   if (filter?.search) {
@@ -164,26 +169,43 @@ export async function listRecipes(filter?: RecipeFilter): Promise<Recipe[]> {
   }
 
   if (filter?.tags && filter.tags.length > 0) {
-    sql += ` JOIN recipe_tags rt ON rt.recipe_id = r.id JOIN tags t ON t.id = rt.tag_id`;
+    fromClause += ` JOIN recipe_tags rt ON rt.recipe_id = r.id JOIN tags t ON t.id = rt.tag_id`;
     conditions.push(`t.name = ANY($${paramIndex})`);
     params.push(filter.tags);
     paramIndex++;
   }
 
   if (filter?.ingredientIds && filter.ingredientIds.length > 0) {
-    sql += ` JOIN recipe_ingredients ri ON ri.recipe_id = r.id`;
+    fromClause += ` JOIN recipe_ingredients ri ON ri.recipe_id = r.id`;
     conditions.push(`ri.ingredient_id = ANY($${paramIndex})`);
     params.push(filter.ingredientIds);
     paramIndex++;
   }
 
-  if (conditions.length > 0) {
-    sql += ` WHERE ${conditions.join(" AND ")}`;
-  }
+  const whereClause = conditions.length > 0 ? ` WHERE ${conditions.join(" AND ")}` : "";
 
-  sql += ` ORDER BY r.created_at DESC`;
+  const countSql = `SELECT COUNT(DISTINCT r.id) as "count"${fromClause}${whereClause}`;
+  const countResult = await DB.queryOne<{ count: string }>(countSql, params);
+  const totalCount = parseInt(countResult?.count ?? "0", 10);
 
-  return DB.query<Recipe>(sql, params);
+  const offset = (page - 1) * pageSize;
+  const dataSql = `
+    SELECT DISTINCT r.id, r.name, r.instructions, r.prep_time_minutes as "prepTimeMinutes",
+           r.cook_time_minutes as "cookTimeMinutes", r.servings, r.source_url as "sourceUrl",
+           r.notes, r.created_at as "createdAt", r.updated_at as "updatedAt"
+  ${fromClause}${whereClause}
+    ORDER BY r.created_at DESC
+    LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
+
+  const data = await DB.query<Recipe>(dataSql, [...params, pageSize, offset]);
+
+  return {
+    data,
+    totalCount,
+    page,
+    pageSize,
+    totalPages: Math.ceil(totalCount / pageSize),
+  };
 }
 
 export async function updateRecipe(
