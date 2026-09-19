@@ -196,8 +196,16 @@ export function methodNotAllowed(request: Request, allowed: string[]): Response 
   );
 }
 
-/** For GET-only endpoints: an `action` whose entire job is to answer 405 in JSON. */
-export function methodNotAllowedAction(allowed: string[]) {
+/**
+ * A whole `loader` or `action` whose only job is to answer 405 in JSON.
+ *
+ * Needed because a resource route that exports only one of the two hands the
+ * other method to React Router's internal handler, which answers with a 400
+ * carrying an error message and a full stack trace -- neither our envelope nor
+ * anything an API client should ever see. Every route in this API therefore
+ * exports both, even when one of them only exists to say "not that method".
+ */
+export function methodNotAllowedHandler(allowed: string[]) {
   return async ({ request }: { request: Request }): Promise<Response> =>
     methodNotAllowed(request, allowed);
 }
