@@ -164,6 +164,10 @@ export const UNIT_MAPPINGS: Record<string, string> = {
   'dash': 'dash',
   'dashes': 'dash',
 
+  // Count - handful
+  'handful': 'handful',
+  'handfuls': 'handful',
+
   // Count - sprig
   'sprig': 'sprig',
   'sprigs': 'sprig',
@@ -572,6 +576,70 @@ function splitNotes(name: string): { name: string; note: string | null } {
   return { name: name.trim(), note: null };
 }
 
+/**
+ * "plus" marks a compound quantity: "1 cup plus 2 tablespoons buttermilk",
+ * "2 cups flour plus more for dusting". Splitting it keeps the primary
+ * quantity and unit and moves the remainder into the notes.
+ *
+ * This is deliberately the same answer ranges already get. A single
+ * `quantity` column cannot represent "1 cup + 2 Tbsp" any more than it can
+ * represent "2 to 3", and the low-end-plus-a-note shape is the convention
+ * already in place for that, so `plus` reuses it rather than inventing a
+ * second one. Leaving the line alone is not an option: the remainder stays in
+ * `ingredientName` and upserts "plus 2 tablespoons buttermilk" into the
+ * shared `ingredients` table, which is the fragmentation this file exists to
+ * avoid.
+ *
+ * Only a whitespace-delimited "plus" separates, so an ingredient that merely
+ * contains the letters ("surplus", "pluses", a hyphenated "plus-size") is
+ * untouched. The comma'd spelling -- "kosher salt, plus more for serving" --
+ * is already handled by splitNotes and never reaches here.
+ */
+function splitCompoundPlus(text: string): { name: string; note: string | null } {
+  const words = text.split(/\s+/).filter(Boolean);
+  const index = words.findIndex((word) => word.toLowerCase() === 'plus');
+  if (index === -1) return { name: text, note: null };
+
+  const normalized = words.join(' ');
+
+  // "flour plus more for dusting": the name is everything before the word.
+  if (index > 0) {
+    return {
+      name: words.slice(0, index).join(' '),
+      note: words.slice(index).join(' '),
+    };
+  }
+
+  // "1 cup plus 2 tablespoons buttermilk": the primary unit has already been
+  // taken, so this text opens with the second measurement. Consume it and what
+  // follows is the name.
+  const { quantity, remaining } = parseQuantity(words.slice(1).join(' '));
+  if (quantity === null) return { name: text, note: null };
+
+  const after = remaining.split(/\s+/).filter(Boolean);
+
+  // 1-2 word units, as in extractUnit, and at least one word has to survive as
+  // the name. Anything short of a complete second measurement is left verbatim:
+  // a partial split would truncate the name, which is worse than not splitting.
+  for (let span = 1; span <= Math.min(2, after.length - 1); span++) {
+    if (!canonicalizeUnit(after.slice(0, span).join(' '))) continue;
+
+    // `tail` is a suffix of `normalized`, so the note is what precedes it --
+    // cut before "of" is stripped, and carrying the original spelling
+    // ("2 tablespoons", not the canonical "2 tablespoon").
+    const tail = after.slice(span).join(' ');
+    const name = stripLeadingOf(tail);
+    if (!name) break;
+
+    return {
+      name,
+      note: normalized.slice(0, normalized.length - tail.length).trim(),
+    };
+  }
+
+  return { name: text, note: null };
+}
+
 /* -------------------------------------------------------------------------- */
 /* Public API                                                                  */
 /* -------------------------------------------------------------------------- */
@@ -597,6 +665,8 @@ export type ParsedIngredient = {
  * // { quantity: 1, unit: "can", ingredientName: "diced tomatoes", notes: "14.5 ounce" }
  * parseIngredient("2 cups flour, sifted");
  * // { quantity: 2, unit: "cup", ingredientName: "flour", notes: "sifted" }
+ * parseIngredient("1 cup plus 2 tablespoons buttermilk");
+ * // { quantity: 1, unit: "cup", ingredientName: "buttermilk", notes: "plus 2 tablespoons" }
  */
 export function parseIngredient(raw: string): ParsedIngredient {
   const trimmed = raw.trim();
@@ -609,9 +679,15 @@ export function parseIngredient(raw: string): ParsedIngredient {
   const { unit, remaining: afterUnit } = extractUnit(afterQuantity);
 
   // What's left is the ingredient name, minus any trailing preparation note.
-  const { name, note } = splitNotes(afterUnit);
+  // The comma'd clauses go first: splitNotes already handles ", plus more for
+  // serving", and running it first keeps a comma off the front of the compound.
+  const { name: beforePlus, note } = splitNotes(afterUnit);
+  const { name, note: plusNote } = splitCompoundPlus(beforePlus);
 
-  const noteParts = note === null ? parentheticalNotes : [...parentheticalNotes, note];
+  // Roughly the order the notes appeared in the line.
+  const noteParts = [...parentheticalNotes, plusNote, note].filter(
+    (part): part is string => Boolean(part)
+  );
 
   return {
     quantity,

@@ -330,6 +330,8 @@ describe("canonicalizeUnit", () => {
       ["kg.", "kilogram"],
       ["g.", "gram"],
       ["ml.", "milliliter"],
+      ["handful", "handful"],
+      ["handfuls", "handful"],
     ];
 
     it.each(ADDED_SPELLINGS)('resolves "%s" to "%s"', (spelling, canonical) => {
@@ -356,6 +358,7 @@ describe("canonicalizeUnit", () => {
       "fluid ounce",
       "gallon",
       "gram",
+      "handful",
       "head",
       "jar",
       "kilogram",
@@ -602,6 +605,130 @@ describe("parseIngredient with ranges", () => {
 });
 
 /**
+ * A compound quantity gets the same treatment as a range: keep the primary
+ * quantity and unit, push the rest into the notes, because one `quantity`
+ * column can no more hold "1 cup + 2 Tbsp" than it can hold "2 to 3".
+ *
+ * Both shapes used to leave the remainder in the name — "plus 2 tablespoons
+ * buttermilk" and "flour plus more for dusting" — and that is what reached the
+ * shared `ingredients` table.
+ */
+describe('parseIngredient with compound "plus" quantities', () => {
+  it('parses "1 cup plus 2 tablespoons buttermilk"', () => {
+    const result = parseIngredient("1 cup plus 2 tablespoons buttermilk");
+    expect(result.quantity).toBe(1);
+    expect(result.unit).toBe("cup");
+    expect(result.ingredientName).toBe("buttermilk");
+    expect(result.notes).toBe("plus 2 tablespoons");
+  });
+
+  it('parses "2 cups flour plus more for dusting"', () => {
+    const result = parseIngredient("2 cups flour plus more for dusting");
+    expect(result.quantity).toBe(2);
+    expect(result.unit).toBe("cup");
+    expect(result.ingredientName).toBe("flour");
+    expect(result.notes).toBe("plus more for dusting");
+  });
+
+  it("keeps the second measurement's own spelling, and drops its preposition", () => {
+    const result = parseIngredient("1 cup plus 2 tablespoons of buttermilk");
+    expect(result.quantity).toBe(1);
+    expect(result.unit).toBe("cup");
+    expect(result.ingredientName).toBe("buttermilk");
+    expect(result.notes).toBe("plus 2 tablespoons");
+  });
+
+  it("consumes a two-word second unit", () => {
+    const result = parseIngredient("1 quart plus 8 fluid ounces chicken stock");
+    expect(result.quantity).toBe(1);
+    expect(result.unit).toBe("quart");
+    expect(result.ingredientName).toBe("chicken stock");
+    expect(result.notes).toBe("plus 8 fluid ounces");
+  });
+
+  it("splits mid-name even when no unit was matched", () => {
+    const result = parseIngredient("3 large eggs plus 1 egg yolk");
+    expect(result.quantity).toBe(3);
+    expect(result.unit).toBeNull();
+    expect(result.ingredientName).toBe("large eggs");
+    expect(result.notes).toBe("plus 1 egg yolk");
+  });
+
+  // The separator is matched case-insensitively; the note itself keeps the
+  // line's own spelling, as every other note here does.
+  it("is case-insensitive", () => {
+    const result = parseIngredient("2 cups flour Plus more for dusting");
+    expect(result.ingredientName).toBe("flour");
+    expect(result.notes).toBe("Plus more for dusting");
+  });
+
+  it("keeps a trailing comma clause alongside the compound", () => {
+    const result = parseIngredient("1 cup unsalted butter plus more for the pan, melted");
+    expect(result.unit).toBe("cup");
+    expect(result.ingredientName).toBe("unsalted butter");
+    expect(result.notes).toBe("plus more for the pan, melted");
+  });
+
+  it("keeps a parenthetical alongside the compound", () => {
+    const result = parseIngredient("1 cup (240 ml) plus 2 tablespoons buttermilk");
+    expect(result.quantity).toBe(1);
+    expect(result.unit).toBe("cup");
+    expect(result.ingredientName).toBe("buttermilk");
+    expect(result.notes).toBe("240 ml, plus 2 tablespoons");
+  });
+
+  /**
+   * The comma'd spelling is the common one and splitNotes already handled it
+   * before any of this existed; it runs first so the compound split never sees
+   * a clause with a comma stuck to the front of the name.
+   */
+  it("does not regress the comma'd spelling", () => {
+    const result = parseIngredient("1 tablespoon kosher salt, plus more for serving");
+    expect(result.quantity).toBe(1);
+    expect(result.unit).toBe("tablespoon");
+    expect(result.ingredientName).toBe("kosher salt");
+    expect(result.notes).toBe("plus more for serving");
+  });
+
+  /**
+   * Only a whitespace-delimited "plus" separates. A word that merely contains
+   * the letters, or is hyphenated onto them, is left alone — a wrong split
+   * rewrites the canonical name, the same reason splitNotes is cautious.
+   */
+  const NOT_A_SEPARATOR = [
+    ["1 cup surplus stock", "surplus stock"],
+    ["2 tablespoons plussed cream", "plussed cream"],
+    ["2 cups plus-size marshmallows", "plus-size marshmallows"],
+  ];
+
+  it.each(NOT_A_SEPARATOR)('leaves "%s" unsplit', (line, name) => {
+    const result = parseIngredient(line);
+    expect(result.ingredientName).toBe(name);
+    expect(result.notes).toBeNull();
+  });
+
+  /**
+   * A leading "plus" with no complete second measurement behind it is left
+   * verbatim: there is no way to tell where the name starts, and guessing
+   * would truncate it.
+   */
+  it("leaves an incomplete second measurement verbatim", () => {
+    const result = parseIngredient("1 cup plus more buttermilk");
+    expect(result.quantity).toBe(1);
+    expect(result.unit).toBe("cup");
+    expect(result.ingredientName).toBe("plus more buttermilk");
+    expect(result.notes).toBeNull();
+  });
+
+  it("never leaves the name empty", () => {
+    expect(parseIngredient("plus").ingredientName).toBe("plus");
+    expect(parseIngredient("1 cup plus 2 tablespoons").ingredientName).toBe(
+      "plus 2 tablespoons"
+    );
+  });
+});
+
+/**
  * "1 (14.5 ounce) can diced tomatoes" is everywhere on US sites. The
  * parenthetical sat between the quantity and the unit and blocked the unit
  * match outright. Its content is a package size, so it is captured as a note.
@@ -701,6 +828,42 @@ describe("parseIngredient with a leading unit and preposition", () => {
     expect(result.unit).toBeNull();
     expect(result.ingredientName).toBe("Offal");
     expect(result.notes).toBe("trimmed");
+  });
+});
+
+/**
+ * "A handful of fresh parsley" kept its leading words in the name, because the
+ * `of`-strip only fires once a unit has matched and `handful` was not one.
+ * Adding it to UNIT_MAPPINGS means adding it to the `units` table too — every
+ * canonical name has a seeded row, or resolveUnitId writes an `unreviewed`
+ * one — so this arrives with a seed line and a migration.
+ */
+describe("parseIngredient with handfuls", () => {
+  it('parses "A handful of fresh parsley, chopped"', () => {
+    const result = parseIngredient("A handful of fresh parsley, chopped");
+    expect(result.quantity).toBeNull();
+    expect(result.unit).toBe("handful");
+    expect(result.ingredientName).toBe("fresh parsley");
+    expect(result.notes).toBe("chopped");
+  });
+
+  it('parses "Handful of grated parmesan"', () => {
+    const result = parseIngredient("Handful of grated parmesan");
+    expect(result.quantity).toBeNull();
+    expect(result.unit).toBe("handful");
+    expect(result.ingredientName).toBe("grated parmesan");
+  });
+
+  it('parses the counted plural, "2 handfuls baby spinach"', () => {
+    const result = parseIngredient("2 handfuls baby spinach");
+    expect(result.quantity).toBe(2);
+    expect(result.unit).toBe("handful");
+    expect(result.ingredientName).toBe("baby spinach");
+  });
+
+  it("resolves both spellings to the seeded canonical name", () => {
+    expect(canonicalizeUnit("Handful")).toBe("handful");
+    expect(canonicalizeUnit("handfuls")).toBe("handful");
   });
 });
 
