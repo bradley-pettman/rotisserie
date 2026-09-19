@@ -39,20 +39,13 @@ export const action = apiRoute(async ({ request, params }: Route.ActionArgs) => 
 
   switch (request.method) {
     case "PATCH": {
-      const body = await readJsonBody(request);
-
-      if (typeof body !== "object" || body === null || Array.isArray(body)) {
-        throw jsonError(400, "Request body must be a JSON object");
-      }
-
-      // updateRecipeSchema demands `id` inside the payload (it was written for
-      // a form post that carried it in a hidden field). For this API the id is
-      // in the path, so it is merged in here rather than asked of the caller
-      // twice -- and then dropped, because updateRecipe takes it separately.
-      const { id: _fromPath, ...fields } = parseOrThrow(updateRecipeSchema, {
-        ...body,
-        id,
-      });
+      // The id is the one in the path; updateRecipeSchema no longer asks for a
+      // copy of it in the body, and `updateRecipe` takes it separately.
+      //
+      // Only the fields actually present are parsed through, so an omitted
+      // field is left alone and an explicit `null` clears it -- the two are
+      // different requests and stay different all the way to the UPDATE.
+      const fields = parseOrThrow(updateRecipeSchema, await readJsonBody(request));
 
       requireFound(await updateRecipe(id, fields), "Recipe not found");
 

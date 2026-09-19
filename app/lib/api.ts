@@ -241,6 +241,41 @@ const CLIENT_FAULT_SQLSTATES: Record<string, string> = {
 };
 
 /**
+ * `requireFound` for a WRITE: the read-first version of this check does not
+ * exist for every table, and even where it does it is a race -- the row can go
+ * away between the check and the INSERT.
+ *
+ * So run the write and let Postgres be the authority. A 23503 names the
+ * constraint it broke, which names the end of the relationship that was
+ * missing, and `notFoundByConstraint` turns that into the 404 the caller
+ * should see. Without this the generic table above would answer 400 "Request
+ * references a row that does not exist" -- true, but it blames the body for
+ * what is really an id in the path that identifies nothing.
+ *
+ * Constraint names are Postgres's own (`<table>_<column>_fkey` for the inline
+ * REFERENCES in our migrations); anything not in the map is re-thrown
+ * untouched, so an unforeseen violation still gets the generic treatment
+ * rather than a wrong 404.
+ */
+export async function requireReferences<T>(
+  operation: () => Promise<T>,
+  notFoundByConstraint: Record<string, string>
+): Promise<T> {
+  try {
+    return await operation();
+  } catch (error) {
+    const pgError = asPgError(error);
+
+    if (pgError?.code === "23503" && pgError.constraint) {
+      const message = notFoundByConstraint[pgError.constraint];
+      if (message) throw jsonError(404, message);
+    }
+
+    throw error;
+  }
+}
+
+/**
  * Wraps a loader/action so that EVERY exit is a JSON response:
  *   - a thrown Response (401/400/404 from the helpers above) is returned as-is
  *   - a caller-fault Postgres error becomes a 400

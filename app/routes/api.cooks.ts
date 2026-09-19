@@ -32,10 +32,11 @@ export const loader = apiRoute(async ({ request }: Route.LoaderArgs) => {
 /**
  * POST /api/cooks
  *
- * `label` is required by createCookSchema, so the caller always supplies the
- * name this cook is remembered by. logCook can snapshot a recipe's name for a
- * blank label, but that path is unreachable through the schema -- see the
- * report note on this.
+ * `label` is optional: omit it with a `recipeId` and logCook snapshots that
+ * recipe's current name into the cook, inside the insert's own transaction. A
+ * client holding an id and no name can therefore log a cook without reading
+ * the recipe first. Omitting both is the one combination logCook cannot serve,
+ * and createCookSchema rejects it as a 400.
  */
 export const action = apiRoute(async ({ request }: Route.ActionArgs) => {
   assertApiAccess(request);

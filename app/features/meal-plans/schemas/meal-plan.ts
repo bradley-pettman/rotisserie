@@ -38,6 +38,22 @@ export const mealPlanItemSchema = z
     path: ["customText"],
   });
 
+/**
+ * Moving an item rewrites WHEN the meal is meant to happen, and nothing else:
+ * not the recipe, not the notes, and -- deliberately -- not any cook already
+ * recorded against it, which keeps its own date.
+ *
+ * Both fields are required, with no default slot. `moveMealPlanItem` writes
+ * planned_on and meal_slot together in one UPDATE, so a body naming only the
+ * new day would have to invent a slot: defaulting it to "dinner" would quietly
+ * move a breakfast to dinner. A move states where the meal lands, in full.
+ */
+export const moveMealPlanItemSchema = z.object({
+  plannedOn: z.iso.date(),
+  mealSlot: mealSlotSchema,
+});
+
 export type MealSlot = z.infer<typeof mealSlotSchema>;
 export type CreateMealPlanInput = z.infer<typeof createMealPlanSchema>;
 export type MealPlanItemInput = z.infer<typeof mealPlanItemSchema>;
+export type MoveMealPlanItemInput = z.infer<typeof moveMealPlanItemSchema>;
