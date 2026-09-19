@@ -37,8 +37,33 @@ export default function RecipesPage() {
     setSearchTerm(filters.search ?? "");
   }, [filters.search]);
 
-  // Debounced navigation effect for live search
+  // Debounced navigation effect for live search (state -> URL).
+  //
+  // Two things here are load-bearing; neither is decoration.
+  //
+  // 1. The early return. This effect writes the URL and the effect above
+  //    writes state *from* the URL, so the pair only settles if the writer
+  //    stays quiet whenever the two already agree. Comparing `searchTerm`
+  //    against the `search` param the URL actually carries is that test, and
+  //    it is also what keeps this effect off the wire on mount: a fresh load
+  //    seeds `searchTerm` from `filters.search`, the two agree, and no timer
+  //    is ever armed. Same for a back/forward, where the sync effect lands
+  //    state on the value the URL already holds. Without it, landing on
+  //    /recipes scheduled a `replace` navigation 300ms later for a search the
+  //    user never typed.
+  //
+  // 2. `searchParams` in the dependency array. An armed timer navigates with
+  //    `replace: true`, so whatever params it captured *overwrite* the URL
+  //    when it fires. Left out of the deps, that capture went stale and the
+  //    timer silently reverted anything the user changed while it was
+  //    pending -- `view` from the toggle, `tags` from a chip. Listing it makes
+  //    every URL change tear the timer down and re-arm it against the current
+  //    params, so a timer can only ever fire with the newest snapshot, and it
+  //    merges into that rather than replacing it. Do not trim this back to
+  //    `[searchTerm]`: that is precisely the bug.
   useEffect(() => {
+    if (searchTerm === (searchParams.get("search") ?? "")) return;
+
     const timeout = setTimeout(() => {
       const params = new URLSearchParams(searchParams);
       if (searchTerm) {
@@ -50,7 +75,7 @@ export default function RecipesPage() {
     }, 300);
 
     return () => clearTimeout(timeout);
-  }, [searchTerm]);
+  }, [searchTerm, searchParams, navigate]);
 
   const toggleTag = (tagName: string) => {
     const currentTags = filters.tags || [];
