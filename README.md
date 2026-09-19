@@ -53,9 +53,27 @@ npm run dev
 npm run dev          # Start dev server (localhost:5173)
 npm run build        # Production build
 npm run typecheck    # TypeScript check
+npm run lint         # Check feature-module import boundaries (see below)
 npm run test         # Run E2E tests (Playwright)
 npm run test:ui      # Interactive E2E test UI
 npm run test:unit    # Run unit tests (Vitest)
 npm run test:unit:watch  # Unit tests in watch mode
 npm run db:seed      # (Re)load db/seeds/*.sql into $DATABASE_URL
 ```
+
+## Module boundaries
+
+Each feature module under `app/features/` is meant to stand alone — a recipe
+book with no meal planner, a planner with no recipe book. A module may import
+from `~/db/connection`, `~/components/**`, `~/lib/**` and from itself, but
+**not from a sibling feature module**. Code that links two modules belongs in
+`app/features/integrations/`, which is the one module allowed to reach into
+several.
+
+`npm run lint` enforces exactly this and nothing else — it is a single
+architectural rule, not a general lint setup. It checks resolved paths, so both
+`~/features/...` and relative `../../features/...` imports are caught.
+
+Adding a module: add its directory name to `FEATURE_MODULES` at the top of
+`eslint.config.js`. That one line walls it off from every existing module in
+both directions.
