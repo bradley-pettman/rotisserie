@@ -22,12 +22,15 @@ export type ScrapedIngredient = {
   quantity: number | null;
   unit: string | null;
   /**
-   * Always null. Schema.org gives one freeform string per ingredient with no
-   * separate notes field, and `parseIngredient` returns everything after the
-   * quantity and unit as the name — so any "…, finely chopped" tail stays in
-   * `ingredientName` rather than being split out here.
+   * Preparation notes, or null when the line carries none. Schema.org gives one
+   * freeform string per ingredient with no separate notes field, so this is
+   * whatever `parseIngredient` splits off the name: a trailing comma clause
+   * ("…, finely chopped") and/or parenthetical content ("(14.5 ounce)").
+   * Keeping it out of `ingredientName` matters because the name is upserted
+   * into the shared `ingredients` lookup table, where every prep variation
+   * would otherwise become its own row.
    */
-  notes: null;
+  notes: string | null;
 };
 
 /** A recipe draft scraped from a page, shaped to populate the new-recipe form. */
@@ -544,6 +547,18 @@ function collectInstructionSteps(value: unknown, depth = 0, out: string[] = []):
 }
 
 /**
+ * Minutes from an ISO 8601 duration field.
+ *
+ * `parseDuration`'s regex is anchored, so a value padded with whitespace (which
+ * pretty-printed JSON-LD and `datetime` attributes both produce) would otherwise
+ * be rejected outright. Trim before handing it over.
+ */
+function durationMinutes(value: unknown): number | null {
+  const raw = firstString(value);
+  return raw === null ? null : parseDuration(raw.trim());
+}
+
+/**
  * Servings from `recipeYield`, which may be a string ("4 servings", "Serves 6"),
  * a number, an array (`["4", "4 servings"]`) or a QuantitativeValue object.
  * Takes the first integer found, so both "4 servings" and "Serves 4" work.
@@ -585,15 +600,15 @@ function toScrapedRecipe(node: Record<string, unknown>, sourceUrl: string): Scra
     .map(stripHtmlInline)
     .filter((line) => line !== "")
     .map((line) => {
-      const { ingredientName, quantity, unit } = parseIngredient(line);
-      return { ingredientName, quantity, unit, notes: null };
+      const { ingredientName, quantity, unit, notes } = parseIngredient(line);
+      return { ingredientName, quantity, unit, notes };
     });
 
   return {
     name,
     instructions,
-    prepTimeMinutes: parseDuration(firstString(node["prepTime"])),
-    cookTimeMinutes: parseDuration(firstString(node["cookTime"])),
+    prepTimeMinutes: durationMinutes(node["prepTime"]),
+    cookTimeMinutes: durationMinutes(node["cookTime"]),
     servings: parseServings(node["recipeYield"]),
     sourceUrl,
     notes,
@@ -672,7 +687,7 @@ async function fetchHtml(url: string): Promise<string> {
  * const draft = await scrapeRecipe("https://example.com/banana-bread");
  * draft.name;                  // "Banana Bread"
  * draft.prepTimeMinutes;       // 15
- * draft.ingredients[0];        // { ingredientName: "ripe bananas", quantity: 3, unit: null, notes: null }
+ * draft.ingredients[0];        // { ingredientName: "ripe bananas", quantity: 3, unit: null, notes: "mashed" }
  */
 export async function scrapeRecipe(url: string): Promise<ScrapedRecipe> {
   const html = await fetchHtml(url);

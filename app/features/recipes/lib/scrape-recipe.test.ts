@@ -307,20 +307,35 @@ describe("scrapeRecipe", () => {
       const recipe = await scrapeRecipe(RECIPE_URL);
 
       expect(recipe.ingredients).toEqual([
-        { ingredientName: "ripe bananas, mashed", quantity: 3, unit: null, notes: null },
-        { ingredientName: "unsalted butter, browned", quantity: 0.5, unit: "cup", notes: null },
+        { ingredientName: "ripe bananas", quantity: 3, unit: null, notes: "mashed" },
+        { ingredientName: "unsalted butter", quantity: 0.5, unit: "cup", notes: "browned" },
         { ingredientName: "all-purpose flour", quantity: 2, unit: "cup", notes: null },
         { ingredientName: "baking soda", quantity: 1, unit: "teaspoon", notes: null },
         { ingredientName: "whole milk", quantity: 1.5, unit: "cup", notes: null },
       ]);
     });
 
-    it("leaves ingredient notes null — schema.org has no per-ingredient notes field", async () => {
+    /**
+     * Schema.org has no per-ingredient notes field, so `notes` can only come
+     * from splitting the one freeform string. It has to be split: the name is
+     * upserted into the shared `ingredients` table, so "unsalted butter,
+     * browned" would otherwise create its own row next to "unsalted butter".
+     */
+    it("splits preparation notes off the ingredient name", async () => {
       respondWith(BANANA_BREAD_HTML);
 
       const recipe = await scrapeRecipe(RECIPE_URL);
 
-      expect(recipe.ingredients.every((row) => row.notes === null)).toBe(true);
+      expect(recipe.ingredients.map((row) => row.notes)).toEqual([
+        "mashed",
+        "browned",
+        null,
+        null,
+        null,
+      ]);
+      expect(recipe.ingredients.every((row) => !row.ingredientName.includes(","))).toBe(
+        true,
+      );
     });
   });
 
@@ -350,7 +365,7 @@ describe("scrapeRecipe", () => {
 
       expect(recipe.ingredients).toEqual([
         { ingredientName: "boneless short ribs", quantity: 2, unit: "pound", notes: null },
-        { ingredientName: "garlic, halved crosswise", quantity: 1, unit: "head", notes: null },
+        { ingredientName: "garlic", quantity: 1, unit: "head", notes: "halved crosswise" },
         { ingredientName: "flat-leaf parsley", quantity: 1, unit: "bunch", notes: null },
       ]);
     });
@@ -466,6 +481,32 @@ describe("scrapeRecipe", () => {
       respondWith(jsonLdPage({ name: "Chili" }));
 
       expect((await scrapeRecipe(RECIPE_URL)).servings).toBeNull();
+    });
+  });
+
+  describe("JSON-LD: duration fields", () => {
+    it("trims whitespace-padded ISO durations before parsing them", async () => {
+      respondWith(jsonLdPage({ name: "Chili", prepTime: "  PT25M ", cookTime: "\nPT1H10M\n" }));
+
+      const recipe = await scrapeRecipe(RECIPE_URL);
+
+      expect(recipe.prepTimeMinutes).toBe(25);
+      expect(recipe.cookTimeMinutes).toBe(70);
+    });
+
+    it("returns null for a non-ISO duration rather than guessing", async () => {
+      respondWith(jsonLdPage({ name: "Chili", prepTime: "about 20 minutes" }));
+
+      expect((await scrapeRecipe(RECIPE_URL)).prepTimeMinutes).toBeNull();
+    });
+
+    it("returns null when the duration fields are absent", async () => {
+      respondWith(jsonLdPage({ name: "Chili" }));
+
+      const recipe = await scrapeRecipe(RECIPE_URL);
+
+      expect(recipe.prepTimeMinutes).toBeNull();
+      expect(recipe.cookTimeMinutes).toBeNull();
     });
   });
 
@@ -705,5 +746,132 @@ describe("stripHtml", () => {
 
   it("returns an empty string for empty input", () => {
     expect(stripHtml("")).toBe("");
+  });
+});
+
+/**
+ * The scraper hands each `recipeIngredient` line to `parseIngredient` and
+ * passes the result straight through, including the notes it splits off. These
+ * cover the wiring end to end on the shapes real sites emit.
+ */
+describe("scrapeRecipe ingredient parsing", () => {
+  it("keeps the fraction in a mixed Unicode quantity", async () => {
+    respondWith(
+      jsonLdPage({
+        name: "Sugar Cookies",
+        recipeIngredient: ["1½ cups granulated sugar", "1 ¼ teaspoons baking soda"],
+      }),
+    );
+
+    const recipe = await scrapeRecipe(RECIPE_URL);
+
+    expect(recipe.ingredients).toEqual([
+      { ingredientName: "granulated sugar", quantity: 1.5, unit: "cup", notes: null },
+      { ingredientName: "baking soda", quantity: 1.25, unit: "teaspoon", notes: null },
+    ]);
+  });
+
+  it("takes the low end of a range written with an en dash or with 'to'", async () => {
+    respondWith(
+      jsonLdPage({
+        name: "Chili Oil",
+        recipeIngredient: ["2–3 tablespoons olive oil", "1 to 2 teaspoons chili flakes"],
+      }),
+    );
+
+    const recipe = await scrapeRecipe(RECIPE_URL);
+
+    expect(recipe.ingredients).toEqual([
+      { ingredientName: "olive oil", quantity: 2, unit: "tablespoon", notes: null },
+      { ingredientName: "chili flakes", quantity: 1, unit: "teaspoon", notes: null },
+    ]);
+  });
+
+  it("reads the unit past a parenthetical package size and keeps it as a note", async () => {
+    respondWith(
+      jsonLdPage({
+        name: "Weeknight Chili",
+        recipeIngredient: [
+          "1 (14.5 ounce) can diced tomatoes",
+          "2 (15-ounce) cans black beans, drained and rinsed",
+        ],
+      }),
+    );
+
+    const recipe = await scrapeRecipe(RECIPE_URL);
+
+    expect(recipe.ingredients).toEqual([
+      {
+        ingredientName: "diced tomatoes",
+        quantity: 1,
+        unit: "can",
+        notes: "14.5 ounce",
+      },
+      {
+        ingredientName: "black beans",
+        quantity: 2,
+        unit: "can",
+        notes: "15-ounce, drained and rinsed",
+      },
+    ]);
+  });
+
+  it("drops the preposition after a leading unit word", async () => {
+    respondWith(
+      jsonLdPage({ name: "Finishing Salt", recipeIngredient: ["Pinch of flaky sea salt"] }),
+    );
+
+    const recipe = await scrapeRecipe(RECIPE_URL);
+
+    expect(recipe.ingredients).toEqual([
+      { ingredientName: "flaky sea salt", quantity: null, unit: "pinch", notes: null },
+    ]);
+  });
+
+  /**
+   * The point of the split: these four lines are one ingredient in the shared
+   * `ingredients` table, not four.
+   */
+  it("collapses prep variations of one ingredient onto a single name", async () => {
+    respondWith(
+      jsonLdPage({
+        name: "Butter Study",
+        recipeIngredient: [
+          "1 cup butter, melted",
+          "1 cup butter, softened",
+          "1 cup butter, cubed",
+          "1 cup butter",
+        ],
+      }),
+    );
+
+    const recipe = await scrapeRecipe(RECIPE_URL);
+
+    expect(new Set(recipe.ingredients.map((row) => row.ingredientName))).toEqual(
+      new Set(["butter"]),
+    );
+    expect(recipe.ingredients.map((row) => row.notes)).toEqual([
+      "melted",
+      "softened",
+      "cubed",
+      null,
+    ]);
+  });
+
+  it("leaves a name-forming clause on the ingredient name", async () => {
+    respondWith(
+      jsonLdPage({
+        name: "Pepper Salad",
+        recipeIngredient: ["1 bell pepper, red", "1 cup butter, unsalted"],
+      }),
+    );
+
+    const recipe = await scrapeRecipe(RECIPE_URL);
+
+    expect(recipe.ingredients.map((row) => row.ingredientName)).toEqual([
+      "bell pepper, red",
+      "butter, unsalted",
+    ]);
+    expect(recipe.ingredients.every((row) => row.notes === null)).toBe(true);
   });
 });
