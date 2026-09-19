@@ -76,9 +76,27 @@ class IngredientMatch:
     # "exact" on a name match, "partial" when the request was a substring of
     # the stored name or vice versa ("milk" -> "whole milk").
     kind: str
+    # EVERY row of this recipe carrying this name, first one first.
+    #
+    # A recipe may legally list the same ingredient twice -- the unique
+    # constraint on (recipe_id, ingredient_id) was dropped precisely so that
+    # "2 cups flour, divided" and "1 tbsp flour for dusting" can coexist. Being
+    # out of flour means being out of it for both, so the amount to replace is
+    # not necessarily the first row's, and an answer that silently replaces one
+    # of them is a wrong dinner rather than a visible error.
+    occurrences: tuple[tuple[float | None, str | None], ...] = ()
 
     def amount(self) -> str:
         return " ".join(p for p in (_fmt_quantity(self.quantity), self.unit or "") if p)
+
+    def amounts(self) -> list[str]:
+        return [
+            " ".join(p for p in (_fmt_quantity(q), u or "") if p) or "an unstated amount"
+            for q, u in self.occurrences
+        ]
+
+    def listed_more_than_once(self) -> bool:
+        return len(self.occurrences) > 1
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -87,6 +105,7 @@ class IngredientMatch:
             "unit": self.unit,
             "notes": self.notes,
             "match": self.kind,
+            "occurrences": [{"quantity": q, "unit": u} for q, u in self.occurrences],
         }
 
 
@@ -160,7 +179,7 @@ def find_ingredient(recipe: dict[str, Any], requested: str) -> IngredientMatch:
 
     for row in rows:
         if str(row.get("name", "")).strip().casefold() == wanted:
-            return _match(row, "exact")
+            return _match(rows, row, "exact")
 
     partial = [
         row
@@ -168,26 +187,33 @@ def find_ingredient(recipe: dict[str, Any], requested: str) -> IngredientMatch:
         if wanted in str(row.get("name", "")).casefold()
         or str(row.get("name", "")).casefold() in wanted
     ]
-    if len(partial) == 1:
-        return _match(partial[0], "partial")
-    if len(partial) > 1:
+    # Ambiguity is about NAMES, not rows. "milk" in a recipe that lists
+    # buttermilk twice matches two rows and one ingredient, and asking "did you
+    # mean buttermilk or buttermilk?" would be a nonsense question; `_match`
+    # collects both rows either way.
+    names = {str(row.get("name", "")) for row in partial}
+    if len(names) == 1:
+        return _match(rows, partial[0], "partial")
+    if len(names) > 1:
         raise IngredientLookupError(
-            "ambiguous",
-            requested,
-            recipe,
-            candidates=[str(row.get("name", "")) for row in partial],
+            "ambiguous", requested, recipe, candidates=sorted(names)
         )
 
     raise IngredientLookupError("not_in_recipe", requested, recipe)
 
 
-def _match(row: dict[str, Any], kind: str) -> IngredientMatch:
+def _match(
+    rows: list[dict[str, Any]], row: dict[str, Any], kind: str
+) -> IngredientMatch:
+    name = str(row.get("name", ""))
+    same = [r for r in rows if str(r.get("name", "")) == name]
     return IngredientMatch(
-        name=str(row.get("name", "")),
+        name=name,
         quantity=_as_float(row.get("quantity")),
         unit=row.get("unit"),
         notes=row.get("notes"),
         kind=kind,
+        occurrences=tuple((_as_float(r.get("quantity")), r.get("unit")) for r in same),
     )
 
 
@@ -448,11 +474,21 @@ def _build_request_text(context: RecipeContext, reason: str | None, max_candidat
         if match.kind != "exact"
         else ""
     )
+    # Both rows are marked in the ingredient list above; this makes sure the
+    # answer covers both rather than the first one it saw.
+    listed_twice = (
+        f"This recipe lists {match.name} {len(match.occurrences)} times "
+        f"({', '.join(match.amounts())}). They are out of it for all of them, "
+        f"so account for every one and give the total to replace.\n"
+        if match.listed_more_than_once()
+        else ""
+    )
 
     return (
         f"{context.rendered}\n\n"
         f"## THE QUESTION\n\n"
         f"{named_differently}"
+        f"{listed_twice}"
         f"They need to replace the {match.name} -- the recipe calls for {amount} "
         f"of it.\n"
         f"{reason_line}\n\n"
@@ -502,12 +538,24 @@ def verify_suggestion(
         c.name for c in answer.candidates if c.confidence not in CONFIDENCE_LEVELS
     ]
 
-    quantity_matches = (
-        answer.original_quantity is None
-        if match.quantity is None
-        else answer.original_quantity is not None
-        and abs(answer.original_quantity - match.quantity) < 1e-9
-    )
+    # With the ingredient listed once this is plain equality. With it listed
+    # twice, either row's amount or their total is a defensible answer, and
+    # flagging the total -- the most useful answer of the three -- would make
+    # this check noise rather than signal.
+    stated = [q for q, _ in match.occurrences if q is not None]
+    units = {(u or "").strip().casefold() for q, u in match.occurrences if q is not None}
+    acceptable = set(stated)
+    # Only when the rows are in the SAME unit. "2 cup" plus "3 tablespoon" does
+    # not total 5 of anything, and pretending otherwise would have the audit
+    # bless a number nobody should act on.
+    if len(stated) > 1 and len(units) == 1:
+        acceptable.add(sum(stated))
+    if match.quantity is None:
+        quantity_matches = answer.original_quantity is None
+    else:
+        quantity_matches = answer.original_quantity is not None and any(
+            abs(answer.original_quantity - q) < 1e-9 for q in acceptable
+        )
 
     return {
         "requested": context.requested,
@@ -515,6 +563,8 @@ def verify_suggestion(
         "match": match.kind,
         "recipe_quantity": match.quantity,
         "recipe_unit": match.unit,
+        "listed_more_than_once": match.listed_more_than_once(),
+        "all_amounts": match.amounts(),
         "answers_about_the_right_ingredient": claimed == target,
         "replaces_the_right_quantity": quantity_matches,
         "candidate_count": len(answer.candidates),
