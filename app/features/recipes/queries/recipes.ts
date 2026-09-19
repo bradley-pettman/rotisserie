@@ -63,15 +63,26 @@ async function insertIngredients(
 ): Promise<void> {
   for (let i = 0; i < ingredients.length; i++) {
     const ing = ingredients[i];
-    const trimmedName = ing.ingredientName.trim();
-    const capitalizedName =
-      trimmedName.charAt(0).toUpperCase() + trimmedName.slice(1).toLowerCase();
+
+    // LOWERCASE IS THE CANONICAL STORED FORM, trimmed -- the same rule
+    // `resolveUnitId` below applies to units and the same form the seeded
+    // vocabulary uses. It has to be, or ON CONFLICT (name) cannot see the
+    // seeds: capitalizing here forked a second "Allspice" row beside the
+    // seeded "allspice" on every save, leaving the shared `ingredients` table
+    // (which grocery aggregation and inventory both read) full of
+    // near-duplicate pairs and the seeded vocabulary unreachable.
+    //
+    // Nothing is lost by storing the fold: capitalization is a presentation
+    // concern, applied at render time by `capitalizeIngredientName` in
+    // ../lib/display-name. The DB additionally enforces this form with a CHECK
+    // constraint -- see migration 20260919160000.
+    const canonicalName = ing.ingredientName.trim().toLowerCase();
 
     const ingredient = await tx.queryOne<{ id: string }>(
       `INSERT INTO ingredients (name) VALUES ($1)
        ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name
        RETURNING id`,
-      [capitalizedName]
+      [canonicalName]
     );
 
     if (ingredient) {

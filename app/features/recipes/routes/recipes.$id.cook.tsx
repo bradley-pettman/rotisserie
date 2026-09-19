@@ -3,6 +3,7 @@ import { useLoaderData, Link } from "react-router";
 import type { Route } from "./+types/recipes.$id.cook";
 import { getRecipeById } from "../queries/recipes";
 import { ChevronLeft, ChevronRight, Check, ChefHat, Clock, Users, X } from "lucide-react";
+import { capitalizeIngredientName } from "../lib/display-name";
 
 export async function loader({ params }: Route.LoaderArgs) {
   const recipe = await getRecipeById(params.id);
@@ -124,7 +125,7 @@ export default function CookingModePage() {
                   key={ing.id}
                   className="flex justify-between items-center py-2 px-3 rounded-lg bg-[oklch(0.12_0.02_50)] border border-[oklch(0.25_0.03_55)]"
                 >
-                  <span className="text-cream">{ing.name}</span>
+                  <span className="text-cream">{capitalizeIngredientName(ing.name)}</span>
                   <span className="text-gold/70 text-sm font-medium">
                     {ing.quantity && `${ing.quantity}`}
                     {ing.unit && ` ${ing.unit}`}

@@ -3,21 +3,33 @@ import type { Route } from "./+types/recipes.$id";
 import { getRecipeById, deleteRecipe } from "../queries/recipes";
 import { lastCookedAt, logCook } from "../queries/cooks";
 import { createCookSchema } from "../schemas/cook";
+import { capitalizeIngredientName } from "../lib/display-name";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Badge } from "~/components/ui/badge";
 
 /**
- * `cooked_on` is a calendar day, not an instant, and comes back from pg as a
- * local-midnight Date. Formatting it here in the loader rather than in the
- * component keeps the SSR markup and the hydrated markup identical even when
- * the browser sits in a different timezone from the server.
+ * `cooked_on` is a calendar day, not an instant. The query layer now hands it
+ * over as a 'YYYY-MM-DD' string rather than a local-midnight Date, so this
+ * formats the three fields directly instead of parsing.
+ *
+ * Note what is NOT done here: `new Date("2026-09-19")` parses as UTC midnight,
+ * and rendering that in any timezone west of UTC prints the 18th -- the very
+ * off-by-one the string form exists to avoid. Date.UTC plus timeZone: "UTC"
+ * pins the formatting to the day that was actually stored.
+ *
+ * Formatting in the loader rather than the component also keeps the SSR markup
+ * and the hydrated markup identical when the browser sits in a different
+ * timezone from the server.
  */
-function formatCookedOn(date: Date): string {
-  return date.toLocaleDateString("en-US", {
+function formatCookedOn(cookedOn: string): string {
+  const [year, month, day] = cookedOn.split("-").map(Number);
+
+  return new Date(Date.UTC(year, month - 1, day)).toLocaleDateString("en-US", {
     year: "numeric",
     month: "short",
     day: "numeric",
+    timeZone: "UTC",
   });
 }
 
@@ -154,7 +166,7 @@ export default function RecipeDetailPage() {
             <ul className="space-y-2">
               {recipe.ingredients.map((ing) => (
                 <li key={ing.id} className="flex justify-between">
-                  <span>{ing.name}</span>
+                  <span>{capitalizeIngredientName(ing.name)}</span>
                   <span className="text-gray-500">
                     {ing.quantity && `${ing.quantity}`}
                     {ing.unit && ` ${ing.unit}`}

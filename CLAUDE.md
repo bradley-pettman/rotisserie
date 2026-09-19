@@ -91,8 +91,10 @@ Names follow the same split: plan items resolve names live, since an intention s
 **Tables**: recipes, ingredients, recipe_ingredients, tags, recipe_tags, units, cooks, meal_plans, meal_plan_items, cook_fulfillments
 
 **Conventions**:
-- Ingredients auto-capitalize (first letter uppercase, rest lowercase)
+- Ingredients are stored **lowercase and trimmed** — lowercase is the canonical form, matching the seeded vocabulary and `units`. Capitalization is presentation only: apply `capitalizeIngredientName` (`features/recipes/lib/display-name.ts`) at render time, never on the way into the database. Storing a capitalized name forks a duplicate of the seeded row past `ON CONFLICT (name)`; a CHECK constraint (`ingredients_name_is_canonical`) now rejects it outright
 - Tags are lowercased and trimmed
+- Units are lowercased, trimmed and folded onto a canonical spelling by `canonicalizeUnit` before the upsert
+- `NUMERIC` comes back as a **number**, not pg's default string: `app/db/connection.ts` registers one global `pg.types` parser for it. `recipe_ingredients.quantity` is the only NUMERIC column in the schema — adding one that needs arbitrary precision (money) means revisiting that override or selecting the column as `::text`
 - UUID primary keys throughout
 - DATE columns are calendar dates, not instants: select them as `to_char(col, 'YYYY-MM-DD')` and keep them as strings, or `pg` returns a Date at local midnight and the day shifts either side of UTC
 - `meal_slot` uses the same four values (`breakfast`/`lunch`/`dinner`/`snack`) in both `cooks` and `meal_plan_items`, so a cook lines up with the plan item it fulfils
