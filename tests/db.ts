@@ -34,8 +34,9 @@ const DEFAULT_DATABASE_URL =
 /**
  * Same precedence as `db/seed.mjs`: an exported DATABASE_URL wins, then a local
  * `.env`, then the compose default. CI only has to export DATABASE_URL.
- * `playwright.config.ts` hands the resolved value to the dev server it starts,
- * so the browser and the test process always talk to the same database.
+ * `playwright.config.ts` hands the resolved value to whichever server it starts
+ * — the dev server locally, the built one under CI — so the browser and the
+ * test process always talk to the same database.
  */
 function resolveDatabaseUrl(): string {
   if (!process.env.DATABASE_URL) {
@@ -154,13 +155,19 @@ export interface SweepResult {
  * Delete lookup rows the app created while the suite was running and that no
  * surviving recipe references any more.
  *
- * The app upserts an `ingredients` row (capitalized) and possibly a `units` row
- * for every ingredient line of a saved recipe, plus a `tags` row per tag. Those
- * outlive the recipe, so deleting the recipe is not enough. An unreferenced row
- * created inside the run window can only be the leftover of a recipe that has
- * just been deleted — nothing else creates one.
+ * The app upserts an `ingredients` row and possibly a `units` row for every
+ * ingredient line of a saved recipe, plus a `tags` row per tag. All three are
+ * stored folded to lowercase — capitalization is applied at render time by
+ * `capitalizeIngredientName` (app/features/recipes/lib/display-name.ts), and
+ * migration 20260919160000 enforces the stored form with a CHECK constraint.
+ * So a name typed as "Allspice" upserts onto the seeded `allspice` row instead
+ * of forking a second one, and nothing here should expect a capitalized name.
  *
- * `created_at > run.startedAt` is what keeps the seeded 218 ingredients and 32
+ * Those rows outlive the recipe, so deleting the recipe is not enough. An
+ * unreferenced row created inside the run window can only be the leftover of a
+ * recipe that has just been deleted — nothing else creates one.
+ *
+ * `created_at > run.startedAt` is what keeps the seeded 218 ingredients and 33
  * units safe: they were inserted long before the run began.
  */
 export async function sweepOrphans(run: TestRun): Promise<SweepResult> {

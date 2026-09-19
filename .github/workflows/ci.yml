@@ -40,7 +40,9 @@ jobs:
   e2e:
     name: E2E (Playwright)
     runs-on: ubuntu-latest
-    # The suite takes about a minute; this only catches a hung server or browser.
+    # The suite takes about a minute, plus a production build (a few seconds
+    # locally, allow more on a cold runner) that the E2E step now triggers.
+    # This ceiling only catches a hung build, server or browser.
     timeout-minutes: 20
 
     # A service container scoped to this job. The suite runs with `workers: 1`
@@ -64,8 +66,8 @@ jobs:
 
     env:
       # Read by dbmate, by `npm run db:seed` and by tests/db.ts, and forwarded
-      # by playwright.config.ts to the dev server it starts — so the app and the
-      # test process always talk to the same database. Format: .env.example.
+      # by playwright.config.ts to the built server it starts — so the app and
+      # the test process always talk to the same database. Format: .env.example.
       DATABASE_URL: postgres://postgres:postgres@localhost:5432/rotisserie_dev?sslmode=disable
       # INTERNAL_API_KEY is left unset on purpose: per .env.example the suite,
       # like local development, runs against an unauthenticated /api/*.
@@ -121,7 +123,20 @@ jobs:
         run: npx playwright install --with-deps chromium
 
       # GitHub sets CI=true, which is what switches playwright.config.ts to
-      # retries: 2 and forbidOnly — nothing to repeat here.
+      # retries: 2, forbidOnly, and — unlike a local run — a webServer that
+      # runs `npm run build` and serves the result with `react-router-serve`
+      # on PORT=5173 instead of starting Vite. Nothing to repeat here.
+      #
+      # That build happens inside the Playwright webServer command rather than
+      # as a step of its own, so the config is self-contained: `CI=true npm run
+      # test` builds and serves the same way on a laptop as it does here, and
+      # can never serve a stale bundle left over from an earlier step. The
+      # visible cost is that a broken production build is reported as a
+      # webServer start-up failure — the build log is in that step's output.
+      #
+      # It also means this job is what covers `npm run build` at all: `verify`
+      # typechecks but never builds, so before this the production bundle and
+      # the SSR path were not exercised by CI anywhere.
       - name: E2E tests
         run: npm run test
 
