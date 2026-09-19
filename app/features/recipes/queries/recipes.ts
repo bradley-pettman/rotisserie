@@ -74,13 +74,32 @@ async function insertIngredients(
     );
 
     if (ingredient) {
+      const unitId = await resolveUnitId(tx, ing.unit);
+
       await tx.query(
-        `INSERT INTO recipe_ingredients (recipe_id, ingredient_id, quantity, unit, notes, sort_order)
+        `INSERT INTO recipe_ingredients (recipe_id, ingredient_id, quantity, unit_id, notes, sort_order)
          VALUES ($1, $2, $3, $4, $5, $6)`,
-        [recipeId, ingredient.id, ing.quantity, ing.unit, ing.notes, i]
+        [recipeId, ingredient.id, ing.quantity, unitId, ing.notes, i]
       );
     }
   }
+}
+
+async function resolveUnitId(
+  tx: QueryFns,
+  unitName: string | null
+): Promise<string | null> {
+  const normalizedName = unitName?.trim().toLowerCase();
+  if (!normalizedName) return null;
+
+  const unit = await tx.queryOne<{ id: string }>(
+    `INSERT INTO units (name, category) VALUES ($1, 'unreviewed')
+     ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name
+     RETURNING id`,
+    [normalizedName]
+  );
+
+  return unit?.id ?? null;
 }
 
 async function insertTags(
@@ -125,9 +144,10 @@ export async function getRecipeById(id: string): Promise<RecipeWithDetails | nul
     notes: string | null;
     sortOrder: number;
   }>(
-    `SELECT i.id, i.name, ri.quantity, ri.unit, ri.notes, ri.sort_order as "sortOrder"
+    `SELECT i.id, i.name, ri.quantity, u.name as unit, ri.notes, ri.sort_order as "sortOrder"
      FROM recipe_ingredients ri
      JOIN ingredients i ON i.id = ri.ingredient_id
+     LEFT JOIN units u ON u.id = ri.unit_id
      WHERE ri.recipe_id = $1
      ORDER BY ri.sort_order`,
     [id]
@@ -146,13 +166,6 @@ export async function getRecipeById(id: string): Promise<RecipeWithDetails | nul
 }
 
 export async function listRecipes(filter?: RecipeFilter): Promise<Recipe[]> {
-  let sql = `
-    SELECT DISTINCT r.id, r.name, r.instructions, r.prep_time_minutes as "prepTimeMinutes",
-           r.cook_time_minutes as "cookTimeMinutes", r.servings, r.source_url as "sourceUrl",
-           r.notes, r.created_at as "createdAt", r.updated_at as "updatedAt"
-    FROM recipes r
-  `;
-
   const conditions: string[] = [];
   const params: (string | string[])[] = [];
   let paramIndex = 1;
@@ -164,26 +177,45 @@ export async function listRecipes(filter?: RecipeFilter): Promise<Recipe[]> {
   }
 
   if (filter?.tags && filter.tags.length > 0) {
-    sql += ` JOIN recipe_tags rt ON rt.recipe_id = r.id JOIN tags t ON t.id = rt.tag_id`;
-    conditions.push(`t.name = ANY($${paramIndex})`);
+    // All-of: the recipe must carry every selected tag.
+    conditions.push(
+      `r.id IN (
+         SELECT rt.recipe_id
+         FROM recipe_tags rt
+         JOIN tags t ON t.id = rt.tag_id
+         WHERE t.name = ANY($${paramIndex})
+         GROUP BY rt.recipe_id
+         HAVING COUNT(DISTINCT t.name) = cardinality($${paramIndex}::text[])
+       )`
+    );
     params.push(filter.tags);
     paramIndex++;
   }
 
   if (filter?.ingredientIds && filter.ingredientIds.length > 0) {
-    sql += ` JOIN recipe_ingredients ri ON ri.recipe_id = r.id`;
-    conditions.push(`ri.ingredient_id = ANY($${paramIndex})`);
+    // Any-of: the recipe must use at least one of the selected ingredients.
+    conditions.push(
+      `r.id IN (
+         SELECT ri.recipe_id
+         FROM recipe_ingredients ri
+         WHERE ri.ingredient_id = ANY($${paramIndex})
+       )`
+    );
     params.push(filter.ingredientIds);
     paramIndex++;
   }
 
-  if (conditions.length > 0) {
-    sql += ` WHERE ${conditions.join(" AND ")}`;
-  }
+  const where = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
 
-  sql += ` ORDER BY r.created_at DESC`;
-
-  return DB.query<Recipe>(sql, params);
+  return DB.query<Recipe>(
+    `SELECT r.id, r.name, r.instructions, r.prep_time_minutes as "prepTimeMinutes",
+            r.cook_time_minutes as "cookTimeMinutes", r.servings, r.source_url as "sourceUrl",
+            r.notes, r.created_at as "createdAt", r.updated_at as "updatedAt"
+     FROM recipes r
+     ${where}
+     ORDER BY r.created_at DESC`,
+    params
+  );
 }
 
 export async function updateRecipe(
@@ -276,12 +308,4 @@ export interface Unit {
 
 export async function getAllUnits(): Promise<Unit[]> {
   return DB.query(`SELECT id, name, abbreviation, category FROM units ORDER BY category, name`);
-}
-
-export async function deleteRecipesByPattern(pattern: string): Promise<number> {
-  const result = await DB.query(
-    `DELETE FROM recipes WHERE name ILIKE $1 RETURNING id`,
-    [`%${pattern}%`]
-  );
-  return result.length;
 }
