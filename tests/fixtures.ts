@@ -93,6 +93,34 @@ export async function addIngredient(
   }
 }
 
+/**
+ * Go to the recipe list and wait until React has hydrated it.
+ *
+ * The list page's search box, tag chips and view toggle are all React-driven:
+ * the server sends the markup, but until hydration attaches the listeners a
+ * click does nothing and a `fill` is worse than nothing — the input is
+ * controlled, so the first client render throws the typed value away and no
+ * debounce ever runs. Server-rendered and hydrated markup are identical, so
+ * there is no user-visible state to wait for; React's own fiber key on the
+ * host node is the signal that the page will now respond to input.
+ *
+ * This is what a `waitForTimeout` after `goto` would have been guessing at.
+ * Waiting for the real signal is both faster and not a guess: without it the
+ * "URL updates" test fails about four runs in five.
+ */
+export async function gotoRecipeList(page: Page): Promise<void> {
+  await page.goto("/recipes");
+  await expect(page.getByTestId("search-input")).toBeVisible();
+  await page.waitForFunction(
+    () => {
+      const input = document.querySelector('[data-testid="search-input"]');
+      return !!input && Object.keys(input).some((key) => key.startsWith("__reactFiber$"));
+    },
+    undefined,
+    { timeout: 10_000 }
+  );
+}
+
 const RECIPE_ID_IN_URL = /\/recipes\/([0-9a-f-]{36})(?:[/?#]|$)/;
 
 /**

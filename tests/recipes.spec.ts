@@ -7,7 +7,7 @@
  * start from the seeded ingredients/units and no recipes of ours, which is what
  * makes the list and combobox assertions below deterministic.
  */
-import { addIngredient, expect, expectComboboxFiltered, test } from "./fixtures";
+import { addIngredient, expect, expectComboboxFiltered, gotoRecipeList, test } from "./fixtures";
 
 test.describe("Rotisserie Recipe App", () => {
   test("Home page loads and has navigation links", async ({ page }) => {
@@ -122,7 +122,7 @@ test.describe("Recipe List Features", () => {
     await recipes.create(recipeName, "Test instructions", "onion");
 
     // Go to recipes list
-    await page.goto("/recipes");
+    await gotoRecipeList(page);
 
     // Verify card view is default (cards container should be visible)
     await expect(page.getByTestId("recipe-cards")).toBeVisible();
@@ -156,7 +156,7 @@ test.describe("Recipe List Features", () => {
     await recipes.createWithTag(recipeB, "Instructions B", "garlic", tag2);
 
     // Go to recipes list
-    await page.goto("/recipes");
+    await gotoRecipeList(page);
 
     // Both recipes should be visible
     await expect(page.getByText(recipeA)).toBeVisible();
@@ -281,7 +281,7 @@ test.describe("Live Search", () => {
     await recipes.create(recipe2, "Instructions for Beta", "garlic");
 
     // Go to recipes list
-    await page.goto("/recipes");
+    await gotoRecipeList(page);
 
     // Both recipes should be visible initially
     await expect(page.getByText(recipe1)).toBeVisible();
@@ -311,7 +311,7 @@ test.describe("Live Search", () => {
     await recipes.create(recipeName, "Instructions", "tomato");
 
     // Go to recipes list
-    await page.goto("/recipes");
+    await gotoRecipeList(page);
 
     // Type a search term
     await page.getByTestId("search-input").fill("Search URL");
@@ -332,7 +332,7 @@ test.describe("Live Search", () => {
     await recipes.create(recipe2, "Instructions 2", "garlic");
 
     // Go to recipes list
-    await page.goto("/recipes");
+    await gotoRecipeList(page);
 
     // Type a search term that matches only one recipe
     await page.getByTestId("search-input").fill("First");
@@ -376,7 +376,7 @@ test.describe("Live Search", () => {
     await recipes.create(recipe3, "Instructions 3", "tomato");
 
     // Go to recipes list
-    await page.goto("/recipes");
+    await gotoRecipeList(page);
 
     // First, apply tag filter
     await page.getByTestId(`tag-${tag}`).click();
