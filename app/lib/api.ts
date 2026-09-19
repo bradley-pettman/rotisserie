@@ -309,15 +309,23 @@ export function apiRoute<A extends { request: Request }>(
   };
 }
 
-/** Read a bounded positive integer out of the query string. */
-export function intSearchParam(
+export interface IntBounds {
+  min: number;
+  max: number;
+}
+
+/**
+ * The shared parse. Absent or blank yields `undefined`, which the two wrappers
+ * below then read as either "use the fallback" or "the caller said nothing" --
+ * a distinction `limit` needs and `days` does not.
+ */
+function parseIntSearchParam(
   url: URL,
   name: string,
-  fallback: number,
-  { min, max }: { min: number; max: number }
-): number {
+  { min, max }: IntBounds
+): number | undefined {
   const raw = url.searchParams.get(name);
-  if (raw === null || raw.trim() === "") return fallback;
+  if (raw === null || raw.trim() === "") return undefined;
 
   const value = Number(raw);
   if (!Number.isInteger(value) || value < min || value > max) {
@@ -327,6 +335,34 @@ export function intSearchParam(
   }
 
   return value;
+}
+
+/** Read a bounded positive integer out of the query string. */
+export function intSearchParam(
+  url: URL,
+  name: string,
+  fallback: number,
+  bounds: IntBounds
+): number {
+  return parseIntSearchParam(url, name, bounds) ?? fallback;
+}
+
+/**
+ * The same bounded integer, but with NO fallback -- absent stays `undefined`.
+ *
+ * `limit` has no honest default number: the list endpoint's historical
+ * behaviour is "every matching row", which no integer expresses. Substituting
+ * a large-looking default (1000, say) would silently truncate a longer result
+ * set and turn an unpaginated read into a lie. An out-of-range or non-integer
+ * value is still a 400 -- a missing parameter and a garbage one are different
+ * requests.
+ */
+export function optionalIntSearchParam(
+  url: URL,
+  name: string,
+  bounds: IntBounds
+): number | undefined {
+  return parseIntSearchParam(url, name, bounds);
 }
 
 /** `?tags=weeknight,vegetarian` -> ["weeknight", "vegetarian"]; absent/blank -> undefined. */
@@ -340,4 +376,30 @@ export function csvSearchParam(url: URL, name: string): string[] | undefined {
     .filter((value) => value !== "");
 
   return values.length > 0 ? values : undefined;
+}
+
+/**
+ * A CSV query parameter restricted to a known vocabulary, for opt-in response
+ * fields (`?include=lastCookedAt`). Anything outside the vocabulary is a 400
+ * naming the offending values and the ones that exist, because silently
+ * ignoring an unrecognised `include` hands the caller a response missing the
+ * field they asked for with nothing to say why.
+ */
+export function enumSearchParam(
+  url: URL,
+  name: string,
+  allowed: readonly string[]
+): string[] {
+  const values = csvSearchParam(url, name) ?? [];
+  const unknown = values.filter((value) => !allowed.includes(value));
+
+  if (unknown.length > 0) {
+    throw jsonError(
+      400,
+      `Query parameter "${name}" accepts only: ${allowed.join(", ")}`,
+      { [name]: unknown.map((value) => `Unknown value "${value}"`) }
+    );
+  }
+
+  return values;
 }

@@ -1,7 +1,12 @@
 import { DB } from "~/db/connection";
-import type { QueryFns } from "~/db/connection";
+import type { QueryFns, QueryParam } from "~/db/connection";
 import { canonicalizeUnit } from "../lib/parse-ingredient";
 import type { CreateRecipeInput, RecipeFilter } from "../schemas/recipe";
+// Same feature module (app/features/recipes/**), so the boundary rule in
+// CLAUDE.md permits this import: it only forbids reaching into a SIBLING
+// feature module or into integrations/. `cooks.ts` is the recipes module's own
+// cook log, and eslint's no-restricted-paths zones agree.
+import { lastCookedForRecipes } from "./cooks";
 
 export interface Recipe {
   id: string;
@@ -200,9 +205,96 @@ export async function getRecipeNamesByIds(ids: string[]): Promise<Map<string, st
   return new Map(rows.map((row) => [row.id, row.name]));
 }
 
-export async function listRecipes(filter?: RecipeFilter): Promise<Recipe[]> {
+/**
+ * A row in a recipe LIST, as opposed to `getRecipeById`'s `RecipeWithDetails`.
+ *
+ * It carries `tags` because tags are the axis lists are filtered and planned
+ * on: a client that can filter by `?tags=` but cannot read the tags back has
+ * to re-fetch every recipe individually just to learn what it already
+ * filtered on. It deliberately does NOT carry ingredients -- those are
+ * per-recipe detail, and nobody reads a whole page of them.
+ */
+export interface RecipeListItem extends Recipe {
+  tags: { id: string; name: string }[];
+  /**
+   * Last actually cooked, 'YYYY-MM-DD', or null for never.
+   *
+   * Present ONLY when `includeLastCookedAt` was asked for, so the field being
+   * absent means "not requested" while `null` means "never cooked" -- two
+   * different answers that must not collapse into one.
+   */
+  lastCookedAt?: string | null;
+}
+
+/**
+ * Tags for a whole page of recipes in ONE query.
+ *
+ * Deliberately not a join onto the recipe SELECT: a recipe with three tags
+ * would come back as three rows, which both inflates the payload and makes
+ * LIMIT page tag-rows instead of recipes. Batching by id list
+ * (`= ANY($1::uuid[])`, the same shape as `getRecipeNamesByIds` and
+ * `lastCookedForRecipes`) keeps the recipe query one row per recipe and costs
+ * exactly one extra round trip no matter how many recipes came back.
+ *
+ * Recipes with no tags are simply absent from the map; the caller fills in the
+ * empty array.
+ */
+async function tagsForRecipes(
+  recipeIds: string[]
+): Promise<Map<string, { id: string; name: string }[]>> {
+  const byRecipe = new Map<string, { id: string; name: string }[]>();
+  if (recipeIds.length === 0) return byRecipe;
+
+  const rows = await DB.query<{ recipeId: string; id: string; name: string }>(
+    `SELECT rt.recipe_id as "recipeId", t.id, t.name
+     FROM recipe_tags rt
+     JOIN tags t ON t.id = rt.tag_id
+     WHERE rt.recipe_id = ANY($1::uuid[])
+     ORDER BY t.name`,
+    [recipeIds]
+  );
+
+  for (const row of rows) {
+    const tags = byRecipe.get(row.recipeId);
+    if (tags) tags.push({ id: row.id, name: row.name });
+    else byRecipe.set(row.recipeId, [{ id: row.id, name: row.name }]);
+  }
+
+  return byRecipe;
+}
+
+/**
+ * Everything about a list that is NOT a filter. Pagination and field selection
+ * are transport concerns, not part of "which recipes match", which is why they
+ * are a second argument rather than extra keys on `recipeFilterSchema`.
+ */
+export interface ListRecipesOptions {
+  /**
+   * Maximum rows. OMITTED MEANS UNBOUNDED -- the historical behaviour, which
+   * the HTML recipe list still relies on to render every recipe.
+   */
+  limit?: number;
+  /** Rows to skip. Only meaningful against the stable ORDER BY below. */
+  offset?: number;
+  /**
+   * Also report each recipe's last cook date. Costs ONE extra batched query
+   * for the whole page (`lastCookedForRecipes`), never one per row, and is
+   * opt-in so the HTML list does not pay for a column it does not render.
+   */
+  includeLastCookedAt?: boolean;
+}
+
+/**
+ * TWO queries, always -- three with `includeLastCookedAt`. Never N+1:
+ * the page of recipes is fetched first, then the tags for exactly those ids in
+ * a single batched query, and the two are merged in memory.
+ */
+export async function listRecipes(
+  filter?: RecipeFilter,
+  options?: ListRecipesOptions
+): Promise<RecipeListItem[]> {
   const conditions: string[] = [];
-  const params: (string | string[])[] = [];
+  const params: QueryParam[] = [];
   let paramIndex = 1;
 
   if (filter?.search) {
@@ -242,15 +334,50 @@ export async function listRecipes(filter?: RecipeFilter): Promise<Recipe[]> {
 
   const where = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
 
-  return DB.query<Recipe>(
+  // LIMIT/OFFSET are parameterized, never interpolated, and are appended only
+  // when asked for so the default statement is byte-for-byte the one this
+  // function has always issued.
+  let paging = "";
+  if (options?.limit !== undefined) {
+    paging += ` LIMIT $${paramIndex++}`;
+    params.push(options.limit);
+  }
+  if (options?.offset !== undefined && options.offset > 0) {
+    paging += ` OFFSET $${paramIndex++}`;
+    params.push(options.offset);
+  }
+
+  // `r.id` breaks ties on created_at. Without it two recipes saved in the same
+  // millisecond order arbitrarily between statements, so a paged read could
+  // show one of them twice and the other never -- the ordering has to be a
+  // total order before OFFSET means anything.
+  const recipes = await DB.query<Recipe>(
     `SELECT r.id, r.name, r.instructions, r.prep_time_minutes as "prepTimeMinutes",
             r.cook_time_minutes as "cookTimeMinutes", r.servings, r.source_url as "sourceUrl",
             r.notes, r.created_at as "createdAt", r.updated_at as "updatedAt"
      FROM recipes r
      ${where}
-     ORDER BY r.created_at DESC`,
+     ORDER BY r.created_at DESC, r.id DESC${paging}`,
     params
   );
+
+  const ids = recipes.map((recipe) => recipe.id);
+
+  const [tagsByRecipe, lastCooked] = await Promise.all([
+    tagsForRecipes(ids),
+    options?.includeLastCookedAt
+      ? lastCookedForRecipes(ids)
+      : Promise.resolve(null),
+  ]);
+
+  return recipes.map((recipe) => ({
+    ...recipe,
+    tags: tagsByRecipe.get(recipe.id) ?? [],
+    // Spread rather than a plain assignment: when last-cooked was not asked
+    // for the key must be ABSENT, not `undefined`, so it does not serialize
+    // into the JSON body as a field the caller never requested.
+    ...(lastCooked ? { lastCookedAt: lastCooked.get(recipe.id) ?? null } : {}),
+  }));
 }
 
 export async function updateRecipe(
@@ -326,8 +453,80 @@ export async function deleteRecipe(id: string): Promise<boolean> {
   return result.length > 0;
 }
 
-export async function getAllTags(): Promise<{ id: string; name: string }[]> {
-  return DB.query(`SELECT id, name FROM tags ORDER BY name`);
+export interface TagWithUsage {
+  id: string;
+  name: string;
+  /**
+   * How many recipes carry this tag. ZERO IS THE ORPHAN MARKER: `tags` rows
+   * outlive the `recipe_tags` rows that cascade away with a deleted recipe, so
+   * a tag can sit in the vocabulary with nothing using it.
+   *
+   * It is returned here rather than left to the caller precisely so nobody has
+   * to fan out a request per tag to find out -- the same N+1 the tags on
+   * `RecipeListItem` exist to avoid.
+   */
+  recipeCount: number;
+}
+
+/**
+ * The whole tag vocabulary with its usage counts, in one query.
+ *
+ * COUNT is int8 and `pg` hands int8 back as a STRING (the global type-parser
+ * override in db/connection.ts covers NUMERIC only), so it is cast to `::int`
+ * -- the same treatment the aggregates in plan-to-cook.ts get. Without the
+ * cast `recipeCount` arrives as "0" and every `count === 0` orphan test is
+ * quietly false.
+ *
+ * LEFT JOIN, not an inner one: a tag with no recipes is exactly the row a
+ * caller cleaning up orphans is looking for, so it must not drop out.
+ */
+export async function getAllTags(): Promise<TagWithUsage[]> {
+  return DB.query<TagWithUsage>(
+    `SELECT t.id, t.name, COUNT(rt.recipe_id)::int as "recipeCount"
+     FROM tags t
+     LEFT JOIN recipe_tags rt ON rt.tag_id = t.id
+     GROUP BY t.id, t.name
+     ORDER BY t.name`
+  );
+}
+
+export type DeleteTagOutcome = "deleted" | "not-found" | "in-use";
+
+/**
+ * Delete a tag that nothing references, and REFUSE if something does.
+ *
+ * Refusing rather than cascading is the whole point. `recipe_tags.tag_id` is
+ * ON DELETE CASCADE, so an unguarded `DELETE FROM tags` would silently strip
+ * that tag off every recipe carrying it -- a vocabulary tidy-up that quietly
+ * edits recipes. The three outcomes are returned rather than thrown so the
+ * transport layer picks the status code; this module states the fact.
+ *
+ * The check and the delete share a transaction, and the tag row is taken
+ * FOR UPDATE first. That lock is what makes the check meaningful: inserting a
+ * `recipe_tags` row needs FOR KEY SHARE on its parent `tags` row, which
+ * conflicts with FOR UPDATE, so a concurrent request cannot tag a recipe
+ * between our "is it referenced?" and our DELETE.
+ */
+export async function deleteUnreferencedTag(id: string): Promise<DeleteTagOutcome> {
+  return DB.withTransaction<DeleteTagOutcome>(async (tx) => {
+    const tag = await tx.queryOne<{ id: string }>(
+      `SELECT id FROM tags WHERE id = $1 FOR UPDATE`,
+      [id]
+    );
+
+    if (!tag) return "not-found";
+
+    const referenced = await tx.queryOne<{ inUse: boolean }>(
+      `SELECT EXISTS (SELECT 1 FROM recipe_tags WHERE tag_id = $1) as "inUse"`,
+      [id]
+    );
+
+    if (referenced?.inUse) return "in-use";
+
+    await tx.query(`DELETE FROM tags WHERE id = $1`, [id]);
+
+    return "deleted";
+  });
 }
 
 export async function getAllIngredients(): Promise<{ id: string; name: string }[]> {

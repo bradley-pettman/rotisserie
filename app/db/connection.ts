@@ -84,6 +84,33 @@ async function withTransaction<T>(
   }
 }
 
+/**
+ * Liveness probe for GET /api/health.
+ *
+ * It lives here, in the module that owns the pool, rather than in the route:
+ * routes in this app hold no SQL, and "can we reach Postgres?" is not a
+ * recipes or meal-plans question, so neither feature module is its home
+ * either.
+ *
+ * It does a real round trip. A health check that only proves the Node process
+ * is running answers the easy half of the question -- the process outlives the
+ * database it cannot reach, which is exactly the failure a probe exists to
+ * catch. `SELECT 1` touches no table, so it stays cheap and does not depend on
+ * any migration having run.
+ *
+ * Returns false instead of throwing: an unreachable database is a normal,
+ * expected answer here, not an exceptional one, and the caller has to report
+ * it either way.
+ */
+export async function checkDatabase(): Promise<boolean> {
+  try {
+    await pool.query("SELECT 1");
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export const DB: DB = { query, queryOne, withTransaction };
 
 export { pool };

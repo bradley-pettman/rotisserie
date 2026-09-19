@@ -12,8 +12,18 @@ export default [
   // `action` and no default component, so they render nothing and return
   // Responses directly. Shared transport concerns (auth, envelopes, Zod
   // parsing, method dispatch) live in ~/lib/api.
+  // Liveness. First in the list because it is the one endpoint that must keep
+  // answering when everything below it cannot.
+  route("api/health", "routes/api.health.ts"),
+
   route("api/recipes", "routes/api.recipes.ts"),
   route("api/recipes/:id", "routes/api.recipes.$id.ts"),
+
+  // The tag vocabulary. Read-only as a collection -- tags come into existence
+  // by tagging a recipe -- plus a single-id DELETE for the orphans a deleted
+  // recipe leaves behind.
+  route("api/tags", "routes/api.tags.ts"),
+  route("api/tags/:id", "routes/api.tags.$id.ts"),
   route("api/cooks", "routes/api.cooks.ts"),
   route("api/cooks/:id", "routes/api.cooks.$id.ts"),
   route("api/meal-plans", "routes/api.meal-plans.ts"),
