@@ -7,7 +7,26 @@
  * start from the seeded ingredients/units and no recipes of ours, which is what
  * makes the list and combobox assertions below deterministic.
  */
-import { addIngredient, expect, expectComboboxFiltered, gotoRecipeList, test } from "./fixtures";
+import { addIngredient, expect, expectComboboxFiltered, gotoRecipeList, test, type Page } from "./fixtures";
+
+/**
+ * The live-search debounce in app/features/recipes/routes/recipes.tsx. Keep in
+ * step with the `setTimeout` there.
+ */
+const SEARCH_DEBOUNCE_MS = 300;
+
+/**
+ * Sit out the live-search debounce and then some.
+ *
+ * A fixed wait is normally a smell, but here the thing under test *is* a
+ * timer: the two tests below assert that a URL param is still there once the
+ * debounce window the page opened has definitely closed. There is no event to
+ * wait for — a passing run is precisely the one where nothing happens — so the
+ * only honest signal is the clock. Twice the debounce plus a margin.
+ */
+async function outlastSearchDebounce(page: Page): Promise<void> {
+  await page.waitForTimeout(SEARCH_DEBOUNCE_MS * 2 + 200);
+}
 
 test.describe("Rotisserie Recipe App", () => {
   test("Home page loads and has navigation links", async ({ page }) => {
@@ -178,6 +197,73 @@ test.describe("Recipe List Features", () => {
     // Both recipes should be visible again
     await expect(page.getByText(recipeA)).toBeVisible();
     await expect(page.getByText(recipeB)).toBeVisible();
+  });
+
+  /**
+   * Regression: the live-search debounce must not overwrite `view`.
+   *
+   * The list arms a debounced `replace: true` navigation for live search. The
+   * defect was that it armed one on *mount* -- before a single keystroke --
+   * and built that navigation's URL from the params captured when it was
+   * armed. Anything the user changed inside the window was therefore applied,
+   * rendered, and then silently reverted ~300ms later to whatever the mount
+   * had captured, which on a cold load is the bare `/recipes`.
+   *
+   * Hence the shape here: click as early as the page allows -- `gotoRecipeList`
+   * returns the moment the toggle is hydrated, which is also the moment the
+   * mount timer used to start running -- then wait the window out and re-read
+   * the URL. The "Toggle between card and table view" test above trips over
+   * the same defect, but only when the timer happens to land between its two
+   * clicks, which is why it failed roughly four runs in five instead of five.
+   */
+  test("View toggle survives the live-search debounce window", async ({ page, recipes }) => {
+    const recipeName = recipes.name("Debounce View Test");
+    await recipes.create(recipeName, "Test instructions", "onion");
+
+    await gotoRecipeList(page);
+
+    // Click the instant the list is interactive: inside the debounce window.
+    await page.getByTestId("view-table").click();
+    await expect(page).toHaveURL(/view=table/);
+    await expect(page.getByTestId("recipe-table")).toBeVisible();
+
+    await outlastSearchDebounce(page);
+
+    // Nothing was ever typed, so nothing was allowed to navigate: the click
+    // stands, and no `search` param was invented on the user's behalf.
+    await expect(page).toHaveURL(/view=table/);
+    expect(new URL(page.url()).searchParams.has("search")).toBe(false);
+    await expect(page.getByTestId("recipe-table")).toBeVisible();
+    await expect(page.getByRole("cell", { name: recipeName })).toBeVisible();
+  });
+
+  /**
+   * The same defect reached the tag chips, by the same route: one debounced
+   * `replace: true` navigation carrying a stale copy of the params overwrites
+   * whichever one the click had just set. Asserted on the rendered list as
+   * well as the URL, because a reverted `tags` param silently puts the
+   * filtered-out recipes back on screen.
+   */
+  test("Tag filter survives the live-search debounce window", async ({ page, recipes }) => {
+    const tag = recipes.tag("debouncetag");
+    const tagged = recipes.name("Debounce Tagged");
+    const untagged = recipes.name("Debounce Untagged");
+
+    await recipes.createWithTag(tagged, "Instructions tagged", "onion", tag);
+    await recipes.create(untagged, "Instructions untagged", "garlic");
+
+    await gotoRecipeList(page);
+
+    // Again, clicked inside the window the mount used to open.
+    await page.getByTestId(`tag-${tag}`).click();
+    await expect(page).toHaveURL(new RegExp(`tags=${tag}`));
+    await expect(page.getByText(untagged, { exact: true })).not.toBeVisible();
+
+    await outlastSearchDebounce(page);
+
+    await expect(page).toHaveURL(new RegExp(`tags=${tag}`));
+    await expect(page.getByText(tagged, { exact: true })).toBeVisible();
+    await expect(page.getByText(untagged, { exact: true })).not.toBeVisible();
   });
 });
 
