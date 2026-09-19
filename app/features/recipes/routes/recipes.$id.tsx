@@ -1,9 +1,33 @@
 import { useLoaderData, Link, Form, redirect } from "react-router";
 import type { Route } from "./+types/recipes.$id";
 import { getRecipeById, deleteRecipe } from "../queries/recipes";
+import { lastCookedAt, logCook } from "../queries/cooks";
+import { createCookSchema } from "../schemas/cook";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Badge } from "~/components/ui/badge";
+
+/**
+ * `cooked_on` is a calendar day, not an instant, and comes back from pg as a
+ * local-midnight Date. Formatting it here in the loader rather than in the
+ * component keeps the SSR markup and the hydrated markup identical even when
+ * the browser sits in a different timezone from the server.
+ */
+function formatCookedOn(date: Date): string {
+  return date.toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+}
+
+/** Today as YYYY-MM-DD in the server's local time -- not toISOString(), which is UTC. */
+function todayIso(): string {
+  const now = new Date();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${now.getFullYear()}-${month}-${day}`;
+}
 
 export async function loader({ params }: Route.LoaderArgs) {
   const recipe = await getRecipeById(params.id);
@@ -12,7 +36,9 @@ export async function loader({ params }: Route.LoaderArgs) {
     throw new Response("Recipe not found", { status: 404 });
   }
 
-  return { recipe };
+  const lastCooked = await lastCookedAt(recipe.id);
+
+  return { recipe, lastCooked: lastCooked ? formatCookedOn(lastCooked) : null };
 }
 
 export async function action({ params, request }: Route.ActionArgs) {
@@ -24,11 +50,40 @@ export async function action({ params, request }: Route.ActionArgs) {
     return redirect("/recipes");
   }
 
+  if (intent === "log-cook") {
+    const recipe = await getRecipeById(params.id);
+
+    if (!recipe) {
+      throw new Response("Recipe not found", { status: 404 });
+    }
+
+    // The day is resolved here rather than posted from a hidden field, so a
+    // page left open overnight still logs the day the button was pressed.
+    // `label` snapshots the recipe's name as it reads right now -- renaming or
+    // deleting the recipe later must not rewrite this cook.
+    const result = createCookSchema.safeParse({
+      recipeId: recipe.id,
+      label: recipe.name,
+      cookedOn: todayIso(),
+      servingsMade: null,
+      notes: null,
+    });
+
+    if (!result.success) {
+      throw new Response("Could not log this cook", { status: 400 });
+    }
+
+    await logCook(result.data);
+
+    // Redirect rather than returning, so a refresh does not log a second cook.
+    return redirect(`/recipes/${recipe.id}`);
+  }
+
   return null;
 }
 
 export default function RecipeDetailPage() {
-  const { recipe } = useLoaderData<typeof loader>();
+  const { recipe, lastCooked } = useLoaderData<typeof loader>();
 
   const totalTime = (recipe.prepTimeMinutes || 0) + (recipe.cookTimeMinutes || 0);
 
@@ -60,12 +115,19 @@ export default function RecipeDetailPage() {
         </div>
       </div>
 
-      {/* Time and Servings */}
-      <div className="flex gap-6 mb-6 text-sm text-gray-600">
+      {/* Time, Servings and Cook History */}
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-2 mb-6 text-sm text-gray-600">
         {recipe.prepTimeMinutes && <span>Prep: {recipe.prepTimeMinutes} min</span>}
         {recipe.cookTimeMinutes && <span>Cook: {recipe.cookTimeMinutes} min</span>}
         {totalTime > 0 && <span className="font-medium">Total: {totalTime} min</span>}
         {recipe.servings && <span>Servings: {recipe.servings}</span>}
+        <span>{lastCooked ? `Last cooked: ${lastCooked}` : "Never cooked"}</span>
+        <Form method="post">
+          <input type="hidden" name="intent" value="log-cook" />
+          <Button type="submit" variant="outline" size="sm">
+            Log a cook
+          </Button>
+        </Form>
       </div>
 
       {recipe.sourceUrl && (
