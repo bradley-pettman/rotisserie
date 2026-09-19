@@ -7,39 +7,60 @@
  * punctuated forms) onto its canonical singular name. The canonical names are
  * exactly the names seeded into the `units` table, so anything this table maps
  * resolves to a pre-existing row rather than creating a near-duplicate.
+ *
+ * Convention: every abbreviated spelling also gets a trailing-period form
+ * ("tbsp" and "tbsp."), since recipe text punctuates abbreviations freely and
+ * an unmapped spelling would otherwise land in `units` as an `unreviewed` row.
  */
 export const UNIT_MAPPINGS: Record<string, string> = {
   // Volume - cups
   'cup': 'cup',
   'cups': 'cup',
   'c': 'cup',
+  'c.': 'cup',
 
   // Volume - tablespoons
+  // NOTE: no 't' key. Traditional recipe convention is T = tablespoon and
+  // t = teaspoon, but lookups here are deliberately case-insensitive (scraped
+  // text capitalizes arbitrarily), so a single 't' cannot be disambiguated.
+  // Leaving it unresolved (-> `unreviewed`, visibly wrong) is far safer than
+  // silently tripling a teaspoon into a tablespoon in the database.
   'tablespoon': 'tablespoon',
   'tablespoons': 'tablespoon',
   'tbsp': 'tablespoon',
+  'tbsp.': 'tablespoon',
   'tbsps': 'tablespoon',
+  'tbsps.': 'tablespoon',
   'tbs': 'tablespoon',
-  't': 'tablespoon',
+  'tbs.': 'tablespoon',
 
   // Volume - teaspoons
   'teaspoon': 'teaspoon',
   'teaspoons': 'teaspoon',
   'tsp': 'teaspoon',
+  'tsp.': 'teaspoon',
   'tsps': 'teaspoon',
+  'tsps.': 'teaspoon',
 
   // Volume - fluid ounces
   'fluid ounce': 'fluid ounce',
   'fluid ounces': 'fluid ounce',
+  'fluid oz': 'fluid ounce',
+  'fluid oz.': 'fluid ounce',
   'fl oz': 'fluid ounce',
+  'fl oz.': 'fluid ounce',
   'fl. oz': 'fluid ounce',
   'fl. oz.': 'fluid ounce',
+  'floz': 'fluid ounce',
+  'floz.': 'fluid ounce',
 
   // Volume - milliliters
   'milliliter': 'milliliter',
   'milliliters': 'milliliter',
   'ml': 'milliliter',
+  'ml.': 'milliliter',
   'mls': 'milliliter',
+  'mls.': 'milliliter',
 
   // Volume - liters
   'liter': 'liter',
@@ -47,31 +68,39 @@ export const UNIT_MAPPINGS: Record<string, string> = {
   'litre': 'liter',
   'litres': 'liter',
   'l': 'liter',
+  'l.': 'liter',
 
   // Volume - pints
   'pint': 'pint',
   'pints': 'pint',
   'pt': 'pint',
+  'pt.': 'pint',
   'pts': 'pint',
+  'pts.': 'pint',
 
   // Volume - quarts
   'quart': 'quart',
   'quarts': 'quart',
   'qt': 'quart',
+  'qt.': 'quart',
   'qts': 'quart',
+  'qts.': 'quart',
 
   // Volume - gallons
   'gallon': 'gallon',
   'gallons': 'gallon',
   'gal': 'gallon',
+  'gal.': 'gallon',
   'gals': 'gallon',
+  'gals.': 'gallon',
 
   // Weight - ounces
   'ounce': 'ounce',
   'ounces': 'ounce',
   'oz': 'ounce',
-  'ozs': 'ounce',
   'oz.': 'ounce',
+  'ozs': 'ounce',
+  'ozs.': 'ounce',
 
   // Weight - pounds
   'pound': 'pound',
@@ -84,15 +113,22 @@ export const UNIT_MAPPINGS: Record<string, string> = {
   // Weight - grams
   'gram': 'gram',
   'grams': 'gram',
+  'gramme': 'gram',
+  'grammes': 'gram',
   'g': 'gram',
+  'g.': 'gram',
   'gs': 'gram',
+  'gs.': 'gram',
   'gr': 'gram',
+  'gr.': 'gram',
 
   // Weight - kilograms
   'kilogram': 'kilogram',
   'kilograms': 'kilogram',
   'kg': 'kilogram',
+  'kg.': 'kilogram',
   'kgs': 'kilogram',
+  'kgs.': 'kilogram',
   'kilo': 'kilogram',
   'kilos': 'kilogram',
 
@@ -100,7 +136,9 @@ export const UNIT_MAPPINGS: Record<string, string> = {
   'piece': 'piece',
   'pieces': 'piece',
   'pc': 'piece',
+  'pc.': 'piece',
   'pcs': 'piece',
+  'pcs.': 'piece',
 
   // Count - whole
   'whole': 'whole',
@@ -145,12 +183,20 @@ export const UNIT_MAPPINGS: Record<string, string> = {
   // Container - can
   'can': 'can',
   'cans': 'can',
+  'tin': 'can',
+  'tins': 'can',
 
   // Container - package
   'package': 'package',
   'packages': 'package',
+  'packet': 'package',
+  'packets': 'package',
   'pkg': 'package',
+  'pkg.': 'package',
   'pkgs': 'package',
+  'pkgs.': 'package',
+  'pkt': 'package',
+  'pkt.': 'package',
 
   // Container - jar
   'jar': 'jar',
