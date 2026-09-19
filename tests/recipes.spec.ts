@@ -270,44 +270,6 @@ test.describe("Recipe List Features", () => {
     await expect(page.getByText(`Recipe A ${timestamp}`)).toBeVisible();
     await expect(page.getByText(`Recipe B ${timestamp}`)).toBeVisible();
   });
-
-  test("Test recipe cleanup panel", async ({ page }) => {
-    const timestamp = Date.now();
-    const testPattern = `Cleanup Test ${timestamp}`;
-
-    // Create test recipes to clean up
-    await createRecipe(page, `${testPattern} 1`, "Instructions 1", "onion");
-    await createRecipe(page, `${testPattern} 2`, "Instructions 2", "garlic");
-    await createRecipe(page, `Other Recipe ${timestamp}`, "Other instructions", "tomato");
-
-    // Go to recipes list
-    await page.goto("/recipes");
-
-    // Verify all recipes are visible
-    await expect(page.getByText(`${testPattern} 1`)).toBeVisible();
-    await expect(page.getByText(`${testPattern} 2`)).toBeVisible();
-    await expect(page.getByText(`Other Recipe ${timestamp}`)).toBeVisible();
-
-    // Click cleanup toggle button
-    await page.getByTestId("cleanup-toggle").click();
-
-    // Verify cleanup panel is visible
-    await expect(page.getByTestId("cleanup-panel")).toBeVisible();
-
-    // Enter the pattern to delete
-    await page.getByTestId("cleanup-pattern").fill(testPattern);
-
-    // Click delete button
-    await page.getByTestId("cleanup-submit").click();
-
-    // Wait for the action to complete
-    await expect(page.getByTestId("cleanup-success")).toBeVisible();
-
-    // Verify cleanup recipes are gone but other recipe remains
-    await expect(page.getByText(`${testPattern} 1`)).not.toBeVisible();
-    await expect(page.getByText(`${testPattern} 2`)).not.toBeVisible();
-    await expect(page.getByText(`Other Recipe ${timestamp}`)).toBeVisible();
-  });
 });
 
 test.describe("Ingredient and Unit Comboboxes", () => {

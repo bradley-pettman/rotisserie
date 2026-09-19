@@ -1,12 +1,12 @@
-import { useState, useEffect, useCallback } from "react";
-import { data, Form, useLoaderData, useActionData, Link, useNavigate, useSearchParams, useNavigation } from "react-router";
+import { useState, useEffect } from "react";
+import { Form, useLoaderData, Link, useNavigate, useSearchParams, useNavigation } from "react-router";
 import type { Route } from "./+types/recipes";
-import { listRecipes, getAllTags, deleteRecipesByPattern } from "../queries/recipes";
+import { listRecipes, getAllTags } from "../queries/recipes";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Badge } from "~/components/ui/badge";
-import { LayoutGrid, List, Trash2 } from "lucide-react";
+import { LayoutGrid, List } from "lucide-react";
 
 export async function loader({ request }: Route.LoaderArgs) {
   const url = new URL(request.url);
@@ -23,30 +23,11 @@ export async function loader({ request }: Route.LoaderArgs) {
   return { recipes, allTags, filters: { search, tags }, view };
 }
 
-export async function action({ request }: Route.ActionArgs) {
-  const formData = await request.formData();
-  const intent = formData.get("intent");
-
-  if (intent === "cleanup-test-recipes") {
-    const pattern = formData.get("pattern") as string;
-    if (pattern && pattern.length >= 3) {
-      const deletedCount = await deleteRecipesByPattern(pattern);
-      return { success: true, deletedCount };
-    }
-    return data({ error: "Pattern must be at least 3 characters" }, { status: 400 });
-  }
-
-  return data({ error: "Unknown action" }, { status: 400 });
-}
-
 export default function RecipesPage() {
   const { recipes, allTags, filters, view } = useLoaderData<typeof loader>();
-  const actionData = useActionData<typeof action>();
   const navigate = useNavigate();
   const navigation = useNavigation();
   const [searchParams] = useSearchParams();
-  const [showCleanup, setShowCleanup] = useState(false);
-  const [cleanupPattern, setCleanupPattern] = useState("Test Recipe");
   const [searchTerm, setSearchTerm] = useState(filters.search ?? "");
 
   const isSearching = navigation.state === "loading";
@@ -96,55 +77,10 @@ export default function RecipesPage() {
     <div className="container mx-auto p-6">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold">Recipes</h1>
-        <div className="flex items-center gap-2">
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            onClick={() => setShowCleanup(!showCleanup)}
-            title="Clean up test recipes"
-            data-testid="cleanup-toggle"
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
-          <Link to="/recipes/new">
-            <Button>Add Recipe</Button>
-          </Link>
-        </div>
+        <Link to="/recipes/new">
+          <Button>Add Recipe</Button>
+        </Link>
       </div>
-
-      {/* Cleanup Panel */}
-      {showCleanup && (
-        <div className="mb-6 p-4 bg-muted rounded-lg border" data-testid="cleanup-panel">
-          <h3 className="font-semibold mb-2">Clean Up Test Recipes</h3>
-          <p className="text-sm text-muted-foreground mb-3">
-            Delete all recipes matching a pattern. Use with caution.
-          </p>
-          <Form method="post" className="flex gap-2 items-end">
-            <input type="hidden" name="intent" value="cleanup-test-recipes" />
-            <div className="flex-1">
-              <Input
-                name="pattern"
-                value={cleanupPattern}
-                onChange={(e) => setCleanupPattern(e.target.value)}
-                placeholder="Pattern to match (e.g., Test Recipe)"
-                data-testid="cleanup-pattern"
-              />
-            </div>
-            <Button type="submit" variant="destructive" data-testid="cleanup-submit">
-              Delete Matching
-            </Button>
-          </Form>
-          {actionData && "deletedCount" in actionData && (
-            <p className="mt-2 text-sm text-green-600" data-testid="cleanup-success">
-              Deleted {actionData.deletedCount} recipe(s)
-            </p>
-          )}
-          {actionData && "error" in actionData && (
-            <p className="mt-2 text-sm text-red-600" data-testid="cleanup-error">{actionData.error}</p>
-          )}
-        </div>
-      )}
 
       {/* Search and Filter */}
       <Form method="get" className="mb-6">
