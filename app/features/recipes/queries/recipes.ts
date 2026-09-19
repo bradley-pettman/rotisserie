@@ -1,5 +1,6 @@
 import { DB } from "~/db/connection";
 import type { QueryFns } from "~/db/connection";
+import { canonicalizeUnit } from "../lib/parse-ingredient";
 import type { CreateRecipeInput, RecipeFilter } from "../schemas/recipe";
 
 export interface Recipe {
@@ -92,11 +93,17 @@ async function resolveUnitId(
   const normalizedName = unitName?.trim().toLowerCase();
   if (!normalizedName) return null;
 
+  // Fold known spellings ("Cups", "tbsp", "lbs.", "fl oz") onto the canonical
+  // seeded name so the upsert below hits the existing `units` row via
+  // ON CONFLICT (name) instead of creating a near-duplicate. Unrecognized units
+  // ("glug") fall through unchanged and are still recorded as `unreviewed`.
+  const resolvedName = canonicalizeUnit(normalizedName) ?? normalizedName;
+
   const unit = await tx.queryOne<{ id: string }>(
     `INSERT INTO units (name, category) VALUES ($1, 'unreviewed')
      ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name
      RETURNING id`,
-    [normalizedName]
+    [resolvedName]
   );
 
   return unit?.id ?? null;

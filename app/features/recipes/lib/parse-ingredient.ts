@@ -2,8 +2,13 @@
  * Parse ingredient strings into structured data
  */
 
-// Build static lookup maps for unit matching
-const UNIT_MAPPINGS: Record<string, string> = {
+/**
+ * Static lookup of every spelling we accept for a unit (plurals, abbreviations,
+ * punctuated forms) onto its canonical singular name. The canonical names are
+ * exactly the names seeded into the `units` table, so anything this table maps
+ * resolves to a pre-existing row rather than creating a near-duplicate.
+ */
+export const UNIT_MAPPINGS: Record<string, string> = {
   // Volume - cups
   'cup': 'cup',
   'cups': 'cup',
@@ -172,6 +177,28 @@ const UNIT_MAPPINGS: Record<string, string> = {
   'cubes': 'cube',
 };
 
+/**
+ * Normalize a free-typed unit spelling onto its canonical name.
+ *
+ * Lowercases and trims the input, then looks it up in UNIT_MAPPINGS. Returns
+ * the canonical singular name (e.g. "Cups" -> "cup", " TBSP " -> "tablespoon")
+ * or null when the input is blank or is not a spelling we recognize.
+ */
+export function canonicalizeUnit(raw: string): string | null {
+  if (!raw) return null;
+
+  const normalized = raw.trim().toLowerCase();
+  if (!normalized) return null;
+
+  // Own-property check: a bare index would otherwise resolve inherited
+  // Object.prototype members ("constructor", "toString", ...) to non-units.
+  if (!Object.prototype.hasOwnProperty.call(UNIT_MAPPINGS, normalized)) {
+    return null;
+  }
+
+  return UNIT_MAPPINGS[normalized];
+}
+
 // Unicode fraction mappings
 const UNICODE_FRACTIONS: Record<string, number> = {
   '½': 0.5,
@@ -257,20 +284,20 @@ function extractUnit(input: string): { unit: string | null; remaining: string } 
 
   // Try matching 1-2 word units (e.g., "fluid ounce")
   for (let i = 0; i < Math.min(2, words.length); i++) {
-    const possibleUnit = words.slice(0, i + 1).join(' ').toLowerCase();
+    const canonical = canonicalizeUnit(words.slice(0, i + 1).join(' '));
 
-    if (UNIT_MAPPINGS[possibleUnit]) {
+    if (canonical) {
       const remaining = words.slice(i + 1).join(' ').trim();
-      return { unit: UNIT_MAPPINGS[possibleUnit], remaining };
+      return { unit: canonical, remaining };
     }
   }
 
   // Special case: if the first word is "a" or "an", skip it and try again
   if (words.length > 1 && (words[0].toLowerCase() === 'a' || words[0].toLowerCase() === 'an')) {
-    const possibleUnit = words[1].toLowerCase();
-    if (UNIT_MAPPINGS[possibleUnit]) {
+    const canonical = canonicalizeUnit(words[1]);
+    if (canonical) {
       const remaining = words.slice(2).join(' ').trim();
-      return { unit: UNIT_MAPPINGS[possibleUnit], remaining };
+      return { unit: canonical, remaining };
     }
   }
 

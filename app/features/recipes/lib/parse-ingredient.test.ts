@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { parseIngredient } from "~/features/recipes/lib/parse-ingredient";
+import {
+  canonicalizeUnit,
+  parseIngredient,
+  UNIT_MAPPINGS,
+} from "~/features/recipes/lib/parse-ingredient";
 
 /**
  * Every assertion in the "specified behaviour" block below is a direct
@@ -159,5 +163,51 @@ describe("parseIngredient", () => {
       expect(result.unit).toBe("cup");
       expect(result.ingredientName).toBe("oats");
     });
+  });
+});
+
+describe("canonicalizeUnit", () => {
+  it("normalizes case and plurals", () => {
+    expect(canonicalizeUnit("Cups")).toBe("cup");
+  });
+
+  it("trims surrounding whitespace and normalizes abbreviations", () => {
+    expect(canonicalizeUnit("  TBSP ")).toBe("tablespoon");
+  });
+
+  it("handles punctuated abbreviations", () => {
+    expect(canonicalizeUnit("lbs.")).toBe("pound");
+  });
+
+  it("handles multi-word units", () => {
+    expect(canonicalizeUnit("fl oz")).toBe("fluid ounce");
+  });
+
+  it("returns null for an unknown unit", () => {
+    expect(canonicalizeUnit("glug")).toBeNull();
+  });
+
+  it("returns null for an empty string", () => {
+    expect(canonicalizeUnit("")).toBeNull();
+  });
+
+  it("returns null for a whitespace-only string", () => {
+    expect(canonicalizeUnit("   ")).toBeNull();
+  });
+
+  it("passes canonical names through unchanged", () => {
+    expect(canonicalizeUnit("cup")).toBe("cup");
+    expect(canonicalizeUnit("fluid ounce")).toBe("fluid ounce");
+  });
+
+  it("does not resolve inherited Object properties to a unit", () => {
+    expect(canonicalizeUnit("constructor")).toBeNull();
+    expect(canonicalizeUnit("toString")).toBeNull();
+  });
+
+  it("maps every spelling onto a canonical name that is itself a key", () => {
+    for (const canonical of Object.values(UNIT_MAPPINGS)) {
+      expect(canonicalizeUnit(canonical)).toBe(canonical);
+    }
   });
 });
