@@ -172,6 +172,23 @@ export async function getRecipeById(id: string): Promise<RecipeWithDetails | nul
   return { ...recipe, ingredients, tags };
 }
 
+/**
+ * Batched name lookup for callers holding a list of recipe ids -- one query
+ * for the whole list, never a `getRecipeById` per id. Ids that match nothing
+ * (a recipe deleted since the caller read them) are simply absent from the
+ * map, which is how callers tell "gone" from "never had a recipe".
+ */
+export async function getRecipeNamesByIds(ids: string[]): Promise<Map<string, string>> {
+  if (ids.length === 0) return new Map();
+
+  const rows = await DB.query<{ id: string; name: string }>(
+    `SELECT id, name FROM recipes WHERE id = ANY($1::uuid[])`,
+    [ids]
+  );
+
+  return new Map(rows.map((row) => [row.id, row.name]));
+}
+
 export async function listRecipes(filter?: RecipeFilter): Promise<Recipe[]> {
   const conditions: string[] = [];
   const params: (string | string[])[] = [];
