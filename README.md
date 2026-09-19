@@ -26,7 +26,7 @@ A family-focused meal planning and recipe management application that connects r
 | Styling | Tailwind CSS + shadcn/ui |
 | Database | PostgreSQL |
 | Data Layer | Raw SQL (pg) + Zod validation |
-| Testing | Playwright |
+| Testing | Playwright (E2E) + Vitest (unit) |
 
 ## Getting Started
 
@@ -40,6 +40,9 @@ docker-compose up -d
 # Run migrations
 dbmate up
 
+# Load seed data (common ingredients + units)
+npm run db:seed
+
 # Start dev server
 npm run dev
 ```
@@ -50,6 +53,9 @@ npm run dev
 npm run dev          # Start dev server (localhost:5173)
 npm run build        # Production build
 npm run typecheck    # TypeScript check
-npm run test         # Run E2E tests
-npm run test:ui      # Interactive test UI
+npm run test         # Run E2E tests (Playwright)
+npm run test:ui      # Interactive E2E test UI
+npm run test:unit    # Run unit tests (Vitest)
+npm run test:unit:watch  # Unit tests in watch mode
+npm run db:seed      # (Re)load db/seeds/*.sql into $DATABASE_URL
 ```
