@@ -26,7 +26,12 @@ from .api_client import ApiError, RotisserieClient
 from .catalog import CatalogCache
 from .config import Settings, get_settings
 from .conversations import ConversationStore
-from .errors import describe_anthropic_error, describe_api_error
+from .errors import (
+    MISSING_CREDENTIALS_BODY,
+    describe_anthropic_error,
+    describe_api_error,
+    has_credentials,
+)
 from .planner import default_start, plan_week
 from .prompts import build_system_blocks, today_preamble
 from .tools import (
@@ -113,6 +118,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "model": state.settings.anthropic_model,
             "rotisserie_api": state.settings.rotisserie_api_url,
             "api_key_mode": "set" if state.settings.internal_api_key else "open",
+            "anthropic_credentials": (
+                "resolved" if has_credentials(state.anthropic) else "missing"
+            ),
             "conversations": await state.conversations.stats(),
         }
 
@@ -170,6 +178,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 status_code=409,
             )
 
+        if not has_credentials(state.anthropic):
+            return JSONResponse(
+                {"error": MISSING_CREDENTIALS_BODY}, status_code=503
+            )
+
         try:
             result = await plan_week(
                 state.anthropic,
@@ -221,6 +234,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         except ApiError as exc:
             status, error = describe_api_error(exc)
             return JSONResponse({"error": error}, status_code=status)
+
+        if not has_credentials(state.anthropic):
+            return JSONResponse({"error": MISSING_CREDENTIALS_BODY}, status_code=503)
 
         conversation = await state.conversations.get_or_create(body.conversation_id)
 

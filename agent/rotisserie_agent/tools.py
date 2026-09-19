@@ -24,7 +24,7 @@ from datetime import date
 from typing import Any, Literal
 
 from anthropic import beta_async_tool
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
 
 from .api_client import ApiError, RotisserieClient
 from .catalog import CatalogCache
@@ -238,6 +238,19 @@ async def save_meal_plan(
     if not ctx.gate.allowed:
         return _err(ctx.gate.reason)
 
+    # The tool runner hands over `PlanItem` instances, but this function is
+    # also called directly (tests, scripts), where plain dicts are natural.
+    # Validate both through the same model so the payload is built from one
+    # shape -- and so a malformed item is a clear ValidationError rather than
+    # an AttributeError halfway through the comprehension.
+    try:
+        parsed = [
+            item if isinstance(item, PlanItem) else PlanItem.model_validate(item)
+            for item in items
+        ]
+    except ValidationError as exc:
+        return _err(f"Invalid plan item: {exc.errors()}")
+
     payload = {
         "name": name,
         "startsOn": starts_on,
@@ -251,7 +264,7 @@ async def save_meal_plan(
                 "sortOrder": item.sort_order,
                 "notes": item.notes,
             }
-            for item in items
+            for item in parsed
         ],
     }
 

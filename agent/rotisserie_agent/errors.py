@@ -69,3 +69,28 @@ def describe_api_error(exc: ApiError) -> tuple[int, dict[str, Any]]:
         "path": exc.path,
         "detail": exc.details,
     }
+
+
+MISSING_CREDENTIALS_BODY: dict[str, Any] = {
+    "kind": "no_credentials",
+    "message": (
+        "No Anthropic credentials are available to this service. The SDK "
+        "resolves them from the environment: set ANTHROPIC_API_KEY, or "
+        "ANTHROPIC_AUTH_TOKEN, or log in with `ant auth login`. The service "
+        "itself takes no key parameter by design."
+    ),
+}
+
+
+def has_credentials(client: anthropic.AsyncAnthropic) -> bool:
+    """Whether the SDK resolved any credential when the client was built.
+
+    Worth checking up front because the SDK raises a bare `TypeError` from
+    deep inside request building when nothing resolved -- not an `APIError`,
+    so it would otherwise sail past the typed handlers above and surface as an
+    unexplained 500. Callers turn this into a 503 that says what to set.
+    """
+    return any(
+        getattr(client, attr, None) is not None
+        for attr in ("api_key", "auth_token", "credentials")
+    )
