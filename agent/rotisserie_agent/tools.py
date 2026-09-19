@@ -4,6 +4,13 @@ Every tool here is a wrapper and nothing more: no SQL, no validation, no
 business rules. Anything a tool "decides" would be a second implementation of a
 rule the TypeScript API already owns.
 
+`suggest_substitution` is the one tool that is not a wrapper over a single HTTP
+call -- it reads a recipe and then asks the model a question of its own. It is
+still not a second implementation of anything: it delegates to
+`substitutions.suggest_substitution`, the same function `POST
+/suggest-substitution` calls, so the conversational answer and the endpoint's
+answer cannot drift apart. It is a read, and it is offered on every chat turn.
+
 Schemas are generated from the signatures and docstrings by `@beta_async_tool`,
 so the `Args:` sections below are the parameter descriptions the model actually
 reads. They are documentation and interface at once -- edit them as such.
@@ -23,11 +30,15 @@ from dataclasses import dataclass, field
 from datetime import date
 from typing import Any, Literal
 
+import anthropic
 from anthropic import beta_async_tool
 from pydantic import BaseModel, Field, ValidationError
 
+from . import substitutions
 from .api_client import ApiError, RotisserieClient
 from .catalog import CatalogCache
+from .config import Settings
+from .errors import describe_anthropic_error, has_credentials
 
 MealSlot = Literal["breakfast", "lunch", "dinner", "snack"]
 
@@ -62,6 +73,11 @@ class ToolContext:
 
     client: RotisserieClient
     catalog: CatalogCache
+    # Only `suggest_substitution` needs these, being the one tool that asks the
+    # model something. Optional so every other tool can still be driven from a
+    # script or a test with nothing but an API client.
+    anthropic_client: anthropic.AsyncAnthropic | None = None
+    settings: Settings | None = None
     gate: WriteGate = field(default_factory=WriteGate)
     writes: list[dict[str, Any]] = field(default_factory=list)
     calls: list[dict[str, Any]] = field(default_factory=list)
@@ -189,6 +205,86 @@ async def get_cooking_history(days: int = 14) -> str:
             "count": len(cooks),
             "cooks": cooks,
             "recipeIdsCookedInWindow": cooked_ids,
+        }
+    )
+
+
+@beta_async_tool
+async def suggest_substitution(
+    recipe_id: str,
+    ingredient: str,
+    reason: str | None = None,
+) -> str:
+    """Work out what to use instead of one ingredient IN A PARTICULAR RECIPE.
+
+    This is the tool for "I'm out of buttermilk", "she can't eat dairy" and
+    "can we make this less spicy". Do not answer those from memory: it reads
+    the recipe's real ingredients and instructions first, because what an
+    ingredient is doing in a cake is not what it is doing in a dressing, and
+    both the swap and the amount depend on that.
+
+    Returns the amount to use, one line on what each swap changes about the
+    result, and a caveat where one is warranted. It reads and changes nothing.
+
+    Args:
+        recipe_id: The recipe's UUID, copied exactly from the catalog.
+        ingredient: The ingredient to replace, as the user named it, e.g. "buttermilk".
+        reason: Why they are replacing it, in their own words -- "dairy allergy", "don't have any", "want it less spicy". Omit it when they did not say.
+    """
+    ctx = current_context()
+    ctx.calls.append(
+        {
+            "tool": "suggest_substitution",
+            "recipe_id": recipe_id,
+            "ingredient": ingredient,
+            "reason": reason,
+        }
+    )
+
+    if ctx.anthropic_client is None or ctx.settings is None:
+        return _err(
+            "Substitutions are unavailable: this request was built without a "
+            "model client."
+        )
+
+    # /chat already refuses the whole turn when nothing resolved, so this is a
+    # backstop for any other caller. It is here because the SDK raises a bare
+    # TypeError from inside request building when there is no credential --
+    # not an APIError, so it would sail past the handler below and take the
+    # conversation down instead of failing as one tool result.
+    if not has_credentials(ctx.anthropic_client):
+        return _err(
+            "Substitutions are unavailable: this service has no Anthropic "
+            "credentials. Set ANTHROPIC_API_KEY in its environment."
+        )
+
+    try:
+        context = await substitutions.load_recipe_context(
+            ctx.client, recipe_id, ingredient
+        )
+    except substitutions.IngredientLookupError as exc:
+        # The message carries the recipe's real ingredient names, so the model
+        # can ask which one they meant instead of guessing.
+        return _err(exc.as_tool_result())
+    except ApiError as exc:
+        return _err(exc.as_tool_result())
+
+    try:
+        result = await substitutions.suggest_substitution(
+            ctx.anthropic_client, ctx.settings, context, reason=reason
+        )
+    except anthropic.APIError as exc:
+        # Typed and most-specific-first, through the one mapping in errors.py.
+        # A failed nested call is a tool failure, not a dead conversation.
+        _, error = describe_anthropic_error(exc)
+        return _err(error["message"])
+
+    return _ok(
+        {
+            "recipe": context.summary(),
+            "replacing": context.match.to_dict(),
+            "suggestion": result.answer.model_dump(),
+            "check": result.verification,
         }
     )
 
@@ -332,6 +428,6 @@ async def log_cook(
 
 # Deterministic order: the tool list renders BEFORE the system prompt, so a
 # reordering would invalidate the cached prefix on every request.
-READ_TOOLS = [search_recipes, get_recipe, get_cooking_history]
+READ_TOOLS = [search_recipes, get_recipe, get_cooking_history, suggest_substitution]
 WRITE_TOOLS = [save_meal_plan, log_cook]
 ALL_TOOLS = [*READ_TOOLS, *WRITE_TOOLS]

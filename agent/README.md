@@ -4,6 +4,10 @@ A FastAPI service that plans a week of meals from prose:
 
 > "easy dinners, nothing we've had in two weeks, Friday is pizza night"
 
+...and answers the question that comes up mid-recipe:
+
+> "I'm out of buttermilk, what can I use?"
+
 It talks to Claude, and it reaches Rotisserie's data **only** through the
 TypeScript JSON API.
 
@@ -112,6 +116,68 @@ re-derives the exclusion set server-side and reports whether the draft actually
 honours it — so "the two-week rule held" is checkable without reading the
 model's own account of its work.
 
+### `POST /suggest-substitution`
+
+One ingredient, one recipe, what to use instead. It reads; it writes nothing.
+
+```bash
+curl -X POST localhost:8099/suggest-substitution -H 'Content-Type: application/json' -d '{
+  "recipe_id": "c534a4ae-01b9-48e1-a44e-83818c907be6",
+  "ingredient": "buttermilk",
+  "reason": "dairy allergy"
+}'
+```
+
+`reason` is optional prose in the household's own words — "dairy allergy",
+"don't have any", "want it less spicy" — and where there is one it is treated
+as a hard constraint rather than a preference.
+
+**The recipe is the answer's context, and that is the point.** Buttermilk in a
+cake is acid reacting with the baking soda and tenderness in the crumb;
+buttermilk in a dressing is tang and body. The swap differs, and so does the
+amount, so the model is shown this recipe's real ingredient list and its real
+instructions — fetched through `get_recipe`, the same path the chat tool uses.
+The instructions are included in full because heat, timing and order decide
+whether a swap survives, and the ingredient list alone never says so.
+
+The answer comes back through `output_config.format`, so a client parses it
+rather than scraping prose:
+
+| Field | |
+|---|---|
+| `recipe` | the recipe's own context — its real ingredients, instructions, tags and times |
+| `replacing` | the ingredient row the request resolved to, with the quantity and unit the recipe calls for |
+| `suggestion.role` | what that ingredient is doing *in this recipe*, and therefore what a replacement has to reproduce |
+| `suggestion.candidates[]` | `name`, `quantity`, `unit`, `preparation`, `effect` (one line on what it changes about the result), `confidence`, `caveat`, `meets_constraint` |
+| `suggestion.no_good_substitute` | when the honest answer is "shop, or cook something else" rather than a padded list |
+| `check` | an independent audit of the answer against the recipe row |
+| `context_shown_to_model` | the exact text the answer was derived from |
+| `persisted` | always `false`, stated in the payload |
+
+`check` is the same idea as `/plan-week`'s `constraint_check`: it re-reads the
+recipe row and reports whether the answer is about the ingredient that was
+asked about, whether it replaces the quantity the recipe actually calls for,
+whether any "substitute" is the original ingredient again, whether a candidate
+arrived without a quantity, and — when a reason was given — whether any
+candidate is one the model itself marked as breaking it. None of that depends
+on the model's account of its own work.
+
+Two refusals happen before any model call, and are therefore free:
+
+- `409 ingredient_not_in_recipe` and `409 ingredient_ambiguous` carry the
+  recipe's real ingredient names. An exact name wins; a single partial match is
+  accepted ("milk" in a recipe that has only buttermilk); a name matching
+  several rows is asked about rather than guessed at, because choosing between
+  "whole milk" and "coconut milk" on the user's behalf is exactly the silent
+  wrong answer this feature must not give.
+- `404 recipe_not_found` passes the API's own status through. This is the one
+  endpoint whose id comes from the caller rather than from the catalog, so a
+  404 is the caller's mistake, not a broken dependency.
+
+It builds no catalog snapshot at all: the question is about one recipe, so the
+rest of the collection cannot affect the answer and the N+1 catalog build is
+never paid.
+
 ### `POST /chat`
 
 Streams the reply over SSE (`event: start` / `thinking` / `token` / `tool_use` /
@@ -121,6 +187,12 @@ Streams the reply over SSE (`event: start` / `thinking` / `token` / `tool_use` /
 curl -N -X POST localhost:8099/chat -H 'Content-Type: application/json' \
   -d '{"message": "what is quick this week?", "conversation_id": "conv_abc"}'
 ```
+
+Substitutions work conversationally too — "I'm out of buttermilk, what can I
+use?" routes to the `suggest_substitution` tool, which runs the same code the
+endpoint does, so the two answers cannot drift apart. The structured answer
+arrives in that turn's `tool_result` event for any client that wants to parse
+it rather than read the prose.
 
 ### `GET /catalog`
 
@@ -137,8 +209,9 @@ well as in the prompt:
   write tools are not even offered to the model, and the `WriteGate` in
   `tools.py` refuses them as a second line of defence — a refusal comes back as
   a tool result telling the model to go ask the human.
-- `POST /plan-week` passes **no write tools at all**. The capability is absent,
-  not merely discouraged.
+- `POST /plan-week` and `POST /suggest-substitution` pass **no tools at all**.
+  The capability is absent, not merely discouraged. Being out of buttermilk is
+  not a reason to touch the database.
 
 A client shows the draft, the human says yes, and only then does the client
 re-send with `confirm_writes: true` so `save_meal_plan` can run.
@@ -147,14 +220,16 @@ re-send with `confirm_writes: true` so `save_meal_plan` can run.
 
 ## Tools
 
-Each is a thin wrapper over one HTTP call. Schemas are generated from the
-signatures and docstrings, so the docstrings are the interface.
+Each is a thin wrapper over one HTTP call — with one stated exception below.
+Schemas are generated from the signatures and docstrings, so the docstrings are
+the interface.
 
 | Tool | Endpoint | Notes |
 |---|---|---|
 | `search_recipes(search, tags, limit)` | `GET /api/recipes` | Compact rows — id, name, tags, times — never full recipes. |
 | `get_recipe(recipe_id)` | `GET /api/recipes/:id` | Full recipe with ingredients and tags. |
 | `get_cooking_history(days)` | `GET /api/cooks?days=N` | Answers "nothing we've had in two weeks". Returns `recipeIdsCookedInWindow` so the rule is applied on ids, not names. |
+| `suggest_substitution(recipe_id, ingredient, reason)` | `GET /api/recipes/:id` + one model call | The only tool that is not a wrapper over a single HTTP call: it reads the recipe, then asks the model what to use instead. It delegates to the same function `POST /suggest-substitution` calls. A read — offered on every turn, gated on nothing. |
 | `save_meal_plan(...)` | `POST /api/meal-plans` | **Gated.** Posts the plan and its items in one call. |
 | `log_cook(...)` | `POST /api/cooks` | **Gated.** Omitting `label` asks the API to snapshot the recipe's name. |
 
@@ -216,9 +291,10 @@ agent/
     ├── prompts.py         # system-prompt assembly, split at the cache breakpoint
     ├── tools.py           # the five tools + the write gate
     ├── planner.py         # plan_week: prose -> structured draft, + constraint check
+    ├── substitutions.py   # suggest_substitution: one recipe -> structured swaps, + audit
     ├── conversations.py   # conversation store keyed by id
     ├── errors.py          # typed SDK/API errors -> HTTP responses
-    └── main.py            # FastAPI: /health, /plan-week, /chat, /catalog
+    └── main.py            # FastAPI: /health, /plan-week, /suggest-substitution, /chat, /catalog
 ```
 
 ## Model configuration
@@ -229,7 +305,11 @@ agent/
 - `output_config={"effort": ...}` — effort lives inside `output_config`.
 - Tools run through the beta tool runner
   (`client.beta.messages.tool_runner`) with `@beta_async_tool`.
-- `max_tokens` 16000 for the non-streaming planner; `/chat` streams.
+- `max_tokens` 16000 for the non-streaming paths (`plan_week`,
+  `suggest_substitution`); `/chat` streams.
+- Structured outputs go in `output_config.format` as a `json_schema` block,
+  with every property listed in `required`, `additionalProperties: false`, and
+  optionality expressed as a nullable type.
 - SDK exceptions are caught most-specific-first by type
   (`NotFoundError` → `AuthenticationError` → `RateLimitError` →
   `APIStatusError` → `APIConnectionError`); nothing matches on message text.

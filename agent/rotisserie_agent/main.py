@@ -1,4 +1,4 @@
-"""FastAPI surface: /health, /plan-week, /chat.
+"""FastAPI surface: /health, /plan-week, /suggest-substitution, /chat.
 
 Long-lived objects -- the HTTP client, the catalog cache, the conversation
 store, the Anthropic client -- are built once in the lifespan handler and hung
@@ -34,6 +34,12 @@ from .errors import (
 )
 from .planner import default_start, plan_week
 from .prompts import build_system_blocks, today_preamble
+from .substitutions import (
+    DEFAULT_MAX_CANDIDATES,
+    IngredientLookupError,
+    load_recipe_context,
+    suggest_substitution,
+)
 from .tools import (
     ALL_TOOLS,
     READ_TOOLS,
@@ -61,6 +67,21 @@ class PlanWeekRequest(BaseModel):
     exclude_cooked_within_days: int = Field(default=14, ge=0, le=365)
     meal_slots: list[str] = Field(default_factory=lambda: ["dinner"])
     refresh_catalog: bool = False
+
+
+class SuggestSubstitutionRequest(BaseModel):
+    recipe_id: str = Field(description="The recipe they are cooking, by id.")
+    ingredient: str = Field(
+        min_length=1,
+        description="The ingredient to replace, as the user named it.",
+        examples=["buttermilk"],
+    )
+    reason: str | None = Field(
+        default=None,
+        description="Why, in their own words. Optional -- 'don't have any' is a reason too.",
+        examples=["dairy allergy"],
+    )
+    max_candidates: int = Field(default=DEFAULT_MAX_CANDIDATES, ge=1, le=8)
 
 
 class ChatRequest(BaseModel):
@@ -223,6 +244,87 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         )
 
     # -----------------------------------------------------------------
+    # suggest-substitution -- advice about one recipe, never a write
+    # -----------------------------------------------------------------
+    @app.post("/suggest-substitution")
+    async def suggest_substitution_endpoint(
+        request: Request, body: SuggestSubstitutionRequest
+    ) -> JSONResponse:
+        state = request.app.state
+
+        # No catalog snapshot anywhere on this path: the question is about ONE
+        # recipe, named by id, so there is nothing for the rest of the
+        # collection to contribute and no N+1 catalog build to pay for.
+        try:
+            context = await load_recipe_context(
+                state.api, body.recipe_id, body.ingredient
+            )
+        except IngredientLookupError as exc:
+            # A correct answer to a wrong question, not a server failure. The
+            # body carries the recipe's real ingredient names so the caller can
+            # fix the request without a second round trip.
+            return JSONResponse({"error": exc.as_error_body()}, status_code=409)
+        except ApiError as exc:
+            # The recipe id here comes straight from the caller, unlike every
+            # other id in this service, which comes from the catalog. A 4xx is
+            # therefore the caller's, and describe_api_error's uniform 502 --
+            # right when a dependency misbehaves -- would blame the wrong side.
+            # The API answers 404 for a malformed id as well as an unknown one
+            # (`uuidPathParam`), so its status and message pass through rather
+            # than being second-guessed here.
+            if exc.status in (400, 404):
+                return JSONResponse(
+                    {
+                        "error": {
+                            "kind": (
+                                "recipe_not_found"
+                                if exc.status == 404
+                                else "invalid_recipe_id"
+                            ),
+                            "message": exc.message,
+                            "recipe_id": body.recipe_id,
+                        }
+                    },
+                    status_code=exc.status,
+                )
+            status, error = describe_api_error(exc)
+            return JSONResponse({"error": error}, status_code=status)
+
+        if not has_credentials(state.anthropic):
+            return JSONResponse({"error": MISSING_CREDENTIALS_BODY}, status_code=503)
+
+        try:
+            result = await suggest_substitution(
+                state.anthropic,
+                state.settings,
+                context,
+                reason=body.reason,
+                max_candidates=body.max_candidates,
+            )
+        except anthropic.APIError as exc:
+            status, error = describe_anthropic_error(exc)
+            return JSONResponse({"error": error}, status_code=status)
+
+        return JSONResponse(
+            {
+                "data": {
+                    # Advice, never an edit -- stated in the payload, the same
+                    # way /plan-week states that its draft was not saved.
+                    "persisted": False,
+                    "recipe": context.full(),
+                    "replacing": context.match.to_dict(),
+                    "reason": body.reason,
+                    "suggestion": result.answer.model_dump(),
+                    "check": result.verification,
+                    # The exact text the answer was derived from, so "it knew
+                    # this was a cake" is checkable rather than assumed.
+                    "context_shown_to_model": context.rendered,
+                    "usage": result.usage,
+                }
+            }
+        )
+
+    # -----------------------------------------------------------------
     # chat -- SSE
     # -----------------------------------------------------------------
     @app.post("/chat")
@@ -251,6 +353,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 ctx = ToolContext(
                     client=state.api,
                     catalog=state.catalog,
+                    # `suggest_substitution` asks the model a question of its
+                    # own; every other tool ignores these.
+                    anthropic_client=state.anthropic,
+                    settings=state.settings,
                     gate=WriteGate(allowed=body.confirm_writes),
                 )
                 token = set_tool_context(ctx)
