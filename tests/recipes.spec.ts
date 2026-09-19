@@ -1,90 +1,13 @@
-import { test, expect } from "@playwright/test";
-
-// Helper function to add an ingredient using the combobox
-async function addIngredient(page: any, ingredientName: string, quantity?: string, unit?: string) {
-  // Click ingredient combobox
-  const ingredientCombobox = page.getByTestId("ingredient-combobox").first();
-  await ingredientCombobox.click();
-
-  // Type the ingredient name in the search input
-  const searchInput = page.getByPlaceholder("Search or type new...").first();
-  await searchInput.fill(ingredientName);
-
-  // Wait for the dropdown to update
-  await page.waitForTimeout(300);
-
-  // Use keyboard navigation to select
-  await searchInput.press("ArrowDown");
-  await searchInput.press("Enter");
-
-  // Wait for the popover to close
-  await page.waitForTimeout(200);
-
-  // Fill in quantity if provided
-  if (quantity) {
-    await page.getByPlaceholder("Qty").first().fill(quantity);
-  }
-
-  // Select unit using the unit combobox if provided
-  if (unit) {
-    const unitCombobox = page.getByTestId("unit-combobox").first();
-    await unitCombobox.click();
-
-    // Type the unit in the search input
-    const unitSearchInput = page.getByPlaceholder("Search or type new...").first();
-    await unitSearchInput.fill(unit);
-
-    // Wait for the dropdown to update
-    await page.waitForTimeout(300);
-
-    // Select the first match
-    await unitSearchInput.press("ArrowDown");
-    await unitSearchInput.press("Enter");
-
-    // Wait for the popover to close
-    await page.waitForTimeout(200);
-  }
-}
-
-// Helper function to create a recipe with a tag
-async function createRecipeWithTag(page: any, name: string, instructions: string, ingredientName: string, tag: string) {
-  await page.goto("/recipes/new");
-  await page.getByLabel("Recipe Name").fill(name);
-
-  // Add an ingredient
-  await addIngredient(page, ingredientName, "1", "piece");
-
-  // Add a tag
-  await page.getByPlaceholder("Add a tag").fill(tag);
-  await page.getByRole("button", { name: "Add", exact: true }).click();
-
-  // Fill in instructions
-  await page.locator('textarea[name="instructions"]').fill(instructions);
-
-  // Click "Save Recipe"
-  await page.getByRole("button", { name: "Save Recipe" }).click();
-
-  // Wait for redirect to detail page
-  await expect(page).toHaveURL(/\/recipes\/[a-f0-9-]+$/);
-}
-
-// Helper function to create a recipe
-async function createRecipe(page: any, name: string, instructions: string, ingredientName = "onion") {
-  await page.goto("/recipes/new");
-  await page.getByLabel("Recipe Name").fill(name);
-
-  // Add an ingredient using an existing seeded ingredient
-  await addIngredient(page, ingredientName, "1", "piece");
-
-  // Fill in instructions
-  await page.locator('textarea[name="instructions"]').fill(instructions);
-
-  // Click "Save Recipe"
-  await page.getByRole("button", { name: "Save Recipe" }).click();
-
-  // Wait for redirect to detail page
-  await expect(page).toHaveURL(/\/recipes\/[a-f0-9-]+$/);
-}
+/**
+ * E2E suite.
+ *
+ * Every recipe/tag here is created through the `recipes` fixture, which names
+ * rows with this run's marker, records their ids and deletes exactly those rows
+ * after each test (see tests/fixtures.ts and tests/db.ts). Tests therefore each
+ * start from the seeded ingredients/units and no recipes of ours, which is what
+ * makes the list and combobox assertions below deterministic.
+ */
+import { addIngredient, expect, expectComboboxFiltered, test } from "./fixtures";
 
 test.describe("Rotisserie Recipe App", () => {
   test("Home page loads and has navigation links", async ({ page }) => {
@@ -106,23 +29,23 @@ test.describe("Rotisserie Recipe App", () => {
     await expect(page).toHaveURL("/recipes");
   });
 
-  test("Create a new recipe", async ({ page }) => {
-    const recipeName = `Test Recipe ${Date.now()}`;
+  test("Create a new recipe", async ({ page, recipes }) => {
+    const recipeName = recipes.name("Test Recipe");
     const instructions = "Step 1: Mix ingredients\nStep 2: Cook for 20 minutes\nStep 3: Serve hot";
 
     // Create the recipe using our helper
-    await createRecipe(page, recipeName, instructions, "garlic");
+    await recipes.create(recipeName, instructions, "garlic");
 
     // Verify recipe name appears on the page
     await expect(page.getByRole("heading", { name: recipeName })).toBeVisible();
   });
 
-  test("View recipe list and detail", async ({ page }) => {
+  test("View recipe list and detail", async ({ page, recipes }) => {
     // First, create a recipe to ensure there's one to view
-    const recipeName = `View Test Recipe ${Date.now()}`;
+    const recipeName = recipes.name("View Test Recipe");
     const instructions = "Instructions for viewing test";
 
-    await createRecipe(page, recipeName, instructions, "tomato");
+    await recipes.create(recipeName, instructions, "tomato");
 
     // Visit /recipes
     await page.goto("/recipes");
@@ -138,13 +61,13 @@ test.describe("Rotisserie Recipe App", () => {
     await expect(page.getByText(instructions)).toBeVisible();
   });
 
-  test("Edit a recipe", async ({ page }) => {
+  test("Edit a recipe", async ({ page, recipes }) => {
     // First, create a recipe to edit
-    const originalName = `Edit Test Recipe ${Date.now()}`;
+    const originalName = recipes.name("Edit Test Recipe");
     const updatedName = `Updated ${originalName}`;
     const instructions = "Original instructions";
 
-    await createRecipe(page, originalName, instructions, "potato");
+    await recipes.create(originalName, instructions, "potato");
 
     // Click "Edit" button
     await page.getByRole("link", { name: "Edit" }).click();
@@ -157,9 +80,7 @@ test.describe("Rotisserie Recipe App", () => {
 
     // Change the recipe name
     await page.getByLabel("Recipe Name").fill(updatedName);
-
-    // Wait for any React state updates
-    await page.waitForTimeout(300);
+    await expect(page.getByLabel("Recipe Name")).toHaveValue(updatedName);
 
     // Click "Save Changes"
     await page.getByRole("button", { name: "Save Changes" }).click();
@@ -171,12 +92,12 @@ test.describe("Rotisserie Recipe App", () => {
     await expect(page.getByRole("heading", { name: updatedName })).toBeVisible();
   });
 
-  test("Delete a recipe", async ({ page }) => {
+  test("Delete a recipe", async ({ page, recipes }) => {
     // First, create a recipe to delete
-    const recipeName = `Delete Test Recipe ${Date.now()}`;
+    const recipeName = recipes.name("Delete Test Recipe");
     const instructions = "Instructions for delete test";
 
-    await createRecipe(page, recipeName, instructions, "carrot");
+    await recipes.create(recipeName, instructions, "carrot");
 
     // Handle the confirmation dialog
     page.on("dialog", async (dialog) => {
@@ -195,10 +116,10 @@ test.describe("Rotisserie Recipe App", () => {
 });
 
 test.describe("Recipe List Features", () => {
-  test("Toggle between card and table view", async ({ page }) => {
+  test("Toggle between card and table view", async ({ page, recipes }) => {
     // Create a recipe first to have something to display
-    const recipeName = `View Toggle Test ${Date.now()}`;
-    await createRecipe(page, recipeName, "Test instructions", "onion");
+    const recipeName = recipes.name("View Toggle Test");
+    await recipes.create(recipeName, "Test instructions", "onion");
 
     // Go to recipes list
     await page.goto("/recipes");
@@ -224,34 +145,22 @@ test.describe("Recipe List Features", () => {
     await expect(page.getByTestId("recipe-cards")).toBeVisible();
   });
 
-  test("Filter recipes by tag", async ({ page }) => {
-    const timestamp = Date.now();
-    const tag1 = `testtag${timestamp}a`;
-    const tag2 = `testtag${timestamp}b`;
+  test("Filter recipes by tag", async ({ page, recipes }) => {
+    const tag1 = recipes.tag("testtaga");
+    const tag2 = recipes.tag("testtagb");
+    const recipeA = recipes.name("Recipe A");
+    const recipeB = recipes.name("Recipe B");
 
     // Create two recipes with different tags
-    await createRecipeWithTag(
-      page,
-      `Recipe A ${timestamp}`,
-      "Instructions A",
-      "onion",
-      tag1
-    );
-
-    await createRecipeWithTag(
-      page,
-      `Recipe B ${timestamp}`,
-      "Instructions B",
-      "garlic",
-      tag2
-    );
+    await recipes.createWithTag(recipeA, "Instructions A", "onion", tag1);
+    await recipes.createWithTag(recipeB, "Instructions B", "garlic", tag2);
 
     // Go to recipes list
     await page.goto("/recipes");
 
     // Both recipes should be visible
-    await expect(page.getByText(`Recipe A ${timestamp}`)).toBeVisible();
-    await expect(page.getByText(`Recipe B ${timestamp}`)).toBeVisible();
+    await expect(page.getByText(recipeA)).toBeVisible();
+    await expect(page.getByText(recipeB)).toBeVisible();
 
     // Click on first tag to filter
     await page.getByTestId(`tag-${tag1}`).click();
@@ -260,15 +169,15 @@ test.describe("Recipe List Features", () => {
     await expect(page).toHaveURL(new RegExp(`tags=${tag1}`));
 
     // Only Recipe A should be visible now
-    await expect(page.getByText(`Recipe A ${timestamp}`)).toBeVisible();
-    await expect(page.getByText(`Recipe B ${timestamp}`)).not.toBeVisible();
+    await expect(page.getByText(recipeA)).toBeVisible();
+    await expect(page.getByText(recipeB)).not.toBeVisible();
 
     // Click the tag again to deselect
     await page.getByTestId(`tag-${tag1}`).click();
 
     // Both recipes should be visible again
-    await expect(page.getByText(`Recipe A ${timestamp}`)).toBeVisible();
-    await expect(page.getByText(`Recipe B ${timestamp}`)).toBeVisible();
+    await expect(page.getByText(recipeA)).toBeVisible();
+    await expect(page.getByText(recipeB)).toBeVisible();
   });
 });
 
@@ -285,7 +194,7 @@ test.describe("Ingredient and Unit Comboboxes", () => {
 
     // Search for an ingredient
     await page.getByPlaceholder("Search or type new...").fill("onion");
-    await page.waitForTimeout(300);
+    await expectComboboxFiltered(page, "onion");
 
     // Select the ingredient
     await page.getByPlaceholder("Search or type new...").press("ArrowDown");
@@ -305,9 +214,8 @@ test.describe("Ingredient and Unit Comboboxes", () => {
 
     // Type a new ingredient name
     await page.getByPlaceholder("Search or type new...").fill(newIngredient);
-    await page.waitForTimeout(300);
 
-    // Click "Create" option
+    // Click "Create" option (the click waits for the filtered list to render it)
     await page.getByText(`Create "${newIngredient}"`).click();
 
     // Verify the combobox shows the new ingredient
@@ -329,7 +237,7 @@ test.describe("Ingredient and Unit Comboboxes", () => {
 
     // Search for a unit
     await page.getByPlaceholder("Search or type new...").fill("cup");
-    await page.waitForTimeout(300);
+    await expectComboboxFiltered(page, "cup");
 
     // Select the unit
     await page.getByPlaceholder("Search or type new...").press("ArrowDown");
@@ -353,7 +261,7 @@ test.describe("Ingredient and Unit Comboboxes", () => {
     await ingredientComboboxes.nth(1).click();
 
     await page.getByPlaceholder("Search or type new...").first().fill("garlic");
-    await page.waitForTimeout(300);
+    await expectComboboxFiltered(page, "garlic");
     await page.getByPlaceholder("Search or type new...").first().press("ArrowDown");
     await page.getByPlaceholder("Search or type new...").first().press("Enter");
 
@@ -364,14 +272,13 @@ test.describe("Ingredient and Unit Comboboxes", () => {
 });
 
 test.describe("Live Search", () => {
-  test("Filters as you type", async ({ page }) => {
-    const timestamp = Date.now();
-    const recipe1 = `LiveSearch Alpha ${timestamp}`;
-    const recipe2 = `LiveSearch Beta ${timestamp}`;
+  test("Filters as you type", async ({ page, recipes }) => {
+    const recipe1 = recipes.name("LiveSearch Alpha");
+    const recipe2 = recipes.name("LiveSearch Beta");
 
     // Create two recipes with distinct names
-    await createRecipe(page, recipe1, "Instructions for Alpha", "onion");
-    await createRecipe(page, recipe2, "Instructions for Beta", "garlic");
+    await recipes.create(recipe1, "Instructions for Alpha", "onion");
+    await recipes.create(recipe2, "Instructions for Beta", "garlic");
 
     // Go to recipes list
     await page.goto("/recipes");
@@ -397,12 +304,11 @@ test.describe("Live Search", () => {
     await expect(page.getByText(recipe2)).not.toBeVisible();
   });
 
-  test("URL updates", async ({ page }) => {
-    const timestamp = Date.now();
-    const recipeName = `Search URL Test ${timestamp}`;
+  test("URL updates", async ({ page, recipes }) => {
+    const recipeName = recipes.name("Search URL Test");
 
     // Create a recipe to search for
-    await createRecipe(page, recipeName, "Instructions", "tomato");
+    await recipes.create(recipeName, "Instructions", "tomato");
 
     // Go to recipes list
     await page.goto("/recipes");
@@ -417,14 +323,13 @@ test.describe("Live Search", () => {
     await expect(page).toHaveURL(/\?.*search=Search\+URL/);
   });
 
-  test("Clear restores all", async ({ page }) => {
-    const timestamp = Date.now();
-    const recipe1 = `Clear Test First ${timestamp}`;
-    const recipe2 = `Clear Test Second ${timestamp}`;
+  test("Clear restores all", async ({ page, recipes }) => {
+    const recipe1 = recipes.name("Clear Test First");
+    const recipe2 = recipes.name("Clear Test Second");
 
     // Create two recipes
-    await createRecipe(page, recipe1, "Instructions 1", "onion");
-    await createRecipe(page, recipe2, "Instructions 2", "garlic");
+    await recipes.create(recipe1, "Instructions 1", "onion");
+    await recipes.create(recipe2, "Instructions 2", "garlic");
 
     // Go to recipes list
     await page.goto("/recipes");
@@ -459,17 +364,16 @@ test.describe("Live Search", () => {
     await expect(page).not.toHaveURL(/search=/);
   });
 
-  test("Works with tag filter", async ({ page }) => {
-    const timestamp = Date.now();
-    const tag = `searchtag${timestamp}`;
-    const recipe1 = `Tagged Chicken Recipe ${timestamp}`;
-    const recipe2 = `Tagged Beef Recipe ${timestamp}`;
-    const recipe3 = `Untagged Chicken Recipe ${timestamp}`;
+  test("Works with tag filter", async ({ page, recipes }) => {
+    const tag = recipes.tag("searchtag");
+    const recipe1 = recipes.name("Tagged Chicken Recipe");
+    const recipe2 = recipes.name("Tagged Beef Recipe");
+    const recipe3 = recipes.name("Untagged Chicken Recipe");
 
     // Create recipes with different combinations
-    await createRecipeWithTag(page, recipe1, "Instructions 1", "onion", tag);
-    await createRecipeWithTag(page, recipe2, "Instructions 2", "garlic", tag);
-    await createRecipe(page, recipe3, "Instructions 3", "tomato");
+    await recipes.createWithTag(recipe1, "Instructions 1", "onion", tag);
+    await recipes.createWithTag(recipe2, "Instructions 2", "garlic", tag);
+    await recipes.create(recipe3, "Instructions 3", "tomato");
 
     // Go to recipes list
     await page.goto("/recipes");
