@@ -25,8 +25,12 @@
  * cooked_on, because neither date is wrong.
  */
 import { DB } from "~/db/connection";
+import type { QueryFns } from "~/db/connection";
 import { MEAL_SLOT_SQL_ORDER } from "~/features/meal-plans/queries/meal-plans";
 import type { MealPlanItem } from "~/features/meal-plans/queries/meal-plans";
+import { logCook } from "~/features/recipes/queries/cooks";
+import type { Cook } from "~/features/recipes/queries/cooks";
+import type { CreateCookInput } from "~/features/recipes/schemas/cook";
 
 export interface PlanAdherence {
   planned: number;
@@ -40,14 +44,44 @@ export interface PlanAdherence {
  */
 export async function fulfilPlanItem(
   cookId: string,
-  mealPlanItemId: string
+  mealPlanItemId: string,
+  db: QueryFns = DB
 ): Promise<void> {
-  await DB.query(
+  await db.query(
     `INSERT INTO cook_fulfillments (cook_id, meal_plan_item_id)
      VALUES ($1, $2)
      ON CONFLICT DO NOTHING`,
     [cookId, mealPlanItemId]
   );
+}
+
+/**
+ * "We cooked this": record the cook AND the link back to the plan item it
+ * fulfils, atomically.
+ *
+ * ATOMIC BECAUSE THE HALVES ARE NOT EQUALLY RECOVERABLE. These were two
+ * autocommit statements, and the window between them is real: the plan item
+ * can be removed in another tab, in which case the fulfilment insert violates
+ * `cook_fulfillments_meal_plan_item_id_fkey` -- and by then the cook is
+ * already committed. The user saw a 500, the meal still read as not cooked,
+ * adherence undercounted it permanently, and pressing the button again
+ * appended a SECOND cook, because `cooks` is append-only fact with no
+ * de-duplication and no delete in the UI.
+ *
+ * Returns `null` when the cook names a recipe that no longer exists, matching
+ * `logCook`, so the caller can answer 404 rather than 500.
+ */
+export async function logCookFulfillingPlanItem(
+  input: CreateCookInput,
+  mealPlanItemId: string
+): Promise<Cook | null> {
+  return DB.withTransaction(async (tx) => {
+    const cook = await logCook(input, tx);
+    if (!cook) return null;
+
+    await fulfilPlanItem(cook.id, mealPlanItemId, tx);
+    return cook;
+  });
 }
 
 /**

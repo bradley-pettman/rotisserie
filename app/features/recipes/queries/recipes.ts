@@ -7,6 +7,7 @@ import type { CreateRecipeInput, RecipeFilter } from "../schemas/recipe";
 // feature module or into integrations/. `cooks.ts` is the recipes module's own
 // cook log, and eslint's no-restricted-paths zones agree.
 import { lastCookedAt, lastCookedForRecipes } from "./cooks";
+import { isUuid } from "~/lib/uuid";
 
 export interface Recipe {
   id: string;
@@ -149,6 +150,10 @@ async function insertTags(
 }
 
 export async function getRecipeById(id: string): Promise<RecipeWithDetails | null> {
+  // A non-UUID is not a miss, it is a Postgres 22P02 and therefore a 500.
+  // See ~/lib/uuid: the guard lives here so no caller can forget it.
+  if (!isUuid(id)) return null;
+
   const recipe = await DB.queryOne<Recipe>(
     `SELECT id, name, instructions, prep_time_minutes as "prepTimeMinutes",
             cook_time_minutes as "cookTimeMinutes", servings, source_url as "sourceUrl",
@@ -313,6 +318,15 @@ export interface ListRecipesOptions {
  * the page of recipes is fetched first, then the tags for exactly those ids in
  * a single batched query, and the two are merged in memory.
  */
+/**
+ * Escape the LIKE/ILIKE metacharacters so a search term is matched literally.
+ * Pairs with `ESCAPE '\'` on the comparison; the backslash itself has to be
+ * escaped first or it would escape whatever followed it.
+ */
+function escapeLikePattern(value: string): string {
+  return value.replace(/[\\%_]/g, "\\$&");
+}
+
 export async function listRecipes(
   filter?: RecipeFilter,
   options?: ListRecipesOptions
@@ -322,8 +336,13 @@ export async function listRecipes(
   let paramIndex = 1;
 
   if (filter?.search) {
-    conditions.push(`r.name ILIKE $${paramIndex}`);
-    params.push(`%${filter.search}%`);
+    // The value is a bound parameter, so this was never injectable -- but `%`
+    // and `_` are ILIKE wildcards, and leaving the user's own live meant
+    // `?search=%` matched the entire library (the filter silently became a
+    // no-op) and no one could search for a literal "100%". Escaping them makes
+    // the box mean what it looks like it means: a substring search.
+    conditions.push(`r.name ILIKE $${paramIndex} ESCAPE '\\'`);
+    params.push(`%${escapeLikePattern(filter.search)}%`);
     paramIndex++;
   }
 
@@ -339,7 +358,12 @@ export async function listRecipes(
          HAVING COUNT(DISTINCT t.name) = cardinality($${paramIndex}::text[])
        )`
     );
-    params.push(filter.tags);
+    // Tags are stored lowercase and trimmed (see CLAUDE.md), and this compares
+    // with `=`, so the caller's capitalisation has to be folded to match. It
+    // was not, which made `/recipes?tags=Weeknight` return nothing at all
+    // against a `weeknight` tag -- a link someone typed by hand, or a tag name
+    // title-cased by a client, silently found zero recipes.
+    params.push(filter.tags.map((tag) => tag.trim().toLowerCase()));
     paramIndex++;
   }
 
@@ -470,6 +494,8 @@ export async function updateRecipe(
 }
 
 export async function deleteRecipe(id: string): Promise<boolean> {
+  if (!isUuid(id)) return false;
+
   const result = await DB.query(
     `DELETE FROM recipes WHERE id = $1 RETURNING id`,
     [id]
@@ -532,6 +558,8 @@ export type DeleteTagOutcome = "deleted" | "not-found" | "in-use";
  * between our "is it referenced?" and our DELETE.
  */
 export async function deleteUnreferencedTag(id: string): Promise<DeleteTagOutcome> {
+  if (!isUuid(id)) return "not-found";
+
   return DB.withTransaction<DeleteTagOutcome>(async (tx) => {
     const tag = await tx.queryOne<{ id: string }>(
       `SELECT id FROM tags WHERE id = $1 FOR UPDATE`,

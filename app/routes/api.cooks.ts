@@ -15,6 +15,7 @@ import {
   methodNotAllowed,
   parseOrThrow,
   readJsonBody,
+  requireFound,
 } from "~/lib/api";
 
 /** GET /api/cooks?days=30 -- everything cooked in the last N days, newest first. */
@@ -47,5 +48,10 @@ export const action = apiRoute(async ({ request }: Route.ActionArgs) => {
 
   const input = parseOrThrow(createCookSchema, await readJsonBody(request));
 
-  return jsonOk(await logCook(input), 201);
+  // `logCook` answers null when the body names a recipe that does not exist.
+  // That is a 404, the same as every other "you referenced a missing row" in
+  // this API -- it used to be an uncaught Error and therefore a 500.
+  const cook = requireFound(await logCook(input), "Recipe not found");
+
+  return jsonOk(cook, 201);
 });

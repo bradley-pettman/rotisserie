@@ -7,7 +7,10 @@ import { Button } from "~/components/ui/button";
 import { Drawer } from "~/components/ui/drawer";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
-import { fulfilPlanItem, getPlanAdherence } from "~/features/integrations/plan-to-cook";
+import {
+  getPlanAdherence,
+  logCookFulfillingPlanItem,
+} from "~/features/integrations/plan-to-cook";
 import type { ResolvedMealPlanItem } from "~/features/integrations/plan-with-recipes";
 import { getMealPlanWithRecipeNames } from "~/features/integrations/plan-with-recipes";
 import type { PlannedDay } from "~/features/meal-plans/components/week-grid";
@@ -20,7 +23,6 @@ import {
   removeMealPlanItem,
 } from "~/features/meal-plans/queries/meal-plans";
 import { mealPlanItemSchema } from "~/features/meal-plans/schemas/meal-plan";
-import { logCook } from "~/features/recipes/queries/cooks";
 import { getRecipeById, listRecipes } from "~/features/recipes/queries/recipes";
 import { createCookSchema } from "~/features/recipes/schemas/cook";
 import {
@@ -158,8 +160,14 @@ export async function action({ request }: Route.ActionArgs) {
 
     if (!parsed.success) throw new Response("Could not log this cook", { status: 400 });
 
-    const cook = await logCook(parsed.data);
-    await fulfilPlanItem(cook.id, item.id);
+    // One transaction: the cook and the link back to the plan item it fulfils
+    // commit together or not at all. Written separately, a plan item removed in
+    // another tab between the two left a committed cook with no fulfilment --
+    // the meal still read as uncooked, adherence undercounted it forever, and
+    // clicking again appended a second cook to append-only history.
+    const cook = await logCookFulfillingPlanItem(parsed.data, item.id);
+
+    if (!cook) throw new Response("Recipe not found", { status: 404 });
 
     return redirect("/plan");
   }

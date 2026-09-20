@@ -1,6 +1,7 @@
 import { DB } from "~/db/connection";
 import type { QueryFns } from "~/db/connection";
 import type { CreateMealPlanInput, MealPlanItemInput, MealSlot } from "../schemas/meal-plan";
+import { isUuid } from "~/lib/uuid";
 
 export interface MealPlan {
   id: string;
@@ -108,6 +109,10 @@ async function insertMealPlanItems(
 }
 
 export async function getMealPlanById(id: string): Promise<MealPlanWithItems | null> {
+  // A non-UUID is not a miss, it is a Postgres 22P02 and therefore a 500.
+  // See ~/lib/uuid: the guard lives here so no caller can forget it.
+  if (!isUuid(id)) return null;
+
   const plan = await DB.queryOne<MealPlan>(
     `SELECT ${PLAN_COLUMNS} FROM meal_plans WHERE id = $1`,
     [id]
@@ -199,6 +204,8 @@ export async function assignMeal(
  * and recipe id and nothing else.
  */
 export async function getMealPlanItem(itemId: string): Promise<MealPlanItem | null> {
+  if (!isUuid(itemId)) return null;
+
   return DB.queryOne<MealPlanItem>(
     `SELECT ${ITEM_COLUMNS} FROM meal_plan_items WHERE id = $1`,
     [itemId]
@@ -206,6 +213,8 @@ export async function getMealPlanItem(itemId: string): Promise<MealPlanItem | nu
 }
 
 export async function removeMealPlanItem(itemId: string): Promise<boolean> {
+  if (!isUuid(itemId)) return false;
+
   const result = await DB.query(
     `DELETE FROM meal_plan_items WHERE id = $1 RETURNING id`,
     [itemId]
@@ -232,6 +241,8 @@ export async function moveMealPlanItem(
 }
 
 export async function deleteMealPlan(id: string): Promise<boolean> {
+  if (!isUuid(id)) return false;
+
   const result = await DB.query(
     `DELETE FROM meal_plans WHERE id = $1 RETURNING id`,
     [id]
