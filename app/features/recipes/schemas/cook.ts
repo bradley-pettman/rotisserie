@@ -9,6 +9,28 @@ export const MEAL_SLOTS = ["breakfast", "lunch", "dinner", "snack"] as const;
 
 export const createCookSchema = z
   .object({
+    // THE IDEMPOTENCY KEY, and the only reason a caller may name a primary key
+    // anywhere in this API. A cook is append-only FACT and has no PATCH, so a
+    // client whose POST reached us but whose RESPONSE was lost -- a phone
+    // leaving the kitchen, a proxy timing out -- has no safe move: retrying
+    // appends a SECOND cook and nothing dedupes it. The damage is not
+    // cosmetic. A duplicate over-counts `getPlanAdherence` (cooked 4 of 7,
+    // reported 5) and pollutes the history window the planner reads to answer
+    // "nothing we've had in two weeks". Naming the row up front lets the retry
+    // collapse onto the original instead -- the same move, for the same
+    // reason, as PUT on a fulfilment.
+    //
+    // Absent (or null) is today's behaviour exactly: Postgres fills the id
+    // from the column DEFAULT and the insert cannot conflict. Nothing that
+    // logs a cook today has to change.
+    //
+    // Generate a FRESH uuid per logged cook, when the user presses the button,
+    // and keep it with the queued request so every retry of that request sends
+    // the same one. An id DERIVED from the meal (recipe + day + slot) is the
+    // trap: a second batch of the same dish the same evening is a real and
+    // distinct cook, and deriving the id would make this endpoint swallow it.
+    // `insertCook` documents what a reused id costs.
+    id: z.string().uuid().nullable().default(null),
     // Nullable: takeout and improvised meals are real cooks with no recipe.
     // Absent means null, so a client logging free text need not say so twice.
     recipeId: z.string().uuid().nullable().default(null),
