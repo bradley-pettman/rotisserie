@@ -26,8 +26,11 @@ export const createCookSchema = z
     // to the DATE column so no timezone can shift it to the day before.
     cookedOn: z.iso.date("Cooked date must be YYYY-MM-DD"),
     mealSlot: z.enum(MEAL_SLOTS).default("dinner"),
-    servingsMade: z.number().int().positive().nullable().default(null),
-    notes: z.string().nullable().default(null),
+    // `.max()` mirrors the INTEGER column: zod's `.int()` alone allows a
+    // safe integer, which is far wider than int4, so an oversized value
+    // reached Postgres and came back as a 500 rather than a 400.
+    servingsMade: z.number().int().positive().max(2_147_483_647).nullable().default(null),
+    notes: z.string().max(5_000).nullable().default(null),
     // True when this is eating a previous cook again rather than making it
     // afresh. Counts for variety, but is not a fresh cook.
     isLeftovers: z.boolean().default(false),

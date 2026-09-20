@@ -31,6 +31,13 @@ export interface ApiErrorBody {
 
 const JSON_HEADERS = { "Content-Type": "application/json; charset=utf-8" };
 
+/**
+ * The largest JSON body this API will read. A recipe with a long method and
+ * two hundred ingredients is a few tens of KB, so 1 MB is generous; the point
+ * is only that SOME ceiling exists between an anonymous caller and the heap.
+ */
+const MAX_JSON_BODY_BYTES = 1_000_000;
+
 /** Success envelope. Use 201 on create; use `noContent()` for deletes. */
 export function jsonOk<T>(data: T, status = 200, headers?: HeadersInit): Response {
   return new Response(JSON.stringify({ data }), {
@@ -95,12 +102,57 @@ export function jsonError(
 export function assertApiAccess(request: Request): void {
   const expected = process.env.INTERNAL_API_KEY;
 
-  // Unset (or empty) means "open" -- see the two-mode note above.
-  if (!expected) return;
+  if (!expected) {
+    // FAIL CLOSED IN PRODUCTION. The open mode above is right for `npm run
+    // dev` and for the Playwright suite, but as a *default* it makes a deploy
+    // that forgot the variable indistinguishable from a correct one -- same
+    // logs, same health check, same 200s, with every endpoint below writable
+    // by anyone who can reach the port. Nothing in the repo ever sets the key
+    // (not the Dockerfile, not CI, not .env.example), so "forgot" is the
+    // likely case rather than the exotic one.
+    //
+    // Refusing to serve is the louder failure and the safer one: it is
+    // immediately obvious, and it cannot be mistaken for working. Running
+    // deliberately without auth stays possible, but has to be said out loud.
+    if (
+      process.env.NODE_ENV === "production" &&
+      process.env.ALLOW_UNAUTHENTICATED_API !== "1"
+    ) {
+      throw jsonError(
+        503,
+        "This deployment is refusing API requests because INTERNAL_API_KEY is " +
+          "not set. Set it, or set ALLOW_UNAUTHENTICATED_API=1 to serve the " +
+          "API with no authentication at all."
+      );
+    }
 
-  if (request.headers.get("X-Api-Key") !== expected) {
+    return;
+  }
+
+  const presented = request.headers.get("X-Api-Key");
+
+  if (presented === null || !timingSafeEquals(presented, expected)) {
     throw jsonError(401, "Missing or invalid X-Api-Key header");
   }
+}
+
+/**
+ * Compare two secrets without leaking their contents through how long it
+ * takes. `!==` on strings returns at the first differing byte, which over
+ * enough samples tells an attacker how much of a guessed prefix was right.
+ *
+ * The length is compared first and separately -- that much is observable
+ * whatever we do, and a length mismatch means there is nothing to compare.
+ */
+function timingSafeEquals(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+
+  let difference = 0;
+  for (let index = 0; index < a.length; index++) {
+    difference |= a.charCodeAt(index) ^ b.charCodeAt(index);
+  }
+
+  return difference === 0;
 }
 
 /**
@@ -113,16 +165,39 @@ export function assertApiAccess(request: Request): void {
  * report which fields are missing.
  */
 export async function readJsonBody(request: Request): Promise<unknown> {
-  const contentType = request.headers.get("content-type") ?? "";
+  const contentType = request.headers.get("content-type");
 
-  if (contentType && !contentType.toLowerCase().includes("application/json")) {
+  // Match the ESSENCE, not a substring, and require the header rather than
+  // treating its absence as consent. Both of those were holes with the same
+  // consequence: a cross-origin page could reach these endpoints without
+  // tripping a CORS preflight. `text/plain;charset=application/json` passes a
+  // `.includes()` check while counting as a CORS-safelisted `text/plain`, and
+  // a body sent with no Content-Type at all is safelisted too. There is no
+  // CSRF token and no Origin check here, so this header is what stands
+  // between a POST endpoint and any page the user happens to be visiting.
+  const essence = (contentType ?? "").split(";")[0].trim().toLowerCase();
+  if (essence !== "application/json") {
     throw jsonError(
       400,
-      `Expected Content-Type: application/json, received "${contentType}"`
+      `Expected Content-Type: application/json, received "${contentType ?? "(none)"}"`
     );
   }
 
+  // Refuse an oversized body BEFORE reading it. `request.text()` buffers the
+  // whole thing into one string, and nothing between the socket and this line
+  // imposes a limit -- react-router-serve mounts no body parser -- so a
+  // multi-gigabyte POST is a cheap way to exhaust the heap. Chunked bodies
+  // declare no length, hence the second check after reading.
+  const declaredLength = Number(request.headers.get("content-length") ?? "");
+  if (Number.isFinite(declaredLength) && declaredLength > MAX_JSON_BODY_BYTES) {
+    throw jsonError(413, "Request body is too large");
+  }
+
   const raw = await request.text();
+  if (raw.length > MAX_JSON_BODY_BYTES) {
+    throw jsonError(413, "Request body is too large");
+  }
+
   if (raw.trim() === "") return {};
 
   try {
@@ -206,8 +281,17 @@ export function methodNotAllowed(request: Request, allowed: string[]): Response 
  * exports both, even when one of them only exists to say "not that method".
  */
 export function methodNotAllowedHandler(allowed: string[]) {
-  return async ({ request }: { request: Request }): Promise<Response> =>
-    methodNotAllowed(request, allowed);
+  // Wrapped in `apiRoute` like every other handler, so the 401 that
+  // `assertApiAccess` throws comes back in the envelope rather than escaping
+  // as React Router's plain-text error.
+  return apiRoute(async ({ request }: { request: Request }) => {
+    // Auth first, even here. This was the one handler that skipped it, which
+    // contradicted the "called as the first statement of every loader and
+    // action" rule above and let an unauthenticated caller map the API's
+    // endpoints and their permitted methods from the 405 bodies.
+    assertApiAccess(request);
+    return methodNotAllowed(request, allowed);
+  });
 }
 
 interface PgError {
@@ -238,6 +322,14 @@ const CLIENT_FAULT_SQLSTATES: Record<string, string> = {
   "22P02": "Request contains a malformed value",
   "22007": "Request contains a malformed date or time",
   "22008": "Request contains an out-of-range date or time",
+  // The two a too-long or too-big value actually raises. Without them, a 256th
+  // character in an ingredient name or a servings count above int4 answered
+  // 500 and wrote a stack trace to the log -- a client-triggerable error-log
+  // flood, and the same failure `uuidPathParam` exists to prevent, arriving
+  // through the body instead of the path. The schemas now bound these fields
+  // directly; these entries are the backstop for the next column that changes.
+  "22001": "Request contains a value that is too long for its field",
+  "22003": "Request contains a number outside the allowed range",
 };
 
 /**
