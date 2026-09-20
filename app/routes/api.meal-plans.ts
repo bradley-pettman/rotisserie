@@ -25,7 +25,11 @@ import {
 // Composed from the existing item schema, not a redefinition of it:
 // createMealPlan takes the plan and its items as two arguments, so the single
 // JSON body is split along the same seam before being handed over.
-const mealPlanItemsSchema = z.array(mealPlanItemSchema).default([]);
+// Bounded: `createMealPlan` inserts these one at a time inside a single
+// transaction, so an unbounded array lets one request hold a pooled connection
+// (there are ten) for as long as it likes. A month of four slots a day is
+// ~124 items, so 500 is generous for any real plan.
+const mealPlanItemsSchema = z.array(mealPlanItemSchema).max(500).default([]);
 
 export const loader = apiRoute(async ({ request }: Route.LoaderArgs) => {
   assertApiAccess(request);

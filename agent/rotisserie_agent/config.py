@@ -24,6 +24,23 @@ class Settings(BaseSettings):
     # Unset means the API is open, which is the local-development mode.
     internal_api_key: str | None = None
 
+    # --- This service's OWN front door ---
+    #
+    # Distinct from `internal_api_key`, which is what this service SENDS
+    # upstream. This one is what it REQUIRES from its own callers, and it
+    # exists because without it the service is a confused deputy: it holds the
+    # upstream key and the Anthropic credentials, so anyone who can reach this
+    # port can write cooks and meal plans into Postgres, and spend the
+    # operator's model budget, without ever holding a secret themselves. An
+    # unauthenticated agent silently voids INTERNAL_API_KEY on the TS side.
+    #
+    # Unlike the TS side's historical behaviour, unset does NOT mean open:
+    # `allow_unauthenticated` has to be set as well, so the insecure mode is
+    # something an operator chooses rather than something they forget. See
+    # `require_agent_auth` in main.py.
+    agent_api_key: str | None = None
+    allow_unauthenticated: bool = False
+
     api_timeout_seconds: float = 30.0
 
     # --- Model ---

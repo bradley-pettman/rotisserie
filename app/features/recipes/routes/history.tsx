@@ -1,6 +1,7 @@
 import { useLoaderData } from "react-router";
 
 import { PageHeader } from "~/components/app-shell";
+import { todayIso } from "~/lib/date";
 
 import { HistoryList } from "../components/cook-history";
 import { getCookingHistory } from "../queries/cooks";
@@ -9,11 +10,14 @@ import { getCookingHistory } from "../queries/cooks";
 const WINDOW_DAYS = 90;
 
 export async function loader() {
-  return { cooks: await getCookingHistory(WINDOW_DAYS) };
+  // `today` comes from here, once per request, rather than from `new Date()`
+  // during render -- which would differ between the server and the browser and
+  // make "Today"/"Yesterday" flip on hydration.
+  return { cooks: await getCookingHistory(WINDOW_DAYS), today: todayIso() };
 }
 
 export default function HistoryPage() {
-  const { cooks } = useLoaderData<typeof loader>();
+  const { cooks, today } = useLoaderData<typeof loader>();
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-6 md:px-8 md:py-7">
@@ -25,7 +29,7 @@ export default function HistoryPage() {
             : `${cooks.length} ${cooks.length === 1 ? "meal" : "meals"} cooked in the last ${WINDOW_DAYS} days`
         }
       />
-      <HistoryList cooks={cooks} />
+      <HistoryList cooks={cooks} today={today} />
     </div>
   );
 }

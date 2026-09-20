@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Plus, X } from "lucide-react";
 import type * as React from "react";
-import { Form, Link } from "react-router";
+import { Form, Link, useNavigation } from "react-router";
 
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
@@ -51,6 +51,11 @@ export function RecipeForm({
   /** The delete form, on edit only. Destructive actions live at the bottom. */
   danger?: React.ReactNode;
 }) {
+  // Saving a recipe is not idempotent -- a second click while the first POST is
+  // in flight creates a second recipe. React Router cancels the client fetch on
+  // the new navigation, but the first request already reached the server.
+  const busy = useNavigation().state === "submitting";
+
   const [ingredients, setIngredients] = useState<RecipeIngredient[]>(
     recipe && recipe.ingredients.length > 0
       ? recipe.ingredients.map((ingredient) => ({
@@ -106,7 +111,9 @@ export function RecipeForm({
               <Button asChild variant="ghost">
                 <Link to={cancelTo}>Cancel</Link>
               </Button>
-              <Button type="submit">{submitLabel}</Button>
+              <Button type="submit" disabled={busy}>
+                {busy ? "Saving…" : submitLabel}
+              </Button>
             </div>
           </div>
         </header>

@@ -11,7 +11,7 @@ import { CookRow } from "./recipe-parts";
  * FACT, and renaming or deleting the recipe must not rewrite the record of
  * having made it.
  */
-export function HistoryList({ cooks }: { cooks: Cook[] }) {
+export function HistoryList({ cooks, today }: { cooks: Cook[]; today: string }) {
   if (cooks.length === 0) {
     return <EmptyState>Nothing logged yet.</EmptyState>;
   }
@@ -30,12 +30,12 @@ export function HistoryList({ cooks }: { cooks: Cook[] }) {
       {[...byDay.entries()].map(([day, entries]) => (
         <section key={day}>
           <div className="mb-1 flex items-baseline gap-2">
-            <h3 className="text-sm font-semibold">{relativeDay(day)}</h3>
+            <h3 className="text-sm font-semibold">{relativeDay(day, today)}</h3>
             <span className="text-muted-foreground text-xs">{mediumDate(day)}</span>
           </div>
           <div className="divide-border/70 divide-y rounded-lg border px-3">
             {entries.map((cook) => (
-              <CookRow key={cook.id} cook={cook} />
+              <CookRow key={cook.id} cook={cook} today={today} />
             ))}
           </div>
         </section>

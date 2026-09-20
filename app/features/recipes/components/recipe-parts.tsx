@@ -42,11 +42,14 @@ export function Meta({
 export function RecipeMeta({
   recipe,
   lastCooked,
+  today,
   className,
 }: {
   recipe: Pick<RecipeWithDetails, "prepTimeMinutes" | "cookTimeMinutes" | "servings">;
   /** Omit to hide the field; `null` means "never cooked", which is not the same. */
   lastCooked?: string | null;
+  /** Today, from the loader. Never computed here -- see `relativeDay`. */
+  today: string;
   className?: string;
 }) {
   const total = duration(totalTime(recipe.prepTimeMinutes, recipe.cookTimeMinutes));
@@ -56,7 +59,9 @@ export function RecipeMeta({
       {total && <Meta icon={Clock}>{total}</Meta>}
       {recipe.servings ? <Meta icon={Users}>Serves {recipe.servings}</Meta> : null}
       {lastCooked !== undefined && (
-        <Meta icon={Flame}>{lastCooked ? relativeDay(lastCooked) : "Never cooked"}</Meta>
+        <Meta icon={Flame}>
+          {lastCooked ? relativeDay(lastCooked, today) : "Never cooked"}
+        </Meta>
       )}
     </div>
   );
@@ -142,7 +147,7 @@ export function StepList({ recipe }: { recipe: RecipeWithDetails }) {
  * never joins back to `recipes`. Renaming a recipe must not rewrite what you
  * remember eating, and deleting one must not erase it.
  */
-export function CookRow({ cook }: { cook: Cook }) {
+export function CookRow({ cook, today }: { cook: Cook; today: string }) {
   return (
     <div className="flex items-center justify-between gap-4 py-2.5">
       <div className="flex min-w-0 items-center gap-3">
@@ -156,7 +161,7 @@ export function CookRow({ cook }: { cook: Cook }) {
         </div>
       </div>
       <span className="text-muted-foreground shrink-0 text-xs whitespace-nowrap">
-        {relativeDay(cook.cookedOn)}
+        {relativeDay(cook.cookedOn, today)}
       </span>
     </div>
   );
@@ -165,10 +170,13 @@ export function CookRow({ cook }: { cook: Cook }) {
 /** A recipe as a compact row, for pickers and side panels. */
 export function RecipeRow({
   recipe,
+  today,
   active,
   onClick,
 }: {
   recipe: RecipeListItem;
+  /** Today, from the loader. Never computed here -- see `relativeDay`. */
+  today: string;
   active?: boolean;
   onClick?: () => void;
 }) {
@@ -190,7 +198,7 @@ export function RecipeRow({
       <div className="mt-1.5 flex items-center justify-between gap-3">
         <TagList tags={recipe.tags} max={2} />
         <span className="text-muted-foreground shrink-0 text-xs">
-          {recipe.lastCookedAt ? relativeDay(recipe.lastCookedAt) : "Never"}
+          {recipe.lastCookedAt ? relativeDay(recipe.lastCookedAt, today) : "Never"}
         </span>
       </div>
     </button>

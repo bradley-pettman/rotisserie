@@ -73,3 +73,31 @@ describe("parseDuration", () => {
     });
   });
 });
+
+describe("parseDuration: the T marker separates months from minutes", () => {
+  // ISO 8601 reuses `M` for both months (date part) and minutes (time part),
+  // and only the `T` tells them apart. The pattern used to make `T` optional,
+  // so a date-part `M` fell through into the minutes capture.
+  it('rejects "P1M" rather than reading one month as one minute', () => {
+    expect(parseDuration("P1M")).toBeNull();
+    expect(parseDuration("P3M")).toBeNull();
+  });
+
+  it('rejects "P1H", which is not valid ISO 8601 at all', () => {
+    expect(parseDuration("P1H")).toBeNull();
+    expect(parseDuration("P30S")).toBeNull();
+  });
+
+  it("still reads time-part minutes after the T marker", () => {
+    expect(parseDuration("PT1M")).toBe(1);
+    expect(parseDuration("PT90M")).toBe(90);
+  });
+
+  it("still reads every well-formed duration it used to", () => {
+    expect(parseDuration("PT20M")).toBe(20);
+    expect(parseDuration("PT1H5M")).toBe(65);
+    expect(parseDuration("P1D")).toBe(1440);
+    expect(parseDuration("P1DT2H")).toBe(1560);
+    expect(parseDuration("PT2H30M")).toBe(150);
+  });
+});

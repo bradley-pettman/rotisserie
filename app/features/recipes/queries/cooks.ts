@@ -1,6 +1,7 @@
 import { DB } from "~/db/connection";
 import type { QueryFns } from "~/db/connection";
 import type { CreateCookInput, MealSlot } from "../schemas/cook";
+import { isUuid } from "~/lib/uuid";
 
 /**
  * A cook is a FACT -- append-only history of what was actually made, and when.
@@ -63,12 +64,29 @@ async function insertCook(db: QueryFns, input: CreateCookInput, label: string): 
   return cook;
 }
 
-export async function logCook(input: CreateCookInput): Promise<Cook> {
+/**
+ * Log a cook. Returns `null` when the cook names a recipe that does not exist.
+ *
+ * NULL RATHER THAN THROWING: this is the caller's mistake, not a server fault,
+ * and it used to be a plain `Error`, which `apiRoute` could only read as a 500
+ * with a stack trace in the log. The asymmetry gave it away -- the same bad id
+ * sent WITH a label hit the foreign key instead, and 23503 is in the
+ * caller-fault table, so it answered a correct 400. Only the snapshot branch
+ * misbehaved, and it was a free anonymous way to fill the error log.
+ *
+ * `tx` lets a caller run this inside a transaction it already owns, so a cook
+ * and whatever else must land with it commit together. Omitted, it opens its
+ * own where it needs one.
+ */
+export async function logCook(
+  input: CreateCookInput,
+  tx?: QueryFns
+): Promise<Cook | null> {
   const label = input.label.trim();
 
   // A label was supplied, so there is nothing to look up: one insert, no
   // transaction needed.
-  if (label) return insertCook(DB, input, label);
+  if (label) return insertCook(tx ?? DB, input, label);
 
   if (!input.recipeId) {
     throw new Error("A cook needs either a label or a recipeId to snapshot a label from");
@@ -78,16 +96,18 @@ export async function logCook(input: CreateCookInput): Promise<Cook> {
   // The lookup and the insert share a transaction so a concurrent rename
   // cannot land between them and store a name that never existed together
   // with this cook.
-  return DB.withTransaction(async (tx) => {
-    const recipe = await tx.queryOne<{ name: string }>(
+  const snapshot = async (db: QueryFns): Promise<Cook | null> => {
+    const recipe = await db.queryOne<{ name: string }>(
       `SELECT name FROM recipes WHERE id = $1`,
       [input.recipeId]
     );
 
-    if (!recipe) throw new Error(`Recipe ${input.recipeId} not found`);
+    if (!recipe) return null;
 
-    return insertCook(tx, input, recipe.name);
-  });
+    return insertCook(db, input, recipe.name);
+  };
+
+  return tx ? snapshot(tx) : DB.withTransaction(snapshot);
 }
 
 /**
@@ -116,6 +136,8 @@ export async function getCookingHistory(days: number): Promise<Cook[]> {
  * DATE and picks the latest day, not the lexically largest string.
  */
 export async function lastCookedAt(recipeId: string): Promise<string | null> {
+  if (!isUuid(recipeId)) return null;
+
   const row = await DB.queryOne<{ lastCookedOn: string | null }>(
     `SELECT to_char(MAX(cooked_on), 'YYYY-MM-DD') as "lastCookedOn"
      FROM cooks
@@ -147,6 +169,8 @@ export async function lastCookedForRecipes(recipeIds: string[]): Promise<Map<str
 }
 
 export async function deleteCook(id: string): Promise<boolean> {
+  if (!isUuid(id)) return false;
+
   const result = await DB.query(
     `DELETE FROM cooks WHERE id = $1 RETURNING id`,
     [id]

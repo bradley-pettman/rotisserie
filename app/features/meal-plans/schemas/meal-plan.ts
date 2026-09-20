@@ -27,8 +27,10 @@ export const mealPlanItemSchema = z
     customText: z.string().trim().max(255).nullable().default(null),
     plannedOn: z.iso.date(),
     mealSlot: mealSlotSchema.default("dinner"),
-    sortOrder: z.number().int().min(0).default(0),
-    notes: z.string().nullable().default(null),
+    // `.max()` mirrors the INTEGER column -- zod's `.int()` alone permits a
+    // safe integer, which overflows int4 and answers 500 instead of 400.
+    sortOrder: z.number().int().min(0).max(2_147_483_647).default(0),
+    notes: z.string().max(5_000).nullable().default(null),
   })
   .refine((item) => item.recipeId !== null || (item.customText?.length ?? 0) > 0, {
     // The database CHECK can only test for NULL, so it would accept a

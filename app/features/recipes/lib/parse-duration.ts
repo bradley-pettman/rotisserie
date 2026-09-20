@@ -29,7 +29,15 @@ export function parseDuration(iso: string | undefined | null): number | null {
   // H = hours
   // M = minutes
   // S = seconds
-  const regex = /^P(?:(\d+)D)?T?(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?$/i;
+  //
+  // The `T` is REQUIRED before H/M/S, not optional. ISO 8601 reuses `M` for
+  // both months (date part) and minutes (time part), and the marker is what
+  // separates them -- so with `T?` the date-part `M` fell through to the
+  // minutes capture and `P1M`, which means one month, parsed as one minute.
+  // `P1H` -- not valid ISO at all -- parsed as 60 minutes for the same reason.
+  // Months are deliberately not supported: no recipe has a prep time in
+  // months, and guessing at 30 days would be worse than declining.
+  const regex = /^P(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?)?$/i;
   const match = iso.match(regex);
 
   if (!match) {

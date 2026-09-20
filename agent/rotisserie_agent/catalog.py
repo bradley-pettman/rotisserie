@@ -117,6 +117,43 @@ class CatalogSnapshot:
         }
 
 
+# The widest a single rendered cell may be. Recipe names and cook labels are
+# VARCHAR(255) upstream; a name that long is already pathological in a table,
+# and truncating bounds how much a single row can distort the prefix.
+MAX_CELL_CHARS = 120
+
+
+def _cell(value: object) -> str:
+    """Render one untrusted value as a single, well-behaved table cell.
+
+    UNTRUSTED IS THE OPERATIVE WORD. Recipe names, tags and cook labels are
+    typed by users and can also arrive from scraped pages, and this table is
+    interpolated into the SYSTEM prompt. A name containing a newline used to
+    break out of its row and plant arbitrary text at system level -- and
+    because the snapshot is cached and reused for the whole TTL window, one
+    such row would ride along on every request for five minutes.
+
+    So: collapse anything that could forge structure (newlines, carriage
+    returns, tabs, other control characters) into spaces, neutralise the `|`
+    column delimiter, and cap the length. This is the table's own escaping
+    rule, the same idea as quoting a CSV field -- not a content filter, and it
+    is not trying to decide whether the text is "malicious". Structure is what
+    it protects; `prompts.py` separately tells the model that everything in
+    here is data rather than instructions.
+    """
+    text = str(value)
+    # Control characters (incl. \n, \r, \t) -> a single space each.
+    text = "".join(" " if ch < " " or ch == "\x7f" else ch for ch in text)
+    # The column delimiter cannot appear inside a column.
+    text = text.replace("|", "/")
+    text = " ".join(text.split())
+
+    if len(text) > MAX_CELL_CHARS:
+        text = text[: MAX_CELL_CHARS - 1] + "…"
+
+    return text or "-"
+
+
 def _render(
     recipes: tuple[CatalogRecipe, ...],
     cooks: tuple[dict[str, Any], ...],
@@ -138,9 +175,9 @@ def _render(
         lines.append(
             " | ".join(
                 [
-                    r.id,
-                    r.name,
-                    ",".join(r.tags) if r.tags else "-",
+                    _cell(r.id),
+                    _cell(r.name),
+                    _cell(",".join(r.tags)) if r.tags else "-",
                     _fmt_minutes(r.prep_time_minutes),
                     _fmt_minutes(r.cook_time_minutes),
                     _fmt_minutes(r.total_time_minutes),
@@ -165,10 +202,10 @@ def _render(
             lines.append(
                 " | ".join(
                     [
-                        str(cook.get("cookedOn", "?")),
-                        str(cook.get("mealSlot", "?")),
-                        str(cook.get("recipeId") or "-"),
-                        str(cook.get("label", "?")),
+                        _cell(cook.get("cookedOn", "?")),
+                        _cell(cook.get("mealSlot", "?")),
+                        _cell(cook.get("recipeId") or "-"),
+                        _cell(cook.get("label", "?")),
                         "yes" if cook.get("isLeftovers") else "no",
                     ]
                 )

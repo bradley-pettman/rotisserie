@@ -13,12 +13,13 @@ from __future__ import annotations
 
 import asyncio
 import json
+import secrets
 from contextlib import asynccontextmanager
 from datetime import date, timedelta
-from typing import Any, AsyncIterator
+from typing import Any, AsyncIterator, Literal
 
 import anthropic
-from fastapi import FastAPI, Request
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
@@ -53,8 +54,26 @@ from .tools import (
 # ---------------------------------------------------------------------------
 # request / response models
 # ---------------------------------------------------------------------------
+# Every free-text field below is bounded. Unbounded input into this service is
+# not merely a large request: it is billed straight through to the model, and on
+# /chat it is stored in the conversation and re-sent on every later turn. The
+# limits are generous for prose a person actually types and far below anything
+# that makes a single POST expensive.
+MAX_CONSTRAINTS_CHARS = 2_000
+MAX_MESSAGE_CHARS = 8_000
+MAX_INGREDIENT_CHARS = 255  # matches ingredients.name VARCHAR(255) upstream
+MAX_REASON_CHARS = 500
+MAX_CONVERSATION_ID_CHARS = 128
+
+# The four legal slots, shared with `cooks` and `meal_plan_items` upstream (both
+# carry a CHECK constraint on exactly these). A `list[str]` let an arbitrary
+# string through to the prompt; a Literal rejects it at the boundary.
+MealSlot = Literal["breakfast", "lunch", "dinner", "snack"]
+
+
 class PlanWeekRequest(BaseModel):
     constraints: str = Field(
+        max_length=MAX_CONSTRAINTS_CHARS,
         description="The household's constraints in prose.",
         examples=[
             "easy dinners, nothing we've had in two weeks, Friday is pizza night"
@@ -65,7 +84,9 @@ class PlanWeekRequest(BaseModel):
     )
     days: int = Field(default=7, ge=1, le=31)
     exclude_cooked_within_days: int = Field(default=14, ge=0, le=365)
-    meal_slots: list[str] = Field(default_factory=lambda: ["dinner"])
+    meal_slots: list[MealSlot] = Field(
+        default_factory=lambda: ["dinner"], min_length=1, max_length=4
+    )
     refresh_catalog: bool = False
 
 
@@ -73,11 +94,13 @@ class SuggestSubstitutionRequest(BaseModel):
     recipe_id: str = Field(description="The recipe they are cooking, by id.")
     ingredient: str = Field(
         min_length=1,
+        max_length=MAX_INGREDIENT_CHARS,
         description="The ingredient to replace, as the user named it.",
         examples=["buttermilk"],
     )
     reason: str | None = Field(
         default=None,
+        max_length=MAX_REASON_CHARS,
         description="Why, in their own words. Optional -- 'don't have any' is a reason too.",
         examples=["dairy allergy"],
     )
@@ -85,8 +108,10 @@ class SuggestSubstitutionRequest(BaseModel):
 
 
 class ChatRequest(BaseModel):
-    message: str
-    conversation_id: str | None = None
+    message: str = Field(min_length=1, max_length=MAX_MESSAGE_CHARS)
+    conversation_id: str | None = Field(
+        default=None, max_length=MAX_CONVERSATION_ID_CHARS
+    )
     # CONFIRM BEFORE WRITING. False means the write tools refuse and tell the
     # model to ask. A client sets it true only after the human has said yes.
     confirm_writes: bool = False
@@ -120,6 +145,49 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         await app.state.anthropic.close()
 
 
+def require_agent_auth(request: Request) -> None:
+    """Gate every endpoint that costs money, reads the household's data, or writes.
+
+    THE POINT: this service is a confused deputy without it. It holds the
+    upstream `INTERNAL_API_KEY` and the Anthropic credentials, so a caller who
+    reaches this port gets to write `cooks` and `meal_plans` through the TS API
+    -- and spend the operator's model budget -- while holding no secret at all.
+    Leaving this open silently cancels whatever `INTERNAL_API_KEY` was meant to
+    protect.
+
+    Unset does NOT mean open. The TS side historically treated a missing key as
+    "allow everything", which makes a forgotten environment variable
+    indistinguishable from a correct deployment. Here the open mode has to be
+    asked for by name (`ALLOW_UNAUTHENTICATED=1`), so local development and the
+    test suite still work with no setup while a deploy that forgets the key
+    fails closed and says why.
+
+    The comparison is constant-time: the key is a fixed shared secret, an
+    attacker can retry freely, and `secrets.compare_digest` costs nothing.
+    """
+    settings: Settings = request.app.state.settings
+    expected = settings.agent_api_key
+
+    if not expected:
+        if settings.allow_unauthenticated:
+            return
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "This service is refusing requests because AGENT_API_KEY is not "
+                "set. Set it, or set ALLOW_UNAUTHENTICATED=1 to run without "
+                "authentication (local development only -- this service can "
+                "write to your database and spend your model budget)."
+            ),
+        )
+
+    presented = request.headers.get("X-Api-Key") or ""
+    if not secrets.compare_digest(presented, expected):
+        raise HTTPException(
+            status_code=401, detail="Missing or invalid X-Api-Key header"
+        )
+
+
 def create_app(settings: Settings | None = None) -> FastAPI:
     app = FastAPI(
         title="Rotisserie meal-planning agent",
@@ -128,39 +196,69 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
     app.state.settings = settings or get_settings()
 
+    # Applied to every route below except /health, which stays open so a load
+    # balancer with no way to send headers can still probe liveness -- and which
+    # is trimmed accordingly (see there).
+    authed = [Depends(require_agent_auth)]
+
     # -----------------------------------------------------------------
     # health
     # -----------------------------------------------------------------
     @app.get("/health")
     async def health(request: Request) -> JSONResponse:
+        """Liveness, deliberately unauthenticated -- and deliberately terse.
+
+        This is the one endpoint left open, because a load balancer probing it
+        often cannot attach a header. That makes everything it returns public,
+        so the deployment detail it used to report (the upstream API's URL,
+        whether the upstream key was set, the model id, conversation counts) is
+        now gated: an anonymous caller gets liveness, and a caller holding the
+        key gets the diagnostics. Whether a service is reachable is a fair thing
+        to leak; its topology and its security posture are not.
+        """
         state = request.app.state
-        body: dict[str, Any] = {
-            "status": "ok",
-            "model": state.settings.anthropic_model,
-            "rotisserie_api": state.settings.rotisserie_api_url,
-            "api_key_mode": "set" if state.settings.internal_api_key else "open",
-            "anthropic_credentials": (
-                "resolved" if has_credentials(state.anthropic) else "missing"
-            ),
-            "conversations": await state.conversations.stats(),
-        }
+        settings: Settings = state.settings
+
+        authenticated = bool(
+            settings.agent_api_key
+            and secrets.compare_digest(
+                request.headers.get("X-Api-Key") or "", settings.agent_api_key
+            )
+        )
+
+        body: dict[str, Any] = {"status": "ok"}
+
+        if authenticated or settings.allow_unauthenticated:
+            body |= {
+                "model": settings.anthropic_model,
+                "rotisserie_api": settings.rotisserie_api_url,
+                "api_key_mode": "set" if settings.internal_api_key else "open",
+                "anthropic_credentials": (
+                    "resolved" if has_credentials(state.anthropic) else "missing"
+                ),
+                "conversations": await state.conversations.stats(),
+            }
 
         # Report the dependency rather than hide it: a healthy process with an
-        # unreachable API is not a healthy service.
+        # unreachable API is not a healthy service. `status` is public (that is
+        # what a probe is for); the reason it failed names internal hosts and
+        # is therefore gated with the rest of the diagnostics.
         try:
             await state.api.health()
             body["rotisserie_api_reachable"] = True
         except ApiError as exc:
             body["status"] = "degraded"
             body["rotisserie_api_reachable"] = False
-            body["rotisserie_api_error"] = f"{exc.status}: {exc.message}"
+            if authenticated or settings.allow_unauthenticated:
+                body["rotisserie_api_error"] = f"{exc.status}: {exc.message}"
         except Exception as exc:  # network-level
             body["status"] = "degraded"
             body["rotisserie_api_reachable"] = False
-            body["rotisserie_api_error"] = str(exc)
+            if authenticated or settings.allow_unauthenticated:
+                body["rotisserie_api_error"] = str(exc)
 
         snapshot = state.catalog.peek()
-        if snapshot is not None:
+        if snapshot is not None and (authenticated or settings.allow_unauthenticated):
             body["catalog"] = {
                 "recipes": len(snapshot.recipes),
                 "cooks": len(snapshot.cooks),
@@ -173,7 +271,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     # -----------------------------------------------------------------
     # plan-week -- returns a DRAFT, never saves
     # -----------------------------------------------------------------
-    @app.post("/plan-week")
+    @app.post("/plan-week", dependencies=authed)
     async def plan_week_endpoint(
         request: Request, body: PlanWeekRequest
     ) -> JSONResponse:
@@ -246,7 +344,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     # -----------------------------------------------------------------
     # suggest-substitution -- advice about one recipe, never a write
     # -----------------------------------------------------------------
-    @app.post("/suggest-substitution")
+    @app.post("/suggest-substitution", dependencies=authed)
     async def suggest_substitution_endpoint(
         request: Request, body: SuggestSubstitutionRequest
     ) -> JSONResponse:
@@ -327,7 +425,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     # -----------------------------------------------------------------
     # chat -- SSE
     # -----------------------------------------------------------------
-    @app.post("/chat")
+    @app.post("/chat", dependencies=authed)
     async def chat_endpoint(request: Request, body: ChatRequest) -> Any:
         state = request.app.state
 
@@ -453,7 +551,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
         )
 
-    @app.get("/catalog")
+    @app.get("/catalog", dependencies=authed)
     async def catalog_endpoint(request: Request, refresh: bool = False) -> JSONResponse:
         """The exact cached prefix, for debugging cache behaviour and prompts."""
         state = request.app.state

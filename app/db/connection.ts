@@ -26,8 +26,59 @@ const { Pool } = pg;
  */
 pg.types.setTypeParser(pg.types.builtins.NUMERIC, (value) => Number(value));
 
+/** Read a positive-integer knob from the environment, falling back when unset or junk. */
+function envInt(name: string, fallback: number): number {
+  const raw = process.env[name];
+  if (raw === undefined || raw.trim() === "") return fallback;
+
+  const value = Number(raw);
+  return Number.isInteger(value) && value > 0 ? value : fallback;
+}
+
+/**
+ * The pool's defaults are all "wait forever", which is the wrong answer for
+ * every one of them under load:
+ *
+ * - `connectionTimeoutMillis: 0` queues a request for a connection with no
+ *   deadline. Once `max` slots are busy, every further request piles up
+ *   invisibly instead of failing fast, including the one from `checkDatabase`
+ *   below -- so the liveness probe stops answering at exactly the moment it
+ *   has something to report, and a load balancer cannot take the instance out
+ *   of rotation. A bounded wait converts that silent pile-up into a 500 the
+ *   caller can see and the probe can outrun.
+ * - No `statement_timeout` lets one pathological query hold a slot forever.
+ *   Postgres enforces this server-side, so it covers the query even if the
+ *   Node process stops waiting on it.
+ * - `idleTimeoutMillis` returns unused connections to Postgres rather than
+ *   holding `max` of them open against a shared server.
+ *
+ * All four are env-tunable because the right numbers depend on the deployment
+ * (a serverless runtime wants a much smaller `max` than a long-lived server),
+ * and a deploy should not need a rebuild to change them.
+ */
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
+  max: envInt("PGPOOL_MAX", 10),
+  connectionTimeoutMillis: envInt("PGPOOL_CONNECTION_TIMEOUT_MS", 5_000),
+  idleTimeoutMillis: envInt("PGPOOL_IDLE_TIMEOUT_MS", 30_000),
+  statement_timeout: envInt("PGPOOL_STATEMENT_TIMEOUT_MS", 10_000),
+});
+
+/**
+ * REQUIRED, not optional logging: `Pool` is an EventEmitter, and Node throws an
+ * `error` event that has no listener as an uncaught exception. pg re-emits
+ * errors from clients sitting IDLE in the pool here -- which is what a Postgres
+ * restart, a failover, an OOM kill, a `pg_terminate_backend()`, or a NAT/
+ * pgbouncer idle timeout all look like from this side. Without this line the
+ * first such blip takes the whole server process down, in-flight requests and
+ * all, for a condition the pool would otherwise recover from on its own by
+ * discarding the dead client.
+ *
+ * There is nothing to do but log: the failed client is already being removed,
+ * and the next `connect()` opens a fresh one.
+ */
+pool.on("error", (error) => {
+  console.error("[db] idle client error", error);
 });
 
 export type QueryParam = string | number | boolean | null | Date | string[];
@@ -75,12 +126,29 @@ async function withTransaction<T>(
 
     const result = await fn({ query: txQuery, queryOne: txQueryOne });
     await client.query("COMMIT");
+    client.release();
     return result;
   } catch (error) {
-    await client.query("ROLLBACK");
+    // The ROLLBACK is best-effort and its own failure is swallowed ON PURPOSE.
+    // The case where it fails is the case where the connection itself died --
+    // which is usually the very thing that threw `error` a moment ago. Letting
+    // the ROLLBACK's rejection propagate would replace the real cause with a
+    // meaningless "connection terminated", losing the only useful diagnostic.
+    //
+    // `release(true)` then DESTROYS the connection rather than returning it to
+    // the pool: a client whose ROLLBACK did not land may still be inside an
+    // aborted transaction, and handing that to the next caller would fail
+    // their query for reasons they cannot see. Discarding it costs one
+    // reconnect; reusing it costs a bug that only shows up under load.
+    let rolledBack = true;
+    try {
+      await client.query("ROLLBACK");
+    } catch {
+      rolledBack = false;
+    }
+
+    client.release(rolledBack ? undefined : true);
     throw error;
-  } finally {
-    client.release();
   }
 }
 

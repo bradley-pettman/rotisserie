@@ -1,13 +1,32 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { scrapeRecipe, stripHtml } from "~/features/recipes/lib/scrape-recipe";
+import {
+  isBlockedAddress,
+  scrapeRecipe,
+  stripHtml,
+} from "~/features/recipes/lib/scrape-recipe";
 
 /**
  * This suite must never touch the network — it runs in CI. `globalThis.fetch`
  * is replaced with a `vi.fn()` before every test and restored afterwards, and
  * every fixture below is inline HTML. Any real request would surface as an
  * unstubbed-call failure rather than a silent outbound connection.
+ *
+ * DNS is stubbed for the same reason. `scrapeRecipe` now resolves a hostname
+ * before fetching it, to keep an import from being aimed at loopback or at a
+ * cloud metadata endpoint (see `assertFetchableUrl`). That resolution is a real
+ * network call, so it is mocked here and answers with a public address —
+ * the SSRF guard itself is exercised directly in the "refuses" tests below,
+ * against literal addresses that need no lookup.
  */
+vi.mock("node:dns/promises", () => ({
+  lookup: vi.fn(async (hostname: string) => {
+    if (hostname === "internal.example.com") {
+      return [{ address: "169.254.169.254", family: 4 }];
+    }
+    return [{ address: "93.184.216.34", family: 4 }];
+  }),
+}));
 
 const RECIPE_URL = "https://example.com/recipes/brown-butter-banana-bread";
 
@@ -873,5 +892,225 @@ describe("scrapeRecipe ingredient parsing", () => {
       "butter, unsalted",
     ]);
     expect(recipe.ingredients.every((row) => row.notes === null)).toBe(true);
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/* Hardening: the network boundary                                            */
+/* -------------------------------------------------------------------------- */
+
+describe("isBlockedAddress", () => {
+  it("blocks loopback, private, link-local and metadata addresses", () => {
+    for (const address of [
+      "127.0.0.1",
+      "127.1.2.3",
+      "0.0.0.0",
+      "10.0.0.7",
+      "172.16.0.1",
+      "172.31.255.255",
+      "192.168.1.1",
+      "169.254.169.254", // AWS/GCP/Azure instance metadata
+      "100.64.0.1", // carrier-grade NAT
+      "198.18.0.1",
+      "224.0.0.1",
+      "::1",
+      "::",
+      "fc00::1",
+      "fd12:3456::1",
+      "fe80::1",
+      "::ffff:169.254.169.254", // the v4 metadata address wearing a v6 hat
+    ]) {
+      expect(isBlockedAddress(address), address).toBe(true);
+    }
+  });
+
+  it("allows ordinary public addresses", () => {
+    for (const address of [
+      "93.184.216.34",
+      "8.8.8.8",
+      "1.1.1.1",
+      "172.32.0.1", // just outside 172.16/12
+      "192.169.0.1", // just outside 192.168/16
+      "2606:2800:220:1::1",
+    ]) {
+      expect(isBlockedAddress(address), address).toBe(false);
+    }
+  });
+});
+
+describe("scrapeRecipe: refuses to be pointed at the inside of the network", () => {
+  it("rejects a non-http scheme without fetching", async () => {
+    for (const url of [
+      "file:///etc/passwd",
+      "data:text/html,<h1>hi</h1>",
+      "gopher://example.com/",
+      "ftp://example.com/recipe",
+    ]) {
+      await expect(scrapeRecipe(url)).rejects.toThrow(/only http and https/i);
+    }
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects a literal private or metadata address without fetching", async () => {
+    for (const url of [
+      "http://127.0.0.1:5432/",
+      "http://169.254.169.254/latest/meta-data/iam/security-credentials/",
+      "http://10.0.0.1/admin",
+      "http://[::1]:8080/",
+    ]) {
+      await expect(scrapeRecipe(url)).rejects.toThrow(/not reachable for import/i);
+    }
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects a hostname that resolves to a private address", async () => {
+    await expect(
+      scrapeRecipe("https://internal.example.com/recipe"),
+    ).rejects.toThrow(/not reachable for import/i);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects credentials embedded in the URL", async () => {
+    await expect(
+      scrapeRecipe("https://user:pass@example.com/recipe"),
+    ).rejects.toThrow(/remove the credentials/i);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("re-checks every redirect hop, so a public URL cannot bounce us inward", async () => {
+    // The classic bypass: the first URL passes every check, and the answer is a
+    // 302 into the metadata service.
+    fetchMock.mockResolvedValueOnce({
+      ok: false,
+      status: 302,
+      statusText: "Found",
+      headers: new Headers({ location: "http://169.254.169.254/latest/meta-data/" }),
+      text: async () => "",
+    });
+
+    await expect(scrapeRecipe(RECIPE_URL)).rejects.toThrow(
+      /not reachable for import/i,
+    );
+    // The first hop was fetched; the second was refused before any request.
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("follows a redirect that stays on a public address", async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: false,
+      status: 301,
+      statusText: "Moved Permanently",
+      headers: new Headers({ location: "https://example.com/recipes/moved" }),
+      text: async () => "",
+    });
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      statusText: "OK",
+      headers: new Headers({ "content-type": "text/html" }),
+      text: async () => BANANA_BREAD_HTML,
+    });
+
+    const recipe = await scrapeRecipe(RECIPE_URL);
+
+    expect(recipe.name).toBe("Brown Butter Banana Bread & Walnuts");
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("gives up rather than following a redirect loop forever", async () => {
+    fetchMock.mockResolvedValue({
+      ok: false,
+      status: 302,
+      statusText: "Found",
+      headers: new Headers({ location: "https://example.com/again" }),
+      text: async () => "",
+    });
+
+    await expect(scrapeRecipe(RECIPE_URL)).rejects.toThrow(/redirected too many times/i);
+  });
+
+  it("refuses a body that declares itself larger than the cap", async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      status: 200,
+      statusText: "OK",
+      headers: new Headers({
+        "content-type": "text/html",
+        "content-length": String(50_000_000),
+      }),
+      text: async () => "",
+    });
+
+    await expect(scrapeRecipe(RECIPE_URL)).rejects.toThrow(/too large to import/i);
+  });
+
+  it("refuses a response that is plainly not HTML", async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      status: 200,
+      statusText: "OK",
+      headers: new Headers({ "content-type": "image/jpeg" }),
+      text: async () => "",
+    });
+
+    await expect(scrapeRecipe(RECIPE_URL)).rejects.toThrow(/not HTML/i);
+  });
+});
+
+describe("scrapeRecipe: hostile input stays cheap to process", () => {
+  // Each of these used to be quadratic: every start position rescanned to the
+  // end of the input, so 512 KB of unterminated tags measured over 30 seconds
+  // of blocked event loop. Node serves every other request on that same thread.
+  const HOSTILE = [
+    ["unterminated script tags", "<script ".repeat(60_000)],
+    ["unterminated comments", "<!--".repeat(60_000)],
+    ["unterminated block tags", "<br".repeat(60_000)],
+    ["unterminated inline tags", "<a ".repeat(60_000)],
+  ] as const;
+
+  for (const [label, payload] of HOSTILE) {
+    it(`handles ${label} in well under a second`, async () => {
+      respondWith(payload);
+
+      const started = Date.now();
+      await expect(scrapeRecipe(RECIPE_URL)).rejects.toThrow(
+        /could not find recipe data/i,
+      );
+      const elapsed = Date.now() - started;
+
+      expect(elapsed).toBeLessThan(2_000);
+    });
+  }
+
+  it("caps how many ingredients and steps one page can contribute", async () => {
+    respondWith(
+      jsonLdPage({
+        name: "Ingredient Flood",
+        recipeIngredient: Array.from({ length: 5_000 }, () => "1 cup flour"),
+        recipeInstructions: Array.from({ length: 5_000 }, (_, i) => `Step ${i}.`),
+      }),
+    );
+
+    const recipe = await scrapeRecipe(RECIPE_URL);
+
+    expect(recipe.ingredients).toHaveLength(200);
+    expect(recipe.instructions?.split("\n\n")).toHaveLength(200);
+  });
+});
+
+describe("stripHtml: the entity table is not a prototype lookup", () => {
+  it("leaves &constructor; alone instead of substituting Object's source", () => {
+    // A bare `NAMED_ENTITIES[key]` resolved inherited properties, so this
+    // spliced "function Object() { [native code] }" into the recipe text.
+    expect(stripHtml("Bake &constructor; 20 min")).toBe("Bake &constructor; 20 min");
+    expect(stripHtml("&toString; &hasOwnProperty; &__proto__;")).toBe(
+      "&toString; &hasOwnProperty; &__proto__;",
+    );
+  });
+
+  it("still decodes the entities it actually knows", () => {
+    expect(stripHtml("Salt &amp; pepper")).toBe("Salt & pepper");
+    expect(stripHtml("350&deg;F")).toBe("350°F");
+    expect(stripHtml("&frac12; cup")).toBe("½ cup");
   });
 });
