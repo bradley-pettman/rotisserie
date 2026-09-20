@@ -38,6 +38,39 @@ if (!connectionString) {
   process.exit(1);
 }
 
+/**
+ * GUARD: this script TRUNCATEs recipes, cooks and meal plans. Until now the
+ * only thing standing between `npm run db:demo` and a production library was
+ * the operator remembering which DATABASE_URL was exported -- and exporting a
+ * staging or production URL is the normal way to run `dbmate up` against one,
+ * so the dangerous state is a state people are routinely in. The command also
+ * sits one line below `npm run db:seed` in the docs, which is harmless.
+ *
+ * `cooks` is append-only FACT (see the create_cooks migration) and is meant to
+ * survive even a recipe deletion, so there is no "undo" and no other copy.
+ *
+ * So: refuse anything that does not look like a scratch database by name, and
+ * make the override explicit and deliberate rather than a flag someone can
+ * pass by habit.
+ */
+const databaseName = (() => {
+  try {
+    return decodeURIComponent(new URL(connectionString).pathname.replace(/^\//, ""));
+  } catch {
+    return "";
+  }
+})();
+
+if (!/(_dev|_test|_demo)$/.test(databaseName) && process.env.ALLOW_DESTRUCTIVE !== "1") {
+  console.error(
+    `Refusing to run: this truncates recipes, cooks and meal plans, and ` +
+      `"${databaseName || connectionString}" is not a scratch database.\n` +
+      `Scratch databases end in _dev, _test or _demo.\n` +
+      `If you really mean it: ALLOW_DESTRUCTIVE=1 npm run db:demo`
+  );
+  process.exit(1);
+}
+
 const c = new pg.Client({ connectionString });
 await c.connect();
 

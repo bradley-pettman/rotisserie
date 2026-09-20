@@ -5,6 +5,13 @@ on:
   push:
     branches: [main]
 
+# Least privilege for GITHUB_TOKEN. The repository default is often read/write,
+# and neither job writes anything back to GitHub -- they install, build, test
+# and upload an artifact (which needs no repo scope). Setting this at the
+# workflow level means a new job cannot silently inherit write access.
+permissions:
+  contents: read
+
 jobs:
   verify:
     name: Lint, typecheck and unit tests

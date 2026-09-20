@@ -1,4 +1,35 @@
+# Build outputs and installed dependencies -- rebuilt inside the image.
 .react-router
 build
 node_modules
+
+# Secrets. `COPY . /app` in the builder stages would otherwise pull a
+# developer's real .env into an image layer. The final stage copies only
+# build/ and node_modules, so it never reaches the runtime image -- but the
+# builder layers are exactly what a registry cache export, a `--target` build
+# or a `docker save` publishes. Keep them out entirely.
+.env
+.env.*
+!.env.example
+
+# Version-control and CI metadata: full history in a layer, for no benefit.
+.git
+.gitignore
+.github
+
+# Local Postgres data, if docker-compose was ever run with a bind mount.
+pgdata
+
+# Things the build does not read.
 README.md
+ROADMAP.md
+SPEC-live-search.md
+CLAUDE.md
+LICENSE
+docs
+tests
+playwright.config.ts
+playwright-report
+test-results
+.wiggum
+agent
