@@ -1,19 +1,23 @@
-import type { Cook } from "./data";
-import { mediumDate, relativeDay } from "./format";
-import { CookRow, EmptyState } from "./parts";
+import { EmptyState } from "~/components/ui/section";
+import { mediumDate, relativeDay } from "~/lib/date";
+
+import type { Cook } from "../queries/cooks";
+import { CookRow } from "./recipe-parts";
 
 /**
  * Cooking history, grouped by day.
  *
- * Reads `cook.label` — the name snapshotted when the cook was logged — and
- * never joins back to `recipes`. Renaming a recipe must not rewrite what you
- * remember eating, and deleting one must not erase it.
+ * Renders `cook.label` rather than joining back to `recipes`: a cook is a
+ * FACT, and renaming or deleting the recipe must not rewrite the record of
+ * having made it.
  */
 export function HistoryList({ cooks }: { cooks: Cook[] }) {
   if (cooks.length === 0) {
     return <EmptyState>Nothing logged yet.</EmptyState>;
   }
 
+  // Cooks arrive newest-first and already ordered, so grouping is a single
+  // pass: a Map keeps insertion order, which keeps the days in that order too.
   const byDay = new Map<string, Cook[]>();
   for (const cook of cooks) {
     const day = byDay.get(cook.cookedOn);

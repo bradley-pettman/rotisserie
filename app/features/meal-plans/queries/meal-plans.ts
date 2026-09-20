@@ -132,6 +132,40 @@ export async function listMealPlans(): Promise<MealPlan[]> {
   );
 }
 
+/**
+ * The plan covering a given calendar day, if one exists.
+ *
+ * Plans are weeks in practice but the columns are just a date range, so this
+ * asks the range question directly rather than assuming a length. Overlapping
+ * plans are not prevented by the schema; the newest wins, because the one you
+ * just made is the one you meant.
+ */
+export async function findPlanCovering(day: string): Promise<MealPlan | null> {
+  return DB.queryOne<MealPlan>(
+    `SELECT ${PLAN_COLUMNS} FROM meal_plans
+     WHERE starts_on <= $1 AND ends_on >= $1
+     ORDER BY created_at DESC
+     LIMIT 1`,
+    [day]
+  );
+}
+
+/**
+ * How many meals are planned in a date range. One COUNT, not a plan read --
+ * the sidebar wants a number, not the week.
+ *
+ * ::int because COUNT returns bigint, which `pg` hands back as a string.
+ */
+export async function countMealsPlannedBetween(from: string, to: string): Promise<number> {
+  const row = await DB.queryOne<{ count: number }>(
+    `SELECT COUNT(*)::int AS count FROM meal_plan_items
+     WHERE planned_on BETWEEN $1 AND $2`,
+    [from, to]
+  );
+
+  return row?.count ?? 0;
+}
+
 export async function assignMeal(
   planId: string,
   item: MealPlanItemInput
@@ -155,6 +189,20 @@ export async function assignMeal(
   if (!created) throw new Error("Failed to assign meal");
 
   return created;
+}
+
+/**
+ * One plan item by its own id.
+ *
+ * The planner needs this to act on a single meal without reading the whole
+ * week back -- marking one item cooked, for instance, needs that item's slot
+ * and recipe id and nothing else.
+ */
+export async function getMealPlanItem(itemId: string): Promise<MealPlanItem | null> {
+  return DB.queryOne<MealPlanItem>(
+    `SELECT ${ITEM_COLUMNS} FROM meal_plan_items WHERE id = $1`,
+    [itemId]
+  );
 }
 
 export async function removeMealPlanItem(itemId: string): Promise<boolean> {

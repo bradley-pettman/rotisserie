@@ -15,7 +15,15 @@ import { randomUUID } from "node:crypto";
 
 import { test as base, expect, type Locator, type Page } from "@playwright/test";
 
-import { beginRun, closeDb, deleteRecipes, residueSince, sweepOrphans, type TestRun } from "./db";
+import {
+  beginRun,
+  closeDb,
+  deleteRecipes,
+  residueSince,
+  sweepEmptyPlans,
+  sweepOrphans,
+  type TestRun,
+} from "./db";
 
 /**
  * Lowercase alphanumeric: this marker ends up inside tag names, a
@@ -94,34 +102,51 @@ export async function addIngredient(
 }
 
 /**
- * Go to the recipe list and wait until React has hydrated it.
+ * Navigate, then wait until React has hydrated the element the test is about
+ * to drive.
  *
- * The list page's search box, tag chips and view toggle are all React-driven:
- * the server sends the markup, but until hydration attaches the listeners a
- * click does nothing and a `fill` is worse than nothing — the input is
- * controlled, so the first client render throws the typed value away and no
- * debounce ever runs. Server-rendered and hydrated markup are identical, so
- * there is no user-visible state to wait for; React's own fiber key on the
- * host node is the signal that the page will now respond to input.
+ * The server sends the markup, but until hydration attaches the listeners a
+ * click does nothing and a `fill` is worse than nothing — a controlled input
+ * throws the typed value away on the first client render. Server-rendered and
+ * hydrated markup are identical, so there is no user-visible state to wait
+ * for; React's own fiber key on the host node is the signal that the page will
+ * respond to input.
  *
  * This is what a `waitForTimeout` after `goto` would have been guessing at.
- * Waiting for the real signal is both faster and not a guess: without it the
- * "URL updates" test fails about four runs in five.
+ * Waiting for the real signal is both faster and not a guess.
  */
-export async function gotoRecipeList(page: Page): Promise<void> {
-  await page.goto("/recipes");
-  await expect(page.getByTestId("search-input")).toBeVisible();
+async function gotoHydrated(page: Page, url: string, testId: string): Promise<void> {
+  await page.goto(url);
+  await expect(page.getByTestId(testId).first()).toBeVisible();
   await page.waitForFunction(
-    () => {
-      const input = document.querySelector('[data-testid="search-input"]');
-      return !!input && Object.keys(input).some((key) => key.startsWith("__reactFiber$"));
+    (id) => {
+      const node = document.querySelector(`[data-testid="${id}"]`);
+      return !!node && Object.keys(node).some((key) => key.startsWith("__reactFiber$"));
     },
-    undefined,
+    testId,
     { timeout: 10_000 }
   );
 }
 
-const RECIPE_ID_IN_URL = /\/recipes\/([0-9a-f-]{36})(?:[/?#]|$)/;
+/** The recipe list: its search box, tag chips and view toggle are all React-driven. */
+export async function gotoRecipeList(page: Page): Promise<void> {
+  await gotoHydrated(page, "/recipes", "search-input");
+}
+
+/**
+ * The recipe form.
+ *
+ * Waits on the ingredient combobox rather than the name field: the name is an
+ * uncontrolled input that accepts a `fill` before hydration, so it is not a
+ * signal. The combobox is a Radix popover whose trigger is inert until
+ * hydration, which is exactly the thing that used to fail — the click landed
+ * on dead markup and the popover never opened.
+ */
+export async function gotoRecipeForm(page: Page, url = "/recipes/new"): Promise<void> {
+  await gotoHydrated(page, url, "ingredient-combobox");
+}
+
+const RECIPE_ID_IN_URL = /[?&]recipe=([0-9a-f-]{36})|\/recipes\/([0-9a-f-]{36})(?:[/?#]|$)/;
 
 /**
  * Creates recipes through the UI and remembers what it created so the fixture
@@ -167,7 +192,7 @@ export class RecipeFactory {
   }): Promise<string> {
     const { page } = this;
 
-    await page.goto("/recipes/new");
+    await gotoRecipeForm(page);
     await page.getByLabel("Recipe Name").fill(recipe.name);
 
     await addIngredient(page, recipe.ingredientName, "1", "piece");
@@ -180,11 +205,13 @@ export class RecipeFactory {
     await page.locator('textarea[name="instructions"]').fill(recipe.instructions);
     await page.getByRole("button", { name: "Save Recipe" }).click();
 
-    // The action redirects to the detail page on success; the id in that URL is
-    // the only handle the test process gets on the row the app just inserted.
-    await expect(page).toHaveURL(/\/recipes\/[a-f0-9-]+$/);
+    // On success the action redirects to the list with the new recipe's drawer
+    // open. The id in that URL is the only handle the test process gets on the
+    // row the app just inserted.
+    await expect(page).toHaveURL(/\/recipes\?recipe=[a-f0-9-]+/);
 
-    const id = RECIPE_ID_IN_URL.exec(page.url())?.[1];
+    const match = RECIPE_ID_IN_URL.exec(page.url());
+    const id = match?.[1] ?? match?.[2];
     if (!id) throw new Error(`Could not read a recipe id out of ${page.url()}`);
     this.createdRecipeIds.push(id);
 
@@ -212,6 +239,7 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
       // teardown, and any lookup row it orphaned.
       await deleteRecipes(run, []);
       await sweepOrphans(run);
+      await sweepEmptyPlans(run);
 
       const residue = await residueSince(run);
       if (Object.keys(residue).length > 0) {
@@ -232,8 +260,11 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
 
     await use(factory);
 
+    // Order matters: deleting the recipes cascades their plan items away,
+    // which is what can leave a plan empty for the sweep below to collect.
     await deleteRecipes(testRun, factory.createdRecipeIds);
     await sweepOrphans(testRun);
+    await sweepEmptyPlans(testRun);
   },
 });
 

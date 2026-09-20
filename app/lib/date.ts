@@ -1,5 +1,5 @@
 /**
- * Presentation helpers for the design prototypes.
+ * Calendar-day and duration formatting.
  *
  * Every date here is a CALENDAR DAY as 'YYYY-MM-DD', never a Date, because
  * that is the shape the query layer hands over (see the DATE note in
@@ -32,6 +32,13 @@ export function addDays(day: string, count: number): string {
   const date = parseDay(day);
   date.setUTCDate(date.getUTCDate() + count);
   return date.toISOString().slice(0, 10);
+}
+
+/**
+ * The Sunday on or before `day`. Weeks run Sunday to Saturday throughout.
+ */
+export function startOfWeek(day: string): string {
+  return addDays(day, -parseDay(day).getUTCDay());
 }
 
 export function weekdayShort(day: string): string {

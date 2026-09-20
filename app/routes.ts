@@ -1,41 +1,28 @@
-import { type RouteConfig, index, route } from "@react-router/dev/routes";
+import { type RouteConfig, index, layout, route } from "@react-router/dev/routes";
 
 export default [
-  index("routes/home.tsx"),
-  route("recipes/new", "features/recipes/routes/recipes.new.tsx"),
-  route("recipes/:id/edit", "features/recipes/routes/recipes.$id.edit.tsx"),
+  // Everything inside the shell: the sidebar is structural, so a page cannot
+  // ship without navigation. Cooking mode sits outside it on purpose.
+  layout("routes/app-layout.tsx", [
+    index("routes/home.tsx"),
+
+    route("recipes", "features/recipes/routes/recipes.tsx"),
+    route("recipes/new", "features/recipes/routes/recipes.new.tsx"),
+    route("recipes/:id/edit", "features/recipes/routes/recipes.$id.edit.tsx"),
+    // Kept as a permalink. Recipe detail is a drawer over the list now, so
+    // this redirects into it rather than rendering a second copy of the page.
+    route("recipes/:id", "features/recipes/routes/recipes.$id.tsx"),
+
+    route("history", "features/recipes/routes/history.tsx"),
+
+    // The planner resolves plan items' recipe names, which crosses two feature
+    // modules, so it lives out here with the API routes rather than inside
+    // either module. See the module boundary rule in CLAUDE.md.
+    route("plan", "routes/plan.tsx"),
+  ]),
+
+  // A full-screen mode with one way out. Outside the shell deliberately.
   route("recipes/:id/cook", "features/recipes/routes/recipes.$id.cook.tsx"),
-  route("recipes/:id", "features/recipes/routes/recipes.$id.tsx"),
-  route("recipes", "features/recipes/routes/recipes.tsx"),
-
-  // ---- UI redesign prototypes ----
-  //
-  // Three proposed shells, mounted beside the current UI rather than replacing
-  // it, so the two can be clicked through side by side. They read the real
-  // loaders and the real database; nothing under /design writes. See
-  // app/design/README.md for what each option is arguing for.
-  route("design", "design/index.tsx"),
-
-  route("design/a", "design/option-a/layout.tsx", [
-    index("design/option-a/recipes.tsx"),
-    route("plan", "design/option-a/plan.tsx"),
-    route("history", "design/option-a/history.tsx"),
-    route("recipes/new", "design/option-a/new.tsx"),
-    route("recipes/:id/edit", "design/option-a/editor.tsx"),
-  ]),
-
-  route("design/b", "design/option-b/layout.tsx", [
-    index("design/option-b/recipes.tsx"),
-    route("plan", "design/option-b/plan.tsx"),
-    route("history", "design/option-b/history.tsx"),
-  ]),
-
-  route("design/c", "design/option-c/layout.tsx", [
-    index("design/option-c/today.tsx"),
-    route("plan", "design/option-c/plan.tsx"),
-    route("recipes", "design/option-c/recipes.tsx"),
-    route("history", "design/option-c/history.tsx"),
-  ]),
 
   // JSON HTTP API. These are resource routes: they export `loader` and/or
   // `action` and no default component, so they render nothing and return

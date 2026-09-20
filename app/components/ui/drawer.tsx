@@ -16,8 +16,10 @@ import { cn } from "~/lib/utils";
  * Why not a new page: a page navigation throws the list away entirely and
  * makes Back the only way home.
  *
- * The boundary is width. Past `wide` a drawer is just a cramped page, and the
- * form it holds belongs on a real route — see Option A's recipe editor.
+ * The rule this codebase follows: a drawer is for ONE decision made against
+ * the context behind it; a page is for a task. The boundary is width — past
+ * `wide` a drawer is a cramped page with a shadow on it, and the form it holds
+ * belongs on a real route. The recipe editor is the worked example.
  */
 const WIDTHS = {
   /** Quick actions: log a cook, assign a meal. */

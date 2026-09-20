@@ -23,6 +23,7 @@ docker-compose up        # Start PostgreSQL
 dbmate up                # Run migrations
 dbmate down              # Rollback migration
 npm run db:seed          # Apply db/seeds (idempotent)
+npm run db:demo          # Replace recipes/cooks/plans with a demo library (DESTRUCTIVE)
 ```
 
 ## Architecture
@@ -51,25 +52,63 @@ app/
 │   │   ├── queries/    # SQL query functions (recipes.ts, cooks.ts)
 │   │   ├── schemas/    # Zod validation schemas
 │   │   ├── lib/        # Pure helpers + their unit tests
-│   │   └── components/ # Feature-specific UI
-│   ├── meal-plans/     # Plans and plan items (queries/, schemas/)
+│   │   └── components/ # Feature-specific UI (recipe-form, recipe-detail, …)
+│   ├── meal-plans/     # Plans and plan items (queries/, schemas/, components/)
 │   └── integrations/   # The ONLY code allowed to import two feature modules
 │       ├── plan-to-cook.ts      # cook_fulfillments: was the plan actually cooked?
 │       └── plan-with-recipes.ts # resolve plan items' recipeIds to names
-├── routes/             # Non-feature routes: home + the JSON API (api.*.ts)
-├── components/ui/      # shadcn/ui components
+├── routes/             # Non-feature routes:
+│   ├── app-layout.tsx  #   the shell every in-app page nests inside
+│   ├── home.tsx        #   `/` → /recipes
+│   ├── plan.tsx        #   the planner — cross-module, so it lives out here
+│   └── api.*.ts        #   the JSON API
+├── components/
+│   ├── app-shell.tsx   # Sidebar + PageHeader
+│   └── ui/             # shadcn/ui components, plus drawer.tsx and section.tsx
 ├── db/connection.ts    # PostgreSQL pool + query helpers
 ├── lib/api.ts          # JSON API response envelopes + method dispatch
+├── lib/date.ts         # Calendar-day + duration formatting
 ├── lib/utils.ts        # cn() helper for Tailwind classes
 ├── routes.ts           # Route configuration
 └── root.tsx            # Root layout/error boundary
 
 db/
 ├── migrations/         # SQL migration files (run with dbmate)
-└── seeds/              # Seed data for ingredients, units
+├── seeds/              # Seed data for ingredients, units
+└── demo-data.mjs       # `npm run db:demo` — a populated library to develop against
 
 tests/                  # Playwright E2E specs (unit tests sit next to source)
 ```
+
+## UI shell
+
+**One shell, one drawer rule.** Every page inside the app nests inside
+`routes/app-layout.tsx`, so the sidebar is structural rather than something each
+page remembers to render. A new route cannot ship without navigation. Cooking
+mode is deliberately outside it — a full-screen mode with one way out.
+
+**Drawers, not modals.** A modal takes the screen away and demands you finish or
+cancel. A drawer (`components/ui/drawer.tsx`) sits beside what you were reading,
+so the list keeps its scroll and its filters. The rule for choosing:
+
+> A drawer is for ONE decision made against the context behind it.
+> A page is for a task.
+
+Reading a recipe, assigning a meal, acting on a planned meal: decisions, so
+drawers. Editing a recipe: a task, so a route — nine fields and a repeating
+ingredient row do not fit a drawer without becoming a cramped page with a shadow
+on it. The `compact`/`default`/`wide` ladder in `drawer.tsx` is where that
+judgement gets made; past `wide`, write a route.
+
+**Drawer state lives in the URL.** The recipe drawer is `?recipe=<id>`, not
+component state, so it is linkable, survives a reload, and closes on Back.
+Closing drops only that parameter, which is what keeps every filter intact.
+`/recipes/:id` is kept as a permalink that redirects into the drawer.
+
+**Where a route file goes.** Inside `features/<module>/routes/` when it reads one
+module; in `app/routes/` when it crosses two. The planner resolves plan items'
+recipe names, so it lives in `app/routes/plan.tsx` for the same reason the
+cross-module API routes do — see the module boundary rule below.
 
 ## Architecture rules
 

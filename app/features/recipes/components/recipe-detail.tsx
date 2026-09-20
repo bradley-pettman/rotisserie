@@ -1,18 +1,20 @@
 import { ExternalLink } from "lucide-react";
 
-import type { RecipeDetail } from "./data";
-import { IngredientList, SectionHeading, StepList, TagList } from "./parts";
+import { SectionHeading } from "~/components/ui/section";
+
+import type { RecipeDetail } from "../queries/recipes";
+import { IngredientList, StepList, TagList } from "./recipe-parts";
 
 /**
  * Everything there is to read about a recipe.
  *
- * One component, three containers: Option A puts it in a drawer, Option B in a
- * permanent pane, Option C in a drawer opened from anywhere. Keeping the body
- * identical is what makes the three options a comparison of LAYOUT rather than
- * a comparison of how much detail each one happens to show.
+ * One component, two containers: the drawer over the list, and the printable
+ * detail a future export view would want. Keeping the body in one place is
+ * what stops the drawer and any other surface drifting into showing different
+ * amounts of the same recipe.
  *
  * `columns` is the only concession to the container: a 34rem drawer stacks,
- * a wide pane can put ingredients beside the method.
+ * anything wider can put the ingredients beside the method.
  */
 export function RecipeBody({
   recipe,
@@ -25,7 +27,11 @@ export function RecipeBody({
     <div className="space-y-7">
       {recipe.tags.length > 0 && <TagList tags={recipe.tags} />}
 
-      <div className={columns ? "grid grid-cols-[minmax(0,17rem)_minmax(0,1fr)] gap-10" : "space-y-7"}>
+      <div
+        className={
+          columns ? "grid grid-cols-[minmax(0,17rem)_minmax(0,1fr)] gap-10" : "space-y-7"
+        }
+      >
         <section>
           <SectionHeading>Ingredients</SectionHeading>
           <IngredientList recipe={recipe} />

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Demo data for reviewing the UI prototypes under /design.
+ * A populated library to develop and review the UI against.
  *
  * DESTRUCTIVE. Truncates recipes, cooks and meal plans before inserting, so a
  * re-run produces the same library rather than a second copy of it. Do not run
