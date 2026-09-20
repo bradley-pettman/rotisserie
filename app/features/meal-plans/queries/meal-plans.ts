@@ -25,6 +25,13 @@ export interface MealPlanItem {
   mealSlot: MealSlot;
   sortOrder: number;
   notes: string | null;
+  // INSTANTS, not calendar days -- the opposite treatment from `plannedOn`
+  // directly above, and the contrast is the point. `plannedOn` is the day a
+  // meal is meant to happen; these two are moments in a sync log. A client
+  // asks "what changed since?" against `updatedAt` to the millisecond, which
+  // is a question a 'YYYY-MM-DD' string cannot answer.
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 export interface MealPlanWithItems extends MealPlan {
@@ -44,7 +51,8 @@ const PLAN_COLUMNS = `id, name,
 const ITEM_COLUMNS = `id, meal_plan_id as "mealPlanId", recipe_id as "recipeId",
             custom_text as "customText",
             to_char(planned_on, 'YYYY-MM-DD') as "plannedOn",
-            meal_slot as "mealSlot", sort_order as "sortOrder", notes`;
+            meal_slot as "mealSlot", sort_order as "sortOrder", notes,
+            created_at as "createdAt", updated_at as "updatedAt"`;
 
 /**
  * Plan items sort by the day, then by the order the meals happen IN that day,
@@ -225,6 +233,14 @@ export async function removeMealPlanItem(itemId: string): Promise<boolean> {
 /**
  * Moving a plan item rewrites the INTENT only. Any cook already recorded
  * against it keeps its own date -- see cook_fulfillments.
+ *
+ * `updated_at = NOW()` is set HERE, in the SET list, rather than by a trigger:
+ * that is how `recipes.updated_at` has always been maintained (`updateRecipe`
+ * appends the same assignment), and this schema is better off with one
+ * mechanism that can be forgotten than with two that have to be told apart.
+ * Migration 20260920130000 argues the trade at length. The obligation it
+ * creates is small and real: every future UPDATE on this table repeats this
+ * line, or it hands clients a row that changed without saying so.
  */
 export async function moveMealPlanItem(
   itemId: string,
@@ -233,7 +249,7 @@ export async function moveMealPlanItem(
 ): Promise<MealPlanItem | null> {
   return DB.queryOne<MealPlanItem>(
     `UPDATE meal_plan_items
-     SET planned_on = $2, meal_slot = $3
+     SET planned_on = $2, meal_slot = $3, updated_at = NOW()
      WHERE id = $1
      RETURNING ${ITEM_COLUMNS}`,
     [itemId, plannedOn, mealSlot]
