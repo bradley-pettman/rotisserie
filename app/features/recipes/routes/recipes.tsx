@@ -1,12 +1,12 @@
-import { useState, useEffect, useCallback } from "react";
-import { data, Form, useLoaderData, useActionData, Link, useNavigate, useSearchParams, useNavigation } from "react-router";
+import { useState, useEffect } from "react";
+import { Form, useLoaderData, Link, useNavigate, useSearchParams, useNavigation } from "react-router";
 import type { Route } from "./+types/recipes";
-import { listRecipes, getAllTags, deleteRecipesByPattern } from "../queries/recipes";
+import { listRecipes, getAllTags } from "../queries/recipes";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Badge } from "~/components/ui/badge";
-import { LayoutGrid, List, Trash2 } from "lucide-react";
+import { LayoutGrid, List } from "lucide-react";
 
 export async function loader({ request }: Route.LoaderArgs) {
   const url = new URL(request.url);
@@ -23,30 +23,11 @@ export async function loader({ request }: Route.LoaderArgs) {
   return { recipes, allTags, filters: { search, tags }, view };
 }
 
-export async function action({ request }: Route.ActionArgs) {
-  const formData = await request.formData();
-  const intent = formData.get("intent");
-
-  if (intent === "cleanup-test-recipes") {
-    const pattern = formData.get("pattern") as string;
-    if (pattern && pattern.length >= 3) {
-      const deletedCount = await deleteRecipesByPattern(pattern);
-      return { success: true, deletedCount };
-    }
-    return data({ error: "Pattern must be at least 3 characters" }, { status: 400 });
-  }
-
-  return data({ error: "Unknown action" }, { status: 400 });
-}
-
 export default function RecipesPage() {
   const { recipes, allTags, filters, view } = useLoaderData<typeof loader>();
-  const actionData = useActionData<typeof action>();
   const navigate = useNavigate();
   const navigation = useNavigation();
   const [searchParams] = useSearchParams();
-  const [showCleanup, setShowCleanup] = useState(false);
-  const [cleanupPattern, setCleanupPattern] = useState("Test Recipe");
   const [searchTerm, setSearchTerm] = useState(filters.search ?? "");
 
   const isSearching = navigation.state === "loading";
@@ -56,8 +37,33 @@ export default function RecipesPage() {
     setSearchTerm(filters.search ?? "");
   }, [filters.search]);
 
-  // Debounced navigation effect for live search
+  // Debounced navigation effect for live search (state -> URL).
+  //
+  // Two things here are load-bearing; neither is decoration.
+  //
+  // 1. The early return. This effect writes the URL and the effect above
+  //    writes state *from* the URL, so the pair only settles if the writer
+  //    stays quiet whenever the two already agree. Comparing `searchTerm`
+  //    against the `search` param the URL actually carries is that test, and
+  //    it is also what keeps this effect off the wire on mount: a fresh load
+  //    seeds `searchTerm` from `filters.search`, the two agree, and no timer
+  //    is ever armed. Same for a back/forward, where the sync effect lands
+  //    state on the value the URL already holds. Without it, landing on
+  //    /recipes scheduled a `replace` navigation 300ms later for a search the
+  //    user never typed.
+  //
+  // 2. `searchParams` in the dependency array. An armed timer navigates with
+  //    `replace: true`, so whatever params it captured *overwrite* the URL
+  //    when it fires. Left out of the deps, that capture went stale and the
+  //    timer silently reverted anything the user changed while it was
+  //    pending -- `view` from the toggle, `tags` from a chip. Listing it makes
+  //    every URL change tear the timer down and re-arm it against the current
+  //    params, so a timer can only ever fire with the newest snapshot, and it
+  //    merges into that rather than replacing it. Do not trim this back to
+  //    `[searchTerm]`: that is precisely the bug.
   useEffect(() => {
+    if (searchTerm === (searchParams.get("search") ?? "")) return;
+
     const timeout = setTimeout(() => {
       const params = new URLSearchParams(searchParams);
       if (searchTerm) {
@@ -69,7 +75,7 @@ export default function RecipesPage() {
     }, 300);
 
     return () => clearTimeout(timeout);
-  }, [searchTerm]);
+  }, [searchTerm, searchParams, navigate]);
 
   const toggleTag = (tagName: string) => {
     const currentTags = filters.tags || [];
@@ -96,55 +102,10 @@ export default function RecipesPage() {
     <div className="container mx-auto p-6">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold">Recipes</h1>
-        <div className="flex items-center gap-2">
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            onClick={() => setShowCleanup(!showCleanup)}
-            title="Clean up test recipes"
-            data-testid="cleanup-toggle"
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
-          <Link to="/recipes/new">
-            <Button>Add Recipe</Button>
-          </Link>
-        </div>
+        <Link to="/recipes/new">
+          <Button>Add Recipe</Button>
+        </Link>
       </div>
-
-      {/* Cleanup Panel */}
-      {showCleanup && (
-        <div className="mb-6 p-4 bg-muted rounded-lg border" data-testid="cleanup-panel">
-          <h3 className="font-semibold mb-2">Clean Up Test Recipes</h3>
-          <p className="text-sm text-muted-foreground mb-3">
-            Delete all recipes matching a pattern. Use with caution.
-          </p>
-          <Form method="post" className="flex gap-2 items-end">
-            <input type="hidden" name="intent" value="cleanup-test-recipes" />
-            <div className="flex-1">
-              <Input
-                name="pattern"
-                value={cleanupPattern}
-                onChange={(e) => setCleanupPattern(e.target.value)}
-                placeholder="Pattern to match (e.g., Test Recipe)"
-                data-testid="cleanup-pattern"
-              />
-            </div>
-            <Button type="submit" variant="destructive" data-testid="cleanup-submit">
-              Delete Matching
-            </Button>
-          </Form>
-          {actionData && "deletedCount" in actionData && (
-            <p className="mt-2 text-sm text-green-600" data-testid="cleanup-success">
-              Deleted {actionData.deletedCount} recipe(s)
-            </p>
-          )}
-          {actionData && "error" in actionData && (
-            <p className="mt-2 text-sm text-red-600" data-testid="cleanup-error">{actionData.error}</p>
-          )}
-        </div>
-      )}
 
       {/* Search and Filter */}
       <Form method="get" className="mb-6">

@@ -31,6 +31,7 @@ INSERT INTO units (name, abbreviation, category) VALUES
   ('bunch', NULL, 'count'),
   ('pinch', NULL, 'count'),
   ('dash', NULL, 'count'),
+  ('handful', NULL, 'count'),
   ('sprig', NULL, 'count'),
   ('head', NULL, 'count'),
   ('stalk', NULL, 'count'),

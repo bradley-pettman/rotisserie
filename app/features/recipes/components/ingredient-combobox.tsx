@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Check, ChevronsUpDown } from "lucide-react";
 import { cn } from "~/lib/utils";
+import { capitalizeIngredientName } from "../lib/display-name";
 import { Button } from "~/components/ui/button";
 import {
   Command,
@@ -52,7 +53,9 @@ export function IngredientCombobox({
           className="w-full justify-between font-normal"
           data-testid="ingredient-combobox"
         >
-          {value || placeholder}
+          {/* Names are STORED lowercase (the canonical form); the capital is
+              put back here, on the way to the screen. */}
+          {value ? capitalizeIngredientName(value) : placeholder}
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
@@ -98,7 +101,7 @@ export function IngredientCombobox({
                         : "opacity-0"
                     )}
                   />
-                  {ing.name}
+                  {capitalizeIngredientName(ing.name)}
                 </CommandItem>
               ))}
               {search && !exactMatch && filtered.length > 0 && (

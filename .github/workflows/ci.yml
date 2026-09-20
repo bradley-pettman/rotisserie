@@ -1,0 +1,152 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  verify:
+    name: Lint, typecheck and unit tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Unit tests
+        run: npm run test:unit
+
+  # Deliberately NOT `needs: verify`. The two jobs answer different questions,
+  # so one push should surface both answers: gating E2E on the fast job would
+  # hide a browser-level regression behind a lint nit and cost a second
+  # push/wait cycle to find it. The price is occasionally spending E2E minutes
+  # on a branch `verify` has already failed.
+  e2e:
+    name: E2E (Playwright)
+    runs-on: ubuntu-latest
+    # The suite takes about a minute, plus a production build (a few seconds
+    # locally, allow more on a cold runner) that the E2E step now triggers.
+    # This ceiling only catches a hung build, server or browser.
+    timeout-minutes: 20
+
+    # A service container scoped to this job. The suite runs with `workers: 1`
+    # and asserts on the contents of the recipe list and of the ingredient/unit
+    # comboboxes, so it needs a database nothing else is writing to. This one is
+    # created and destroyed with the job, which is exactly that.
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: rotisserie_dev
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      # Read by dbmate, by `npm run db:seed` and by tests/db.ts, and forwarded
+      # by playwright.config.ts to the built server it starts — so the app and
+      # the test process always talk to the same database. Format: .env.example.
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/rotisserie_dev?sslmode=disable
+      # INTERNAL_API_KEY is left unset on purpose: per .env.example the suite,
+      # like local development, runs against an unauthenticated /api/*.
+      DBMATE_VERSION: "2.36.0"
+      # sha256 of the v2.36.0 linux-amd64 release asset. Update both together.
+      DBMATE_SHA256: "47e284b3d8cbad1ba5f090495aa05afd1bbd5f35e2ed5577aad06da74ce780ce"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # dbmate is not an npm dependency, so the job fetches it: the pinned
+      # release binary is one ~10 MB download with a checked digest, versus a
+      # container (needs --network host and a mount to see db/migrations) or a
+      # third-party action (another moving part to trust). No sudo needed — it
+      # lands in the runner temp dir and goes on PATH for the later steps.
+      - name: Install dbmate
+        run: |
+          mkdir -p "$RUNNER_TEMP/bin"
+          curl -fsSL -o "$RUNNER_TEMP/bin/dbmate" \
+            "https://github.com/amacneil/dbmate/releases/download/v${DBMATE_VERSION}/dbmate-linux-amd64"
+          echo "${DBMATE_SHA256}  $RUNNER_TEMP/bin/dbmate" | sha256sum --check --strict
+          chmod +x "$RUNNER_TEMP/bin/dbmate"
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+          "$RUNNER_TEMP/bin/dbmate" --version
+
+      # --wait rides out the last moment of Postgres start-up on top of the
+      # service health check. --no-dump-schema because dbmate otherwise shells
+      # out to pg_dump after migrating, which would tie this job to the runner
+      # image shipping a pg_dump at least as new as the service's Postgres; CI
+      # has no use for the dumped schema file.
+      - name: Run migrations
+        run: dbmate --wait --no-dump-schema up
+
+      # Seeds only, no extra fixtures: the combobox tests assert on filtering
+      # and expect the ingredient/unit vocabulary to be exactly what db/seeds/
+      # holds.
+      - name: Load seed data
+        run: npm run db:seed
+
+      # The pinned @playwright/test wants its own Chromium build, and --with-deps
+      # adds the system libraries the runner image does not ship.
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+
+      # GitHub sets CI=true, which is what switches playwright.config.ts to
+      # retries: 2, forbidOnly, and — unlike a local run — a webServer that
+      # runs `npm run build` and serves the result with `react-router-serve`
+      # on PORT=5173 instead of starting Vite. Nothing to repeat here.
+      #
+      # That build happens inside the Playwright webServer command rather than
+      # as a step of its own, so the config is self-contained: `CI=true npm run
+      # test` builds and serves the same way on a laptop as it does here, and
+      # can never serve a stale bundle left over from an earlier step. The
+      # visible cost is that a broken production build is reported as a
+      # webServer start-up failure — the build log is in that step's output.
+      #
+      # It also means this job is what covers `npm run build` at all: `verify`
+      # typechecks but never builds, so before this the production bundle and
+      # the SSR path were not exercised by CI anywhere.
+      - name: E2E tests
+        run: npm run test
+
+      # The HTML reporter is configured with `open: "never"` (serving it would
+      # hang the job), so it is only written to disk — collect it here to make a
+      # red run diagnosable. Traces from the first retry are inside the report.
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
