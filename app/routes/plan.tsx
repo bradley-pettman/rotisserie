@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { CalendarPlus, Check, Search, Trash2 } from "lucide-react";
-import { Form, Link, redirect, useLoaderData } from "react-router";
+import { Form, Link, redirect, useLoaderData, useNavigation } from "react-router";
 
 import { PageHeader } from "~/components/app-shell";
 import { Button } from "~/components/ui/button";
@@ -255,6 +255,10 @@ function MealActions({
   meal: ResolvedMealPlanItem;
   onDone: () => void;
 }) {
+  // See AssignMealForm: a second click while the first write is in flight
+  // reaches the server as a second request, and both of these append rows.
+  const busy = useNavigation().state === "submitting";
+
   return (
     <div className="space-y-6">
       {meal.notes && (
@@ -280,7 +284,7 @@ function MealActions({
         <Form method="post" onSubmit={onDone}>
           <input type="hidden" name="intent" value="cooked" />
           <input type="hidden" name="itemId" value={meal.id} />
-          <Button type="submit" className="w-full gap-2">
+          <Button type="submit" disabled={busy} className="w-full gap-2">
             <Check className="size-4" />
             We cooked this
           </Button>
@@ -289,7 +293,7 @@ function MealActions({
         <Form method="post" onSubmit={onDone}>
           <input type="hidden" name="intent" value="remove" />
           <input type="hidden" name="itemId" value={meal.id} />
-          <Button type="submit" variant="ghost" className="w-full gap-2">
+          <Button type="submit" disabled={busy} variant="ghost" className="w-full gap-2">
             <Trash2 className="size-4" />
             Remove from the plan
           </Button>
@@ -318,6 +322,13 @@ function AssignMealForm({
   const [slot, setSlot] = useState("dinner");
   const [query, setQuery] = useState("");
   const [recipeId, setRecipeId] = useState<string | null>(null);
+  // Disabled while a submission is in flight. React Router aborts the client
+  // fetch when a second navigation starts, but the first request has already
+  // reached the server and its action runs to completion -- so a double click
+  // wrote two rows. `cooks` is append-only fact with no de-duplication and no
+  // delete in the UI, and two plans covering one week make one week's meals
+  // invisible (findPlanCovering returns only the newer).
+  const busy = useNavigation().state === "submitting";
 
   const matches = query
     ? recipes.filter((recipe) => recipe.name.toLowerCase().includes(query.toLowerCase()))
@@ -393,7 +404,7 @@ function AssignMealForm({
         />
       </div>
 
-      <Button type="submit" className="w-full gap-2" data-testid="plan-submit">
+      <Button type="submit" disabled={busy} className="w-full gap-2" data-testid="plan-submit">
         <CalendarPlus className="size-4" />
         Add to plan
       </Button>

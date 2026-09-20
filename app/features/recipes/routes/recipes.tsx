@@ -353,7 +353,15 @@ export default function RecipesPage() {
               <Form method="post">
                 <input type="hidden" name="intent" value="log-cook" />
                 <input type="hidden" name="recipeId" value={openRecipe.id} />
-                <Button type="submit" variant="outline" className="gap-2">
+                {/* Disabled while submitting: `cooks` is append-only fact
+                    with no de-duplication, so a double click logs the meal
+                    twice and there is no way to undo it from the UI. */}
+                <Button
+                  type="submit"
+                  disabled={navigation.state === "submitting"}
+                  variant="outline"
+                  className="gap-2"
+                >
                   <Flame className="size-4" />
                   Log a cook
                 </Button>
