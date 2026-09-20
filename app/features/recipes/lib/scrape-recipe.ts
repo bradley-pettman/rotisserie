@@ -13,6 +13,9 @@
  * usable draft for the import form.
  */
 
+import { lookup } from "node:dns/promises";
+import { isIP } from "node:net";
+
 import { parseDuration } from "~/features/recipes/lib/parse-duration";
 import { parseIngredient } from "~/features/recipes/lib/parse-ingredient";
 
@@ -47,6 +50,29 @@ export type ScrapedRecipe = {
 
 const USER_AGENT = "Mozilla/5.0 (compatible; Rotisserie/1.0)";
 const FETCH_TIMEOUT_MS = 10_000;
+
+/**
+ * Ceilings on what one import is allowed to cost.
+ *
+ * These are not tuning knobs, they are the bound that keeps a single request
+ * from occupying the process. Node runs this parser on the same thread that
+ * serves every other request, so an import that spends 30 seconds in a regex
+ * is 30 seconds in which the app serves nobody -- and several of the HTML
+ * scanners below are quadratic in the length of their input.
+ *
+ * 1 MB is far past any real recipe page (a heavy one is ~300 KB) and far below
+ * the size at which the scanners become a problem. The item caps are the same
+ * idea one level up: a page claiming 100k ingredients is not a recipe, and
+ * every one of them would otherwise become its own row and its own round trip.
+ */
+const MAX_HTML_BYTES = 1_000_000;
+const MAX_HTML_CHARS = 1_000_000;
+const MAX_REDIRECTS = 3;
+const MAX_INGREDIENTS = 200;
+const MAX_INSTRUCTION_STEPS = 200;
+
+/** The widest run of tag-internal text any scanner will backtrack across. */
+const ATTR = "[^>]{0,2000}";
 const NO_RECIPE_FOUND = "Could not find recipe data on this page.";
 
 /* -------------------------------------------------------------------------- */
@@ -113,17 +139,83 @@ function decodeEntities(text: string): string {
  * `ab`; inline tags (`<b>`, `<a>`) are simply dropped so `<b>flour</b>, sifted`
  * stays `flour, sifted` without a stray space before the comma.
  */
+/**
+ * Remove `<script>` and `<style>` elements, bodies included, in one pass.
+ *
+ * Deliberately index-based rather than a regex: see the note at the call site.
+ * An unterminated or unclosed element drops everything from it onward, which is
+ * the safe reading — whatever follows an unclosed `<script>` was never prose.
+ */
+function stripScriptStyle(html: string): string {
+  const lower = html.toLowerCase();
+  let out = "";
+  let cursor = 0;
+
+  for (;;) {
+    let start = -1;
+    let closing = "";
+
+    for (const [open, close] of [
+      ["<script", "</script"],
+      ["<style", "</style"],
+    ] as const) {
+      const at = lower.indexOf(open, cursor);
+      if (at !== -1 && (start === -1 || at < start)) {
+        start = at;
+        closing = close;
+      }
+    }
+
+    if (start === -1) return out + html.slice(cursor);
+
+    out += html.slice(cursor, start);
+
+    const openEnd = html.indexOf(">", start);
+    if (openEnd === -1) return out;
+
+    const closeStart = lower.indexOf(closing, openEnd);
+    if (closeStart === -1) return out;
+
+    const closeEnd = html.indexOf(">", closeStart);
+    if (closeEnd === -1) return out;
+
+    out += " ";
+    cursor = closeEnd + 1;
+  }
+}
+
 export function stripHtml(html: string): string {
   if (!html) return "";
 
   let text = String(html);
 
-  // Script/style bodies are code, not prose — drop them wholesale.
-  text = text.replace(/<(script|style)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, " ");
-  text = text.replace(/<!--[\s\S]*?-->/g, " ");
-  text = text.replace(new RegExp(`<\\s*(?:${BLOCK_TAGS})\\b[^>]*>`, "gi"), "\n");
-  text = text.replace(new RegExp(`<\\s*/\\s*(?:${BLOCK_TAGS})\\s*>`, "gi"), "\n");
-  text = text.replace(/<[^>]*>/g, "");
+  // Script/style bodies are code, not prose — drop them wholesale. Done by
+  // scanning rather than by regex: the obvious pattern
+  // (`<(script|style)\b[^>]*>[\s\S]*?<\/\1>`) is quadratic on input that opens
+  // tags and never closes them, because each of the N start positions rescans
+  // to end-of-input before failing. Measured: 512 KB of `"<script "` took 30
+  // seconds, on the same thread that serves every other request.
+  text = stripScriptStyle(text);
+
+  // Everything past the final `>` cannot contain a complete tag, so the tag
+  // patterns below are run only on the part that can. This is what keeps them
+  // linear: within `head` every `<` has a `>` somewhere ahead, so each match
+  // succeeds and advances instead of failing after a full scan. Without the
+  // split, `"<br".repeat(60000)` spent 8 seconds proving there was no `>`.
+  const lastGt = text.lastIndexOf(">");
+  const head = lastGt === -1 ? "" : text.slice(0, lastGt + 1);
+  const tail = lastGt === -1 ? text : text.slice(lastGt + 1);
+
+  let stripped = head;
+  stripped = stripped.replace(/<!--[\s\S]{0,50000}?-->/g, " ");
+  stripped = stripped.replace(new RegExp(`<\\s*(?:${BLOCK_TAGS})\\b${ATTR}>`, "gi"), "\n");
+  stripped = stripped.replace(new RegExp(`<\\s*/\\s*(?:${BLOCK_TAGS})\\s*>`, "gi"), "\n");
+  stripped = stripped.replace(new RegExp(`<${ATTR}>`, "g"), "");
+
+  // The tail holds no complete tag, but it can still hold a dangling `<foo`
+  // that would otherwise read as prose. Drop from the last unmatched `<`.
+  const dangling = tail.indexOf("<");
+  text = stripped + (dangling === -1 ? tail : tail.slice(0, dangling));
 
   text = decodeEntities(text);
 
@@ -206,8 +298,27 @@ function toStringArray(value: unknown, depth = 0): string[] {
 /* -------------------------------------------------------------------------- */
 
 // `\s` before `type` so that `data-type="application/ld+json"` does not match.
-const JSON_LD_BLOCK =
-  /<script\b[^>]*\stype\s*=\s*["']?application\/ld\+json["']?[^>]*>([\s\S]*?)<\/script\s*>/gi;
+// Applied to ONE tag's attributes at a time (see `jsonLdBlocks`), never scanned
+// across the document: as a document-wide pattern the two `[^>]*` runs around
+// it were quadratic, and `"<script ".repeat(60000)` measured 27 seconds.
+const JSON_LD_TYPE = /(^|\s)type\s*=\s*["']?application\/ld\+json["']?/i;
+
+/** The body of every `<script type="application/ld+json">`, in document order. */
+function* jsonLdBlocks(html: string): Generator<string> {
+  // Lowercased ONCE, outside the loop: doing it per block would reintroduce
+  // quadratic behaviour by the back door, in the number of script tags.
+  const lower = html.toLowerCase();
+
+  for (const tag of eachTag(html)) {
+    if (tag.closing || tag.tag !== "script") continue;
+    if (!JSON_LD_TYPE.test(tag.attrs)) continue;
+
+    const close = lower.indexOf("</script", tag.end);
+    if (close === -1) return; // unterminated: nothing usable follows
+
+    yield unwrapScriptBody(html.slice(tag.end, close));
+  }
+}
 
 /** Unwrap the CDATA / comment jackets sites wrap around inline JSON. */
 function unwrapScriptBody(raw: string): string {
@@ -277,11 +388,7 @@ function findRecipeNode(
  * skipped so one bad block can never abort the scrape.
  */
 function extractJsonLdRecipe(html: string): Record<string, unknown> | null {
-  JSON_LD_BLOCK.lastIndex = 0;
-
-  let block: RegExpExecArray | null;
-  while ((block = JSON_LD_BLOCK.exec(html)) !== null) {
-    const body = unwrapScriptBody(block[1] ?? "");
+  for (const body of jsonLdBlocks(html)) {
     if (!body) continue;
 
     let parsed: unknown;
@@ -315,6 +422,57 @@ function readAttribute(attrs: string, name: string): string | null {
   return match[1] ?? match[2] ?? match[3] ?? null;
 }
 
+type Tag = {
+  tag: string;
+  attrs: string;
+  closing: boolean;
+  selfClosing: boolean;
+  start: number;
+  end: number;
+};
+
+/**
+ * Walk every tag in `html`, left to right, in linear time.
+ *
+ * THIS REPLACES A FAMILY OF QUADRATIC REGEXES. The scanners below all used to
+ * look like `<([a-z][a-z0-9-]*)\b([^>]*\bitemscope\b[^>]*)>` -- two unbounded
+ * runs around a literal. On input that opens tags without closing them, every
+ * start position rescans to end-of-input before failing: `"<a ".repeat(60000)`
+ * measured 11 SECONDS in that one pattern, on the thread that serves every
+ * other request.
+ *
+ * Finding `<` then the next `>` with `indexOf` cannot backtrack, so the whole
+ * document is one pass regardless of how the markup is shaped. Callers filter
+ * on `attrs` themselves, which is both faster and easier to read than encoding
+ * the predicate into the pattern.
+ */
+function* eachTag(html: string, from = 0): Generator<Tag> {
+  let cursor = from;
+
+  for (;;) {
+    const lt = html.indexOf("<", cursor);
+    if (lt === -1) return;
+
+    const gt = html.indexOf(">", lt + 1);
+    if (gt === -1) return; // no complete tag remains
+
+    cursor = gt + 1;
+
+    const raw = html.slice(lt + 1, gt);
+    const name = /^(\/?)\s*([a-z][a-z0-9-]*)/i.exec(raw);
+    if (!name) continue; // a comment, a doctype, or stray punctuation
+
+    yield {
+      tag: name[2].toLowerCase(),
+      attrs: raw.slice(name[0].length),
+      closing: name[1] === "/",
+      selfClosing: /\/\s*$/.test(raw),
+      start: lt,
+      end: gt + 1,
+    };
+  }
+}
+
 /**
  * Index just past the element opened at `contentStart`, by counting nested
  * open/close tags of the same name.
@@ -322,16 +480,16 @@ function readAttribute(attrs: string, name: string): string | null {
 function findElementEnd(html: string, tag: string, contentStart: number): number {
   if (!/^[a-z][a-z0-9-]*$/i.test(tag)) return html.length;
 
-  const scanner = new RegExp(`<\\s*(/?)${tag}\\b[^>]*>`, "gi");
-  scanner.lastIndex = contentStart;
-
+  const wanted = tag.toLowerCase();
   let depth = 1;
-  let match: RegExpExecArray | null;
-  while ((match = scanner.exec(html)) !== null) {
-    if (match[1] === "/") {
+
+  for (const found of eachTag(html, contentStart)) {
+    if (found.tag !== wanted) continue;
+
+    if (found.closing) {
       depth -= 1;
-      if (depth === 0) return match.index;
-    } else if (!/\/\s*>$/.test(match[0])) {
+      if (depth === 0) return found.start;
+    } else if (!found.selfClosing) {
       depth += 1;
     }
   }
@@ -342,17 +500,17 @@ function findElementEnd(html: string, tag: string, contentStart: number): number
 type MicrodataElement = { tag: string; attrs: string; inner: string };
 
 /** The recipe subtree: from the `itemtype="…/Recipe"` element to its close tag. */
+const RECIPE_ITEMTYPE = /\bitemtype\s*=\s*["'][^"']*schema\.org\/Recipe[^"']*["']/i;
+
 function extractRecipeScope(html: string): string | null {
-  const match = html.match(
-    /<([a-z][a-z0-9-]*)\b([^>]*\bitemtype\s*=\s*["'][^"']*schema\.org\/Recipe[^"']*["'][^>]*)>/i,
-  );
-  if (!match || match.index === undefined) return null;
+  for (const found of eachTag(html)) {
+    if (found.closing || !RECIPE_ITEMTYPE.test(found.attrs)) continue;
+    if (VOID_TAGS.has(found.tag)) return null;
 
-  const tag = match[1].toLowerCase();
-  const contentStart = match.index + match[0].length;
-  if (VOID_TAGS.has(tag)) return null;
+    return html.slice(found.end, findElementEnd(html, found.tag, found.end));
+  }
 
-  return html.slice(contentStart, findElementEnd(html, tag, contentStart));
+  return null;
 }
 
 /**
@@ -363,14 +521,12 @@ function extractRecipeScope(html: string): string | null {
  */
 function nestedScopeRanges(scope: string): Array<[number, number]> {
   const ranges: Array<[number, number]> = [];
-  const opener = /<([a-z][a-z0-9-]*)\b([^>]*\bitemscope\b[^>]*)>/gi;
 
-  let match: RegExpExecArray | null;
-  while ((match = opener.exec(scope)) !== null) {
-    const tag = match[1].toLowerCase();
-    if (VOID_TAGS.has(tag)) continue;
-    const contentStart = match.index + match[0].length;
-    ranges.push([match.index, findElementEnd(scope, tag, contentStart)]);
+  for (const found of eachTag(scope)) {
+    if (found.closing || !/\bitemscope\b/i.test(found.attrs)) continue;
+    if (VOID_TAGS.has(found.tag)) continue;
+
+    ranges.push([found.start, findElementEnd(scope, found.tag, found.end)]);
   }
 
   return ranges;
@@ -386,24 +542,26 @@ function findItemprops(
   prop: string,
   nested: Array<[number, number]>,
 ): MicrodataElement[] {
-  const finder = new RegExp(
-    `<([a-z][a-z0-9-]*)\\b([^>]*\\bitemprop\\s*=\\s*["'][^"']*\\b${prop}\\b[^"']*["'][^>]*)>`,
-    "gi",
+  const wanted = new RegExp(
+    `\\bitemprop\\s*=\\s*["'][^"']*\\b${prop}\\b[^"']*["']`,
+    "i",
   );
 
   const found: MicrodataElement[] = [];
-  let match: RegExpExecArray | null;
-  while ((match = finder.exec(scope)) !== null) {
-    if (withinAny(match.index, nested)) continue;
 
-    const tag = match[1].toLowerCase();
-    const attrs = match[2] ?? "";
-    const contentStart = match.index + match[0].length;
-    const inner = VOID_TAGS.has(tag)
+  for (const element of eachTag(scope)) {
+    if (element.closing || !wanted.test(element.attrs)) continue;
+    if (withinAny(element.start, nested)) continue;
+
+    const inner = VOID_TAGS.has(element.tag)
       ? ""
-      : scope.slice(contentStart, findElementEnd(scope, tag, contentStart));
+      : scope.slice(element.end, findElementEnd(scope, element.tag, element.end));
 
-    found.push({ tag, attrs, inner });
+    found.push({ tag: element.tag, attrs: element.attrs, inner });
+
+    // A page claiming thousands of elements for one property is not a recipe,
+    // and each of these costs a nested scan. Bound it.
+    if (found.length >= MAX_INGREDIENTS) break;
   }
 
   return found;
@@ -591,7 +749,14 @@ function toScrapedRecipe(node: Record<string, unknown>, sourceUrl: string): Scra
   const name = nonEmpty(stripHtmlInline(firstString(node["name"]) ?? ""));
   const notes = nonEmpty(stripHtml(firstString(node["description"]) ?? ""));
 
-  const steps = collectInstructionSteps(node["recipeInstructions"]);
+  // Both lists are capped. A page offering thousands of "ingredients" is not a
+  // recipe, and each one becomes a row plus two or three SQL round trips inside
+  // a single transaction on save -- so an uncapped import is a way to hold a
+  // database connection open for minutes. 200 is far past any real recipe.
+  const steps = collectInstructionSteps(node["recipeInstructions"]).slice(
+    0,
+    MAX_INSTRUCTION_STEPS,
+  );
   const instructions = steps.length > 0 ? steps.join("\n\n") : null;
 
   // `ingredients` is the pre-2017 schema.org spelling; some sites still emit it.
@@ -599,6 +764,7 @@ function toScrapedRecipe(node: Record<string, unknown>, sourceUrl: string): Scra
   const ingredients = toStringArray(rawIngredients)
     .map(stripHtmlInline)
     .filter((line) => line !== "")
+    .slice(0, MAX_INGREDIENTS)
     .map((line) => {
       const { ingredientName, quantity, unit, notes } = parseIngredient(line);
       return { ingredientName, quantity, unit, notes };
@@ -638,22 +804,206 @@ function describe(error: unknown): string {
   return String(error);
 }
 
-async function fetchHtml(url: string): Promise<string> {
-  let response: Response;
+/**
+ * Is this address one a request from our server must never be pointed at?
+ *
+ * Covers loopback, RFC1918 private space, carrier-grade NAT, and -- the one
+ * that actually matters on a cloud host -- 169.254.0.0/16, which is where AWS,
+ * GCP and Azure serve instance credentials to anything that asks. Multicast and
+ * reserved space are included because there is no legitimate recipe there
+ * either.
+ */
+export function isBlockedAddress(address: string): boolean {
+  const ip = address.trim().toLowerCase();
+
+  // IPv4-mapped IPv6 (`::ffff:169.254.169.254`) is the same address wearing a
+  // hat, so unwrap it and judge the v4 form.
+  const mapped = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/.exec(ip);
+  if (mapped) return isBlockedAddress(mapped[1]);
+
+  if (ip.includes(":")) {
+    if (ip === "::" || ip === "::1") return true; // unspecified, loopback
+    if (/^f[cd][0-9a-f]{2}:/.test(ip)) return true; // fc00::/7 unique-local
+    if (/^fe[89ab][0-9a-f]:/.test(ip)) return true; // fe80::/10 link-local
+    if (ip.startsWith("64:ff9b:")) return true; // NAT64 -> v4 space
+    return false;
+  }
+
+  const parts = ip.split(".");
+  if (parts.length !== 4) return true; // not an address we understand: refuse
+  const [a, b] = parts.map((part) => Number(part));
+  if (!Number.isInteger(a) || !Number.isInteger(b)) return true;
+
+  if (a === 0) return true; // 0.0.0.0/8
+  if (a === 10) return true; // private
+  if (a === 127) return true; // loopback
+  if (a === 169 && b === 254) return true; // link-local: CLOUD METADATA
+  if (a === 172 && b >= 16 && b <= 31) return true; // private
+  if (a === 192 && b === 168) return true; // private
+  if (a === 192 && b === 0) return true; // IETF protocol assignments
+  if (a === 100 && b >= 64 && b <= 127) return true; // CGNAT
+  if (a === 198 && (b === 18 || b === 19)) return true; // benchmarking
+  if (a >= 224) return true; // multicast + reserved
+
+  return false;
+}
+
+/**
+ * Vet one URL before we are willing to send a request to it.
+ *
+ * WHY THIS EXISTS. `fetchHtml` makes an outbound request to an address the
+ * user chose, from inside the network the server sits in. Without a check that
+ * is a server-side request forgery primitive: `http://169.254.169.254/...`
+ * reads cloud instance credentials, `http://127.0.0.1:5432` and friends reach
+ * every service bound to loopback, and because the scraped text is handed back
+ * to the caller as a recipe draft, whatever comes back is *readable* rather
+ * than merely triggerable.
+ *
+ * KNOWN LIMIT, stated rather than papered over: between this lookup and the
+ * connection the OS makes, a hostile DNS server can change its answer (a
+ * rebinding attack). Closing that needs the connection pinned to the address
+ * validated here, which means reaching past `fetch` into the agent's socket
+ * factory. What is here stops every static payload and every redirect hop;
+ * rebinding remains open, and is the reason the allowlist is deny-by-default
+ * on anything that does not parse.
+ */
+async function assertFetchableUrl(raw: string): Promise<URL> {
+  let url: URL;
+  try {
+    url = new URL(raw);
+  } catch {
+    throw new Error("That does not look like a URL.");
+  }
+
+  if (url.protocol !== "http:" && url.protocol !== "https:") {
+    // Notably this rejects `data:` (which undici will happily "fetch", letting
+    // a caller feed the parser arbitrary bytes) and `file:`.
+    throw new Error("Only http and https addresses can be imported.");
+  }
+
+  if (url.username || url.password) {
+    throw new Error("Remove the credentials from that URL and try again.");
+  }
+
+  const hostname = url.hostname.replace(/^\[|\]$/g, "");
+
+  // A literal address needs no resolution -- and must not get a free pass by
+  // skipping the lookup below.
+  if (isIP(hostname)) {
+    if (isBlockedAddress(hostname)) {
+      throw new Error("That address is not reachable for import.");
+    }
+    return url;
+  }
+
+  let resolved: { address: string }[];
+  try {
+    resolved = await lookup(hostname, { all: true });
+  } catch {
+    throw new Error("Could not find that site.");
+  }
+
+  // EVERY answer must be public: a name that resolves to both a public and a
+  // private address is still a way into the private one.
+  if (resolved.length === 0 || resolved.some((entry) => isBlockedAddress(entry.address))) {
+    throw new Error("That address is not reachable for import.");
+  }
+
+  return url;
+}
+
+/**
+ * Read a response body with a hard ceiling on how much we will hold.
+ *
+ * `response.text()` buffers whatever arrives. Against a server that streams
+ * without end -- or simply serves a large file, or a gzip bomb, which undici
+ * transparently inflates -- that is unbounded memory for the cost of one
+ * request. The timeout does bound the *duration*, but a body can move a lot of
+ * bytes in ten seconds; measured, an endless stream reached +1.7 GB RSS before
+ * the abort fired.
+ *
+ * So take the stream and stop at the budget. A response with no `body` (an
+ * already-buffered one, as in the unit tests) falls back to `text()` and is
+ * capped after the fact -- correct, just not incremental.
+ */
+async function readCappedText(response: Response): Promise<string> {
+  const declared = Number(response.headers?.get?.("content-length") ?? "");
+  if (Number.isFinite(declared) && declared > MAX_HTML_BYTES) {
+    throw new Error("That page is too large to import.");
+  }
+
+  const body = response.body;
+  if (!body) {
+    const text = await response.text();
+    return text.length > MAX_HTML_CHARS ? text.slice(0, MAX_HTML_CHARS) : text;
+  }
+
+  const decoder = new TextDecoder("utf-8");
+  const reader = body.getReader();
+  let received = 0;
+  let text = "";
 
   try {
-    response = await fetch(url, {
-      headers: {
-        "User-Agent": USER_AGENT,
-        Accept: "text/html,application/xhtml+xml",
-      },
-      redirect: "follow",
-      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-    });
-  } catch (error) {
-    // Propagate the abort untouched so callers can branch on `error.name`.
-    if (isAbortError(error)) throw error;
-    throw new Error(`Could not reach that page: ${describe(error)}`);
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (!value) continue;
+
+      received += value.byteLength;
+      if (received > MAX_HTML_BYTES) {
+        // Everything past the ceiling is discarded rather than refused: a
+        // recipe's structured data lives near the top of the document, so a
+        // truncated read usually still parses.
+        text += decoder.decode(value, { stream: true });
+        break;
+      }
+
+      text += decoder.decode(value, { stream: true });
+    }
+  } finally {
+    await reader.cancel().catch(() => {});
+  }
+
+  text += decoder.decode();
+  return text.length > MAX_HTML_CHARS ? text.slice(0, MAX_HTML_CHARS) : text;
+}
+
+async function fetchHtml(url: string): Promise<string> {
+  let current = await assertFetchableUrl(url);
+  let response: Response;
+
+  // Redirects are followed BY HAND so every hop is vetted. With
+  // `redirect: "follow"` the check above guards only the first URL, and a
+  // public page answering 302 to http://169.254.169.254/ walks straight past
+  // it -- which is the standard way naive SSRF filters are defeated.
+  for (let hop = 0; ; hop++) {
+    try {
+      response = await fetch(current.href, {
+        headers: {
+          "User-Agent": USER_AGENT,
+          Accept: "text/html,application/xhtml+xml",
+        },
+        redirect: "manual",
+        signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+      });
+    } catch (error) {
+      // Propagate the abort untouched so callers can branch on `error.name`.
+      if (isAbortError(error)) throw error;
+      throw new Error(`Could not reach that page: ${describe(error)}`);
+    }
+
+    const location =
+      response.status >= 300 && response.status < 400
+        ? response.headers?.get?.("location")
+        : null;
+
+    if (!location) break;
+
+    if (hop >= MAX_REDIRECTS) {
+      throw new Error("That page redirected too many times.");
+    }
+
+    current = await assertFetchableUrl(new URL(location, current).href);
   }
 
   if (!response.ok) {
@@ -664,10 +1014,20 @@ async function fetchHtml(url: string): Promise<string> {
     );
   }
 
+  // A present-but-wrong content type is a refusal; an absent one is not, since
+  // plenty of real sites omit it and the parser tolerates junk anyway.
+  const contentType = response.headers?.get?.("content-type");
+  if (contentType && !/^\s*(?:text\/html|application\/xhtml\+xml|text\/plain)/i.test(contentType)) {
+    throw new Error("That page is not HTML.");
+  }
+
   try {
-    return await response.text();
+    return await readCappedText(response);
   } catch (error) {
     if (isAbortError(error)) throw error;
+    if (error instanceof Error && error.message.startsWith("That page is too large")) {
+      throw error;
+    }
     throw new Error(`Could not read that page: ${describe(error)}`);
   }
 }
