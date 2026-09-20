@@ -33,7 +33,23 @@ export default [
   route("api/health", "routes/api.health.ts"),
 
   route("api/recipes", "routes/api.recipes.ts"),
+  // BEFORE the `:id` route. React Router ranks a static segment above a
+  // dynamic one regardless of order, but "import" and ":id" occupying the same
+  // slot is exactly the kind of thing that should be obvious from reading the
+  // list rather than inferred from the router's ranking rules.
+  route("api/recipes/import", "routes/api.recipes.import.ts"),
   route("api/recipes/:id", "routes/api.recipes.$id.ts"),
+
+  // The controlled vocabularies a recipe editor needs to offer valid values.
+  // Both were reachable from the HTML loaders (`getAllIngredients`,
+  // `getAllUnits`) and from nowhere else, which is the whole shape of the gap
+  // a second UI client exposes -- see docs/plans/2026-09-20-native-ios-frontend.md.
+  route("api/ingredients", "routes/api.ingredients.ts"),
+  route("api/units", "routes/api.units.ts"),
+
+  // Tombstones. A client holding a cache can learn that a row it still has was
+  // deleted; without this the only honest refresh is a full refetch.
+  route("api/deletions", "routes/api.deletions.ts"),
 
   // The tag vocabulary. Read-only as a collection -- tags come into existence
   // by tagging a recipe -- plus a single-id DELETE for the orphans a deleted

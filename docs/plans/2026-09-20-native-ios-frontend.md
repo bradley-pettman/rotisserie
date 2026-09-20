@@ -1,6 +1,8 @@
 # Native iOS frontend: scope and strategy
 
-**Status:** strategy / pre-decision. Nothing here is committed to a milestone yet.
+**Status:** decided. **Option C — native shell with authenticated web views — is the chosen
+direction** (§7). Phase 0 of §9 is being implemented now; see the Decision record below for
+what C constrains in Milestone 4.
 
 **The question:** what would it take to put a native iOS client in front of Rotisserie,
 and is that the right way to spend the effort?
@@ -242,7 +244,7 @@ current feature set — before Milestones 3, 6 and 7 add screens that now have t
 twice, forever.
 **Rough size:** XL, plus M4 (itself L+L+M+M+M), plus the API delta.
 
-### C. Native shell, web views for the long tail — **recommended if you go native**
+### C. Native shell, web views for the long tail — **CHOSEN**
 Native for the surfaces where native wins: today's plan, cooking mode, the Share
 Extension, widgets. Authenticated `WKWebView` for the recipe editor, the planner grid and
 history. You ship items 1–6 without rebuilding the form-heavy screens twice, and you can
@@ -260,6 +262,42 @@ reuse is the Zod schemas and the TypeScript types, which is real value (the sche
 the documented source of truth for what a valid recipe is) but is a shared *validation*
 layer, not a shared *app*. The argument for D is Android. If this is iOS-only, SwiftUI is
 the better tool.
+
+## 7a. Decision record — what choosing C commits you to
+
+Option C is the cheapest route to the native-only wins, but it is not free of
+constraints, and the expensive one lands in Milestone 4 rather than in the iOS project.
+
+**The auth model is now load-bearing, and it is decided in M4, not later.** A native shell
+holding a token and a `WKWebView` needing a session are two different auth mechanisms over
+one identity. The token the app holds must be exchangeable for a web session the web view
+can present, or every web-view screen shows a login wall inside an app the user is already
+signed in to. Concretely, M4 needs to ship:
+
+- OAuth 2.0 + PKCE via `ASWebAuthenticationSession`, refresh token in the Keychain.
+- A token-to-session exchange endpoint the app calls before loading a web view, so the
+  view arrives authenticated.
+- Session and token lifetimes that do not desynchronize — a web view whose cookie expires
+  while the app's token is still valid is the failure mode to design against.
+
+None of that is hard, but all of it is much harder to retrofit than to include. It is the
+single thing option C asks you to get right the first time.
+
+**Two consequences that are easy to miss:**
+
+- **Deep links stop being a nicety.** The native shell and the web views have to hand
+  navigation back and forth. `?recipe=<id>` already makes drawers addressable, which is
+  most of the scheme for free — but it now has to be honoured in both directions, and a
+  web view that navigates somewhere the shell should own needs intercepting.
+- **The web views must be good on a phone.** Roadmap #51 (mobile-responsive navigation)
+  and #58 (responsive audit) stop being PWA-milestone work and become prerequisites for
+  the native app, because the recipe editor and planner grid ship *as web views* inside
+  it. This is the part of M5 that survives choosing native over PWA.
+
+**What this buys:** the form-heavy screens are never written twice, and any web view can be
+replaced with a native screen later, one at a time, without a rewrite. That option value is
+the reason C beats B here — Milestones 3, 6 and 7 all add screens, and under B every one of
+them would be built twice forever.
 
 ## 8. How the existing architecture translates
 

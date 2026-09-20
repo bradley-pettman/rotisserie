@@ -19,6 +19,8 @@
  * `details` is present only when there is something structured to say -- for a
  * failed Zod parse it is `error.flatten().fieldErrors`, keyed by field name.
  */
+import { createHash } from "node:crypto";
+
 import type { z } from "zod";
 
 export interface ApiErrorBody {
@@ -44,6 +46,81 @@ export function jsonOk<T>(data: T, status = 200, headers?: HeadersInit): Respons
     status,
     headers: { ...JSON_HEADERS, ...headers },
   });
+}
+
+/**
+ * Collection metadata, carried ALONGSIDE the payload rather than inside it.
+ *
+ * The envelope stays `{data: ...}` and gains an optional sibling `{meta: ...}`,
+ * because the alternative -- wrapping a list as `data: {items, total}` -- is a
+ * breaking change to every existing caller, and `agent/rotisserie_agent/
+ * api_client.py` unwraps `body["data"]` and hands it straight to a tool. An
+ * added sibling key is invisible to it; a changed `data` shape is not.
+ *
+ * `total` is the count matching the FILTER, not the count on the page: it is
+ * the number a caller needs to size a scrollbar or say "42 recipes", which is
+ * precisely what `data.length` cannot tell them once `limit` is in play.
+ */
+export interface ResponseMeta {
+  total?: number;
+  limit?: number;
+  offset?: number;
+}
+
+/**
+ * A 200 that participates in conditional requests, for reads a client will ask
+ * for again and again.
+ *
+ * WHY THIS EXISTS. A mobile client re-reads the recipe list on every
+ * foreground. Unconditionally that is the whole library over the network each
+ * time, on a connection the kitchen may barely have; with an ETag it is a 304
+ * and no body at all once the list has not changed. The saving is the entire
+ * payload, and the cost is one hash of a string we have already serialized.
+ *
+ * WEAK, deliberately. The validator is `W/"<sha1>"`, not `"<sha1>"`, because a
+ * strong ETag is a promise about the BYTES, and nothing here controls the bytes
+ * end to end -- `react-router-serve` may compress on the way out, and a proxy
+ * may re-encode. Weak only promises the response is semantically the same,
+ * which is exactly what we can honestly claim, and `If-None-Match` on a GET
+ * compares weakly regardless.
+ *
+ * `Cache-Control: private, no-cache` is not "do not cache". It means "cache it,
+ * but revalidate before reuse", which IS this flow: the client keeps the body
+ * and spends one conditional round trip to learn it is still good. `private`
+ * keeps a shared proxy from holding one caller's data once per-user auth lands.
+ */
+export function jsonCached<T>(
+  request: Request,
+  data: T,
+  meta?: ResponseMeta
+): Response {
+  const body = JSON.stringify(meta === undefined ? { data } : { data, meta });
+  const etag = `W/"${createHash("sha1").update(body).digest("base64url")}"`;
+
+  const headers = {
+    ...JSON_HEADERS,
+    ETag: etag,
+    "Cache-Control": "private, no-cache",
+  };
+
+  // `If-None-Match` is a LIST, and "*" is legal in it. Splitting on commas
+  // rather than comparing the raw header is what makes a client that carries
+  // two validators -- or a proxy that merged them -- still get its 304.
+  const presented = request.headers.get("If-None-Match");
+  if (presented !== null) {
+    const candidates = presented.split(",").map((value) => value.trim());
+
+    if (candidates.includes("*") || candidates.includes(etag)) {
+      // 304 carries no body BY SPEC, and must repeat the validator so the
+      // client can keep using it. Content-Type is dropped with the body.
+      return new Response(null, {
+        status: 304,
+        headers: { ETag: etag, "Cache-Control": "private, no-cache" },
+      });
+    }
+  }
+
+  return new Response(body, { status: 200, headers });
 }
 
 /** 204: deletion succeeded and there is deliberately no body to send. */
