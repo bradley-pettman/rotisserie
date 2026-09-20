@@ -58,16 +58,34 @@ export function Drawer({
             // a drawer's is to sit beside what you were reading, so the list
             // behind has to stay legible rather than become a grey field.
             "fixed inset-0 z-50 bg-foreground/10",
-            "data-[state=open]:animate-in data-[state=open]:fade-in-0",
-            "data-[state=closed]:animate-out data-[state=closed]:fade-out-0"
+            "data-[state=open]:animate-in data-[state=open]:fade-in-0"
           )}
         />
+        {/*
+          THE DRAWER ANIMATES IN BUT NOT OUT, and that asymmetry is the fix for
+          a real bug rather than an oversight.
+
+          Radix unmounts the panel only once its exit animation finishes, and
+          its dismissable layer stays mounted for that whole window. While it
+          is there it swallows the next click on the page -- the click never
+          reaches React at all. So closing one drawer and immediately opening
+          another silently did nothing for ~300ms.
+
+          The planner is where it bites: assign a meal, then click the meal you
+          just added, and the drawer does not open. Verified by sampling the DOM
+          each frame -- with a close animation the second drawer never appears;
+          without one it opens on the next frame -- and verified to work either
+          way if you first wait the animation out.
+
+          Entering is what the animation is really for (it explains where the
+          panel came from); leaving instantly reads as responsive rather than
+          abrupt, and never eats a click.
+        */}
         <DialogPrimitive.Content
           className={cn(
             "bg-card fixed inset-y-0 right-0 z-50 flex w-full flex-col border-l shadow-2xl outline-none",
             "duration-300 ease-out",
             "data-[state=open]:animate-in data-[state=open]:slide-in-from-right",
-            "data-[state=closed]:animate-out data-[state=closed]:slide-out-to-right",
             WIDTHS[width],
             className
           )}
