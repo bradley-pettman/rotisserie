@@ -8,6 +8,35 @@ export default [
   route("recipes/:id", "features/recipes/routes/recipes.$id.tsx"),
   route("recipes", "features/recipes/routes/recipes.tsx"),
 
+  // ---- UI redesign prototypes ----
+  //
+  // Three proposed shells, mounted beside the current UI rather than replacing
+  // it, so the two can be clicked through side by side. They read the real
+  // loaders and the real database; nothing under /design writes. See
+  // app/design/README.md for what each option is arguing for.
+  route("design", "design/index.tsx"),
+
+  route("design/a", "design/option-a/layout.tsx", [
+    index("design/option-a/recipes.tsx"),
+    route("plan", "design/option-a/plan.tsx"),
+    route("history", "design/option-a/history.tsx"),
+    route("recipes/new", "design/option-a/new.tsx"),
+    route("recipes/:id/edit", "design/option-a/editor.tsx"),
+  ]),
+
+  route("design/b", "design/option-b/layout.tsx", [
+    index("design/option-b/recipes.tsx"),
+    route("plan", "design/option-b/plan.tsx"),
+    route("history", "design/option-b/history.tsx"),
+  ]),
+
+  route("design/c", "design/option-c/layout.tsx", [
+    index("design/option-c/today.tsx"),
+    route("plan", "design/option-c/plan.tsx"),
+    route("recipes", "design/option-c/recipes.tsx"),
+    route("history", "design/option-c/history.tsx"),
+  ]),
+
   // JSON HTTP API. These are resource routes: they export `loader` and/or
   // `action` and no default component, so they render nothing and return
   // Responses directly. Shared transport concerns (auth, envelopes, Zod
