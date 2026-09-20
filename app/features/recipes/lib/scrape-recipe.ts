@@ -126,8 +126,14 @@ function decodeEntities(text: string): string {
           return whole;
         }
       }
-      const named = NAMED_ENTITIES[body.toLowerCase()];
-      return named === undefined ? whole : named;
+      // `hasOwnProperty`, not a bare lookup: `NAMED_ENTITIES` is an object
+      // literal, so `&constructor;` otherwise resolved through the prototype
+      // chain and substituted "function Object() { [native code] }" into the
+      // recipe text. `canonicalizeUnit` already guards its table this way.
+      const key = body.toLowerCase();
+      if (!Object.prototype.hasOwnProperty.call(NAMED_ENTITIES, key)) return whole;
+
+      return NAMED_ENTITIES[key];
     },
   );
 }

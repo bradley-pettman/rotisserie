@@ -1097,3 +1097,20 @@ describe("scrapeRecipe: hostile input stays cheap to process", () => {
     expect(recipe.instructions?.split("\n\n")).toHaveLength(200);
   });
 });
+
+describe("stripHtml: the entity table is not a prototype lookup", () => {
+  it("leaves &constructor; alone instead of substituting Object's source", () => {
+    // A bare `NAMED_ENTITIES[key]` resolved inherited properties, so this
+    // spliced "function Object() { [native code] }" into the recipe text.
+    expect(stripHtml("Bake &constructor; 20 min")).toBe("Bake &constructor; 20 min");
+    expect(stripHtml("&toString; &hasOwnProperty; &__proto__;")).toBe(
+      "&toString; &hasOwnProperty; &__proto__;",
+    );
+  });
+
+  it("still decodes the entities it actually knows", () => {
+    expect(stripHtml("Salt &amp; pepper")).toBe("Salt & pepper");
+    expect(stripHtml("350&deg;F")).toBe("350°F");
+    expect(stripHtml("&frac12; cup")).toBe("½ cup");
+  });
+});
