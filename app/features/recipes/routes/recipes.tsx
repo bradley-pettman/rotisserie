@@ -48,7 +48,10 @@ export async function loader({ request }: Route.LoaderArgs) {
     openId ? getRecipeDetail(openId) : Promise.resolve(null),
   ]);
 
-  return { recipes, allTags, filters: { search, tags }, view, openRecipe };
+  // `today` is computed once here, not during render: `new Date()` in a
+  // component reads the server's timezone on the server and the browser's in
+  // the browser, so "Today"/"Yesterday" could disagree across hydration.
+  return { recipes, allTags, filters: { search, tags }, view, openRecipe, today: todayIso() };
 }
 
 export async function action({ request }: Route.ActionArgs) {
@@ -84,7 +87,8 @@ export async function action({ request }: Route.ActionArgs) {
 }
 
 export default function RecipesPage() {
-  const { recipes, allTags, filters, view, openRecipe } = useLoaderData<typeof loader>();
+  const { recipes, allTags, filters, view, openRecipe, today } =
+    useLoaderData<typeof loader>();
   const navigate = useNavigate();
   const navigation = useNavigation();
   const [searchParams] = useSearchParams();
@@ -258,6 +262,7 @@ export default function RecipesPage() {
                 <RecipeMeta
                   recipe={recipe}
                   lastCooked={recipe.lastCookedAt}
+                  today={today}
                   className="mt-2 text-xs"
                 />
                 <TagList tags={recipe.tags} max={3} className="mt-3" />
@@ -314,7 +319,7 @@ export default function RecipesPage() {
                             : "text-muted-foreground/60"
                         )}
                       >
-                        {recipe.lastCookedAt ? relativeDay(recipe.lastCookedAt) : "Never"}
+                        {recipe.lastCookedAt ? relativeDay(recipe.lastCookedAt, today) : "Never"}
                       </td>
                     </tr>
                   );
@@ -333,7 +338,7 @@ export default function RecipesPage() {
         title={openRecipe?.name ?? ""}
         subtitle={
           openRecipe ? (
-            <RecipeMeta recipe={openRecipe} lastCooked={openRecipe.lastCookedAt} />
+            <RecipeMeta recipe={openRecipe} lastCooked={openRecipe.lastCookedAt} today={today} />
           ) : undefined
         }
         footer={

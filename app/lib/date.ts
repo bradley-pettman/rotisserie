@@ -74,7 +74,21 @@ export function dateRange(from: string, to: string): string {
  * Both arguments are calendar days, so this is plain integer arithmetic on
  * UTC-pinned dates — no timezone can shift the answer by one.
  */
-export function relativeDay(day: string, reference = todayIso()): string {
+/**
+ * `reference` is REQUIRED, and that is the whole point of this signature.
+ *
+ * It used to default to `todayIso()`, which is `new Date()` -- evaluated at
+ * call time, during render. On the server that reads the Node process's
+ * timezone; in the browser it reads the user's. A cook on 2026-09-19, rendered
+ * at 18:00 in UTC-7 from a UTC server, is "Yesterday" in the SSR HTML and
+ * "Today" after hydration: React reports a mismatch and re-renders, and the
+ * user watches the label change.
+ *
+ * Today has to come from the loader, where it is computed once per request and
+ * shipped with the data. Making the parameter required is what forces that:
+ * the compiler now finds every place that would otherwise have guessed.
+ */
+export function relativeDay(day: string, reference: string): string {
   const days = Math.round(
     (parseDay(reference).getTime() - parseDay(day).getTime()) / 86_400_000
   );
