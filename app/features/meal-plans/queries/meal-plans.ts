@@ -48,7 +48,24 @@ const PLAN_COLUMNS = `id, name,
             to_char(ends_on, 'YYYY-MM-DD') as "endsOn",
             created_at as "createdAt", updated_at as "updatedAt"`;
 
-const ITEM_COLUMNS = `id, meal_plan_id as "mealPlanId", recipe_id as "recipeId",
+/**
+ * EXPORTED so that the one other place that selects plan items -- the
+ * `getUnfulfilledItems` read in `integrations/plan-to-cook.ts` -- can share it
+ * rather than keep a second list beside `MealPlanItem`.
+ *
+ * It had one, and adding `createdAt`/`updatedAt` to the interface is exactly
+ * the edit that caught it out: `DB.query<T>` is an ASSERTION, not a check, so
+ * tsc cannot see a SELECT that returns eight columns while the type it is cast
+ * to declares ten. The compiler stays quiet and `/adherence` starts serving
+ * items missing the two fields `/api/meal-plans/:id` includes -- one endpoint
+ * disagreeing with another about the shape of the same row.
+ *
+ * Unqualified on purpose, so it composes with an aliased FROM: `meal_plan_items`
+ * is the only table in both callers' outer FROM, so these names are
+ * unambiguous whether or not the query aliases it. `MEAL_SLOT_SQL_ORDER` is
+ * exported just below and crosses the same boundary for the same reason.
+ */
+export const ITEM_COLUMNS = `id, meal_plan_id as "mealPlanId", recipe_id as "recipeId",
             custom_text as "customText",
             to_char(planned_on, 'YYYY-MM-DD') as "plannedOn",
             meal_slot as "mealSlot", sort_order as "sortOrder", notes,

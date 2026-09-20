@@ -17,10 +17,10 @@
 --
 --    `recipes` has both. `cooks` has created_at and is append-only, which is
 --    the whole story for a table nothing ever edits. `meal_plan_items` has
---    neither -- and it is the most mutable table in this schema. A plan item
---    is an INTENTION (20260919151000), so moving Tuesday's tacos to Wednesday
---    is an ordinary edit to one. The single table whose rows move is the
---    single table with no column recording that they moved.
+--    neither -- and it is the one table here that exists to be rewritten: a
+--    plan item is an INTENTION (20260919151000), so moving Tuesday's tacos to
+--    Wednesday is an ordinary edit rather than an exception. The table whose
+--    rows are meant to move is the table with nothing recording that they did.
 --
 --    HOW updated_at IS KEPT CURRENT: BY THE APPLICATION, matching `recipes`.
 --    `updateRecipe` pushes `updated_at = NOW()` into its SET list; there is no

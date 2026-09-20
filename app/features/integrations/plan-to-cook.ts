@@ -26,7 +26,7 @@
  */
 import { DB } from "~/db/connection";
 import type { QueryFns } from "~/db/connection";
-import { MEAL_SLOT_SQL_ORDER } from "~/features/meal-plans/queries/meal-plans";
+import { ITEM_COLUMNS, MEAL_SLOT_SQL_ORDER } from "~/features/meal-plans/queries/meal-plans";
 import type { MealPlanItem } from "~/features/meal-plans/queries/meal-plans";
 import { logCook } from "~/features/recipes/queries/cooks";
 import type { Cook } from "~/features/recipes/queries/cooks";
@@ -130,10 +130,10 @@ export async function getPlanAdherence(planId: string): Promise<PlanAdherence> {
  */
 export async function getUnfulfilledItems(planId: string): Promise<MealPlanItem[]> {
   return DB.query<MealPlanItem>(
-    `SELECT mpi.id, mpi.meal_plan_id as "mealPlanId", mpi.recipe_id as "recipeId",
-            mpi.custom_text as "customText",
-            to_char(mpi.planned_on, 'YYYY-MM-DD') as "plannedOn",
-            mpi.meal_slot as "mealSlot", mpi.sort_order as "sortOrder", mpi.notes
+    // ITEM_COLUMNS rather than a list of its own: this query and the meal-plans
+    // module populate the SAME `MealPlanItem`, and `DB.query<T>` is an
+    // assertion that cannot catch the two drifting apart. See its definition.
+    `SELECT ${ITEM_COLUMNS}
      FROM meal_plan_items mpi
      WHERE mpi.meal_plan_id = $1
        AND NOT EXISTS (
