@@ -197,6 +197,36 @@ export async function sweepOrphans(run: TestRun): Promise<SweepResult> {
 }
 
 /**
+ * Delete meal plans the suite caused to exist and that are now empty.
+ *
+ * Planning a meal creates the week's plan if there is not one already, so a
+ * planner test can leave a `meal_plans` row behind even though every item in
+ * it has gone. The items themselves need no handling: `meal_plan_items` has no
+ * `created_at` to scope a delete by, but `recipe_id` is ON DELETE CASCADE, so
+ * deleting the test's recipes takes its plan items with them -- which is also
+ * why this has to run AFTER `deleteRecipes`.
+ *
+ * Two conditions keep this off anybody else's data: the plan must have been
+ * created inside the run window, and it must now be empty. A real plan for
+ * this week predates the run and survives even though the suite added an item
+ * to it; a plan with a free-text item left in it is not ours to judge, so it
+ * survives too.
+ */
+export async function sweepEmptyPlans(run: TestRun): Promise<number> {
+  const plans = await query<{ id: string }>(
+    `DELETE FROM meal_plans p
+      WHERE p.created_at > $1::timestamptz
+        AND NOT EXISTS (
+          SELECT 1 FROM meal_plan_items i WHERE i.meal_plan_id = p.id
+        )
+      RETURNING p.id`,
+    [run.startedAt]
+  );
+
+  return plans.length;
+}
+
+/**
  * Rows created during the run that are still there after the final teardown.
  * Reported, not asserted: the dev database is shared, so a non-zero count is
  * not necessarily this suite's doing.
@@ -207,7 +237,8 @@ export async function residueSince(run: TestRun): Promise<Record<string, number>
      UNION ALL SELECT 'tags', count(*)::text FROM tags WHERE created_at > $1::timestamptz
      UNION ALL SELECT 'ingredients', count(*)::text FROM ingredients WHERE created_at > $1::timestamptz
      UNION ALL SELECT 'units', count(*)::text FROM units WHERE created_at > $1::timestamptz
-     UNION ALL SELECT 'cooks', count(*)::text FROM cooks WHERE created_at > $1::timestamptz`,
+     UNION ALL SELECT 'cooks', count(*)::text FROM cooks WHERE created_at > $1::timestamptz
+     UNION ALL SELECT 'meal_plans', count(*)::text FROM meal_plans WHERE created_at > $1::timestamptz`,
     [run.startedAt]
   );
 

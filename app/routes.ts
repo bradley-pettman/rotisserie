@@ -1,12 +1,28 @@
-import { type RouteConfig, index, route } from "@react-router/dev/routes";
+import { type RouteConfig, index, layout, route } from "@react-router/dev/routes";
 
 export default [
-  index("routes/home.tsx"),
-  route("recipes/new", "features/recipes/routes/recipes.new.tsx"),
-  route("recipes/:id/edit", "features/recipes/routes/recipes.$id.edit.tsx"),
+  // Everything inside the shell: the sidebar is structural, so a page cannot
+  // ship without navigation. Cooking mode sits outside it on purpose.
+  layout("routes/app-layout.tsx", [
+    index("routes/home.tsx"),
+
+    route("recipes", "features/recipes/routes/recipes.tsx"),
+    route("recipes/new", "features/recipes/routes/recipes.new.tsx"),
+    route("recipes/:id/edit", "features/recipes/routes/recipes.$id.edit.tsx"),
+    // Kept as a permalink. Recipe detail is a drawer over the list now, so
+    // this redirects into it rather than rendering a second copy of the page.
+    route("recipes/:id", "features/recipes/routes/recipes.$id.tsx"),
+
+    route("history", "features/recipes/routes/history.tsx"),
+
+    // The planner resolves plan items' recipe names, which crosses two feature
+    // modules, so it lives out here with the API routes rather than inside
+    // either module. See the module boundary rule in CLAUDE.md.
+    route("plan", "routes/plan.tsx"),
+  ]),
+
+  // A full-screen mode with one way out. Outside the shell deliberately.
   route("recipes/:id/cook", "features/recipes/routes/recipes.$id.cook.tsx"),
-  route("recipes/:id", "features/recipes/routes/recipes.$id.tsx"),
-  route("recipes", "features/recipes/routes/recipes.tsx"),
 
   // JSON HTTP API. These are resource routes: they export `loader` and/or
   // `action` and no default component, so they render nothing and return

@@ -7,7 +7,15 @@
  * start from the seeded ingredients/units and no recipes of ours, which is what
  * makes the list and combobox assertions below deterministic.
  */
-import { addIngredient, expect, expectComboboxFiltered, gotoRecipeList, test, type Page } from "./fixtures";
+import {
+  addIngredient,
+  expect,
+  expectComboboxFiltered,
+  gotoRecipeForm,
+  gotoRecipeList,
+  test,
+  type Page,
+} from "./fixtures";
 
 /**
  * The live-search debounce in app/features/recipes/routes/recipes.tsx. Keep in
@@ -29,23 +37,22 @@ async function outlastSearchDebounce(page: Page): Promise<void> {
 }
 
 test.describe("Rotisserie Recipe App", () => {
-  test("Home page loads and has navigation links", async ({ page }) => {
-    // Visit home page
+  test("The shell is present and / lands on the recipe list", async ({ page }) => {
+    // `/` used to be a splash screen whose only job was to offer the two links
+    // that are now permanently in the sidebar, so it redirects into the app.
     await page.goto("/");
-
-    // Verify "Rotisserie" heading exists
-    await expect(page.getByRole("heading", { name: "Rotisserie" })).toBeVisible();
-
-    // Verify "View Recipes" and "Add Recipe" buttons exist
-    const viewRecipesButton = page.getByRole("link", { name: "View Recipes" });
-    const addRecipeButton = page.getByRole("link", { name: "Add Recipe" });
-
-    await expect(viewRecipesButton).toBeVisible();
-    await expect(addRecipeButton).toBeVisible();
-
-    // Click "View Recipes" and verify navigation to /recipes
-    await viewRecipesButton.click();
     await expect(page).toHaveURL("/recipes");
+
+    // The sidebar is a layout route, so every page inside the app has it.
+    const nav = page.getByTestId("app-nav");
+    await expect(nav.getByRole("link", { name: "Recipes" })).toBeVisible();
+    await expect(nav.getByRole("link", { name: "Plan" })).toBeVisible();
+    await expect(nav.getByRole("link", { name: "History" })).toBeVisible();
+
+    await nav.getByRole("link", { name: "Plan" }).click();
+    await expect(page).toHaveURL("/plan");
+    // Still there after navigating: that is the whole point of the shell.
+    await expect(page.getByTestId("app-nav")).toBeVisible();
   });
 
   test("Create a new recipe", async ({ page, recipes }) => {
@@ -59,77 +66,73 @@ test.describe("Rotisserie Recipe App", () => {
     await expect(page.getByRole("heading", { name: recipeName })).toBeVisible();
   });
 
-  test("View recipe list and detail", async ({ page, recipes }) => {
-    // First, create a recipe to ensure there's one to view
+  test("Opening a recipe shows it in a drawer without losing the list", async ({
+    page,
+    recipes,
+  }) => {
     const recipeName = recipes.name("View Test Recipe");
     const instructions = "Instructions for viewing test";
 
     await recipes.create(recipeName, instructions, "tomato");
 
-    // Visit /recipes
-    await page.goto("/recipes");
+    await gotoRecipeList(page);
+    await page.getByRole("cell", { name: recipeName }).getByRole("button").click();
 
-    // Click on the recipe card
-    await page.getByText(recipeName).click();
-
-    // Verify the detail page shows the recipe name, ingredients, instructions
+    // The drawer's title is the recipe, and the body carries both halves.
     await expect(page.getByRole("heading", { name: recipeName })).toBeVisible();
-    await expect(page.locator('[data-slot="card-title"]').filter({ hasText: "Ingredients" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Ingredients" })).toBeVisible();
     await expect(page.getByText("Tomato")).toBeVisible();
-    await expect(page.locator('[data-slot="card-title"]').filter({ hasText: "Instructions" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Method" })).toBeVisible();
     await expect(page.getByText(instructions)).toBeVisible();
+
+    // The drawer is a URL parameter, so it is linkable...
+    await expect(page).toHaveURL(/\?recipe=[a-f0-9-]+/);
+    // ...and the list it opened over is still rendered behind it.
+    await expect(page.getByTestId("recipe-table")).toBeVisible();
+
+    // Back closes it and leaves the list exactly where it was.
+    await page.goBack();
+    await expect(page).not.toHaveURL(/\?recipe=/);
+    await expect(page.getByRole("cell", { name: recipeName })).toBeVisible();
   });
 
   test("Edit a recipe", async ({ page, recipes }) => {
-    // First, create a recipe to edit
     const originalName = recipes.name("Edit Test Recipe");
     const updatedName = `Updated ${originalName}`;
-    const instructions = "Original instructions";
 
-    await recipes.create(originalName, instructions, "potato");
+    await recipes.create(originalName, "Original instructions", "potato");
 
-    // Click "Edit" button
+    // Editing is reached from the drawer the create redirect just opened.
     await page.getByRole("link", { name: "Edit" }).click();
-
-    // Wait for the edit page to load
     await expect(page).toHaveURL(/\/edit$/);
 
-    // Verify the form is pre-populated
     await expect(page.getByLabel("Recipe Name")).toHaveValue(originalName);
-
-    // Change the recipe name
     await page.getByLabel("Recipe Name").fill(updatedName);
-    await expect(page.getByLabel("Recipe Name")).toHaveValue(updatedName);
 
-    // Click "Save Changes"
     await page.getByRole("button", { name: "Save Changes" }).click();
 
-    // Wait for navigation (the form should redirect on success)
-    await page.waitForURL(/\/recipes\/[a-f0-9-]+[^\/]$/, { timeout: 15000 });
-
-    // Verify the updated name appears on detail page
+    // Saving lands back in the drawer for the recipe just edited.
+    await page.waitForURL(/\/recipes\?recipe=[a-f0-9-]+/, { timeout: 15000 });
     await expect(page.getByRole("heading", { name: updatedName })).toBeVisible();
   });
 
   test("Delete a recipe", async ({ page, recipes }) => {
-    // First, create a recipe to delete
     const recipeName = recipes.name("Delete Test Recipe");
-    const instructions = "Instructions for delete test";
 
-    await recipes.create(recipeName, instructions, "carrot");
+    await recipes.create(recipeName, "Instructions for delete test", "carrot");
 
-    // Handle the confirmation dialog
     page.on("dialog", async (dialog) => {
       await dialog.accept();
     });
 
-    // Click "Delete Recipe" button
+    // Deleting lives on the editor, not on the read surface: a destructive
+    // control in a panel you open by clicking a row is one you hit by accident.
+    await page.getByRole("link", { name: "Edit" }).click();
+    await expect(page).toHaveURL(/\/edit$/);
+
     await page.getByRole("button", { name: "Delete Recipe" }).click();
 
-    // Verify redirect to /recipes
     await expect(page).toHaveURL("/recipes");
-
-    // Verify the recipe no longer appears in the list
     await expect(page.getByText(recipeName)).not.toBeVisible();
   });
 });
@@ -143,17 +146,9 @@ test.describe("Recipe List Features", () => {
     // Go to recipes list
     await gotoRecipeList(page);
 
-    // Verify card view is default (cards container should be visible)
-    await expect(page.getByTestId("recipe-cards")).toBeVisible();
-
-    // Click table view button
-    await page.getByTestId("view-table").click();
-
-    // Verify URL updated and table is shown
-    await expect(page).toHaveURL(/view=table/);
+    // The dense table is the default: it is what the list is for, and it is
+    // the view that shows total time and last-cooked side by side.
     await expect(page.getByTestId("recipe-table")).toBeVisible();
-
-    // Verify recipe is in table
     await expect(page.getByRole("cell", { name: recipeName })).toBeVisible();
 
     // Click card view button
@@ -162,6 +157,12 @@ test.describe("Recipe List Features", () => {
     // Verify URL updated and cards are shown
     await expect(page).toHaveURL(/view=cards/);
     await expect(page.getByTestId("recipe-cards")).toBeVisible();
+    await expect(page.getByText(recipeName)).toBeVisible();
+
+    // Back to the table
+    await page.getByTestId("view-table").click();
+    await expect(page).toHaveURL(/view=table/);
+    await expect(page.getByTestId("recipe-table")).toBeVisible();
   });
 
   test("Filter recipes by tag", async ({ page, recipes }) => {
@@ -269,7 +270,7 @@ test.describe("Recipe List Features", () => {
 
 test.describe("Ingredient and Unit Comboboxes", () => {
   test("Select ingredient from combobox", async ({ page }) => {
-    await page.goto("/recipes/new");
+    await gotoRecipeForm(page);
 
     // Click ingredient combobox
     const ingredientCombobox = page.getByTestId("ingredient-combobox").first();
@@ -291,7 +292,7 @@ test.describe("Ingredient and Unit Comboboxes", () => {
   });
 
   test("Create new ingredient in combobox", async ({ page }) => {
-    await page.goto("/recipes/new");
+    await gotoRecipeForm(page);
     const newIngredient = `CustomIngredient${Date.now()}`;
 
     // Click ingredient combobox
@@ -309,7 +310,7 @@ test.describe("Ingredient and Unit Comboboxes", () => {
   });
 
   test("Select unit from combobox", async ({ page }) => {
-    await page.goto("/recipes/new");
+    await gotoRecipeForm(page);
 
     // First select an ingredient to enable the unit combobox row
     await addIngredient(page, "onion");
@@ -334,13 +335,13 @@ test.describe("Ingredient and Unit Comboboxes", () => {
   });
 
   test("Add multiple ingredients to recipe", async ({ page }) => {
-    await page.goto("/recipes/new");
+    await gotoRecipeForm(page);
 
     // Add first ingredient
     await addIngredient(page, "onion", "2", "piece");
 
     // Click "Add Ingredient" button
-    await page.getByRole("button", { name: "+ Add Ingredient" }).click();
+    await page.getByRole("button", { name: "Add Ingredient" }).click();
 
     // Add second ingredient (use the second row's comboboxes)
     const ingredientComboboxes = page.getByTestId("ingredient-combobox");
@@ -495,5 +496,96 @@ test.describe("Live Search", () => {
     // Verify URL has both parameters
     await expect(page).toHaveURL(/tags=/);
     await expect(page).toHaveURL(/search=/);
+  });
+});
+
+/**
+ * The planner and the cook log — the feature family the redesign was for.
+ *
+ * These exercise the two writes that were previously reachable only over the
+ * JSON API: assigning a meal to a day, and recording that a planned meal
+ * actually happened.
+ */
+test.describe("Meal Planning", () => {
+  test("Plan a meal onto a day, then record cooking it", async ({ page, recipes }) => {
+    const recipeName = recipes.name("Planner Test Recipe");
+    await recipes.create(recipeName, "Planner test instructions", "onion");
+
+    await page.goto("/plan");
+
+    // Seven columns, always: an empty day is a slot to fill, so it has to be
+    // a visible target rather than whitespace.
+    await expect(page.getByTestId("week-grid")).toBeVisible();
+    await expect(page.getByRole("button", { name: /^Add a meal on / })).toHaveCount(7);
+
+    await page.getByRole("button", { name: /^Add a meal on / }).last().click();
+
+    await page.getByTestId("plan-recipe-search").fill(recipeName);
+    await page.getByRole("button", { name: recipeName, exact: true }).click();
+    await page.getByTestId("plan-submit").click();
+
+    // The meal is now in the week.
+    const planned = page.getByTestId("week-grid").getByText(recipeName);
+    await expect(planned).toBeVisible();
+
+    // Record that it happened. This writes a cook AND the fulfilment linking
+    // it back to the intention -- the plan item itself is not rewritten.
+    await planned.click();
+    await page.getByRole("button", { name: "We cooked this" }).click();
+
+    // The intention survives being carried out...
+    await expect(page.getByTestId("week-grid").getByText(recipeName)).toBeVisible();
+    // ...and the fact shows up in the log.
+    await page.goto("/history");
+    await expect(page.getByText(recipeName)).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Today" })).toBeVisible();
+  });
+
+  test("Remove a planned meal without erasing the cook", async ({ page, recipes }) => {
+    const recipeName = recipes.name("Removal Test Recipe");
+    await recipes.create(recipeName, "Removal test instructions", "garlic");
+
+    await page.goto("/plan");
+    await page.getByRole("button", { name: /^Add a meal on / }).last().click();
+    await page.getByTestId("plan-recipe-search").fill(recipeName);
+    await page.getByRole("button", { name: recipeName, exact: true }).click();
+    await page.getByTestId("plan-submit").click();
+
+    const planned = page.getByTestId("week-grid").getByText(recipeName);
+    await expect(planned).toBeVisible();
+
+    await planned.click();
+    await page.getByRole("button", { name: "We cooked this" }).click();
+    await expect(page.getByTestId("week-grid").getByText(recipeName)).toBeVisible();
+
+    // Removing the intention leaves the fact alone: `cooks` is append-only
+    // history, and `cook_fulfillments` is the only thing the delete touches.
+    await page.getByTestId("week-grid").getByText(recipeName).click();
+    await page.getByRole("button", { name: "Remove from the plan" }).click();
+    await expect(page.getByTestId("week-grid").getByText(recipeName)).toHaveCount(0);
+
+    await page.goto("/history");
+    await expect(page.getByText(recipeName)).toBeVisible();
+  });
+});
+
+test.describe("Cook Log", () => {
+  test("Log a cook from the recipe drawer", async ({ page, recipes }) => {
+    const recipeName = recipes.name("Cook Log Recipe");
+    await recipes.create(recipeName, "Cook log instructions", "carrot");
+
+    // The create redirect leaves the new recipe's drawer open.
+    await expect(page.getByRole("heading", { name: recipeName })).toBeVisible();
+    await expect(page.getByText("Never cooked")).toBeVisible();
+
+    await page.getByRole("button", { name: "Log a cook" }).click();
+
+    // Back to the same drawer, with the line the button just changed.
+    await expect(page).toHaveURL(/\/recipes\?recipe=[a-f0-9-]+/);
+    await expect(page.getByRole("heading", { name: recipeName })).toBeVisible();
+    await expect(page.getByText("Never cooked")).toHaveCount(0);
+
+    await page.goto("/history");
+    await expect(page.getByText(recipeName)).toBeVisible();
   });
 });

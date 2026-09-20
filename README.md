@@ -15,6 +15,8 @@ A family-focused meal planning and recipe management application that connects r
 ## Features
 
 - **Recipe Management** - Store, organize, and access recipes with full CRUD operations
+- **Meal Planning** - Plan the week a day at a time, and see which nights are still open
+- **Cook Log** - Record what you actually made, and how closely the week followed the plan
 - **Cooking Mode** - Distraction-free, hands-free friendly interface for following recipes
 - **Search & Filter** - Find recipes by name, tags, or ingredients
 
@@ -42,6 +44,10 @@ dbmate up
 
 # Load seed data (common ingredients + units)
 npm run db:seed
+
+# Optional: a demo library to develop against (DESTRUCTIVE -- replaces
+# recipes, cooks and meal plans; leaves the seeded vocabulary alone)
+npm run db:demo
 
 # Start dev server
 npm run dev

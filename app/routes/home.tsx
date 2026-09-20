@@ -1,20 +1,13 @@
-import { Link } from "react-router";
-import { Button } from "~/components/ui/button";
+import { redirect } from "react-router";
 
-export default function Home() {
-  return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-8">
-      <h1 className="text-4xl font-bold mb-2">Rotisserie</h1>
-      <p className="text-gray-600 mb-8">Plan meals. Shop smarter. Cook. Repeat.</p>
-
-      <div className="flex gap-4">
-        <Link to="/recipes">
-          <Button size="lg">View Recipes</Button>
-        </Link>
-        <Link to="/recipes/new">
-          <Button size="lg" variant="outline">Add Recipe</Button>
-        </Link>
-      </div>
-    </div>
-  );
+/**
+ * `/` is the recipe list.
+ *
+ * This used to be a splash screen whose only job was to offer the two links
+ * that are now permanently in the sidebar. With a shell there is nothing left
+ * for it to say, and a screen you click through without reading is a screen
+ * that should not exist.
+ */
+export function loader() {
+  return redirect("/recipes");
 }

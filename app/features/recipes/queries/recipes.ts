@@ -6,7 +6,7 @@ import type { CreateRecipeInput, RecipeFilter } from "../schemas/recipe";
 // CLAUDE.md permits this import: it only forbids reaching into a SIBLING
 // feature module or into integrations/. `cooks.ts` is the recipes module's own
 // cook log, and eslint's no-restricted-paths zones agree.
-import { lastCookedForRecipes } from "./cooks";
+import { lastCookedAt, lastCookedForRecipes } from "./cooks";
 
 export interface Recipe {
   id: string;
@@ -186,6 +186,30 @@ export async function getRecipeById(id: string): Promise<RecipeWithDetails | nul
   );
 
   return { ...recipe, ingredients, tags };
+}
+
+/**
+ * A recipe plus the one fact the recipes table does not hold: when it was last
+ * actually cooked.
+ *
+ * Every surface that shows a recipe shows this next to the title, because
+ * "we had this on Tuesday" is what decides whether to cook it again. Kept as a
+ * separate function rather than folded into `getRecipeById` so the API's
+ * recipe payload does not silently grow a field it never promised.
+ *
+ * `null` means never cooked. Both halves are same-module reads, so this stays
+ * inside `features/recipes/` rather than needing the integration layer.
+ */
+export interface RecipeDetail extends RecipeWithDetails {
+  lastCookedAt: string | null;
+}
+
+export async function getRecipeDetail(id: string): Promise<RecipeDetail | null> {
+  const recipe = await getRecipeById(id);
+
+  if (!recipe) return null;
+
+  return { ...recipe, lastCookedAt: await lastCookedAt(id) };
 }
 
 /**
