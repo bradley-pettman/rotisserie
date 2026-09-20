@@ -54,6 +54,12 @@
  * TOMBSTONE, ALSO NULL ANY CACHED `cooks.recipeId` POINTING AT THAT ID. The
  * information is already in this response; the client is just performing
  * locally what the foreign key did on the server.
+ *
+ * The other silence is `cook_fulfillments`, which has no id of its own to
+ * tombstone: unlinking a cook from the plan item it fulfilled leaves both ends
+ * alive and says nothing here. Re-read a plan's adherence rather than caching
+ * fulfilment links as rows -- GET /api/meal-plans/:id/adherence answers for a
+ * whole plan in one request.
  */
 import { z } from "zod";
 import type { Route } from "./+types/api.deletions";
