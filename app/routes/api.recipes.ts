@@ -7,6 +7,7 @@
  */
 import type { Route } from "./+types/api.recipes";
 import {
+  countRecipes,
   createRecipe,
   getRecipeById,
   listRecipes,
@@ -15,11 +16,13 @@ import {
   createRecipeSchema,
   recipeFilterSchema,
 } from "~/features/recipes/schemas/recipe";
+import type { ResponseMeta } from "~/lib/api";
 import {
   apiRoute,
   assertApiAccess,
   csvSearchParam,
   enumSearchParam,
+  jsonCached,
   jsonOk,
   methodNotAllowed,
   optionalIntSearchParam,
@@ -63,6 +66,12 @@ const MAX_OFFSET = 1_000_000;
  * because they are not part of "which recipes match" -- they are transport,
  * the same as `?days=` on /api/cooks, and they use the same bounded-integer
  * helper.
+ *
+ * The response carries `meta.total` alongside the array: the size of the
+ * MATCHING SET, not of the page. See `jsonCached`/`ResponseMeta` for why it
+ * sits beside `data` rather than inside it -- the existing agent client
+ * unwraps `body["data"]` and hands it straight to a tool, so a new sibling key
+ * is invisible to it while a reshaped `data` would not be.
  */
 export const loader = apiRoute(async ({ request }: Route.LoaderArgs) => {
   assertApiAccess(request);
@@ -79,14 +88,43 @@ export const loader = apiRoute(async ({ request }: Route.LoaderArgs) => {
   );
 
   const include = enumSearchParam(url, "include", INCLUDABLE_FIELDS);
+  const limit = optionalIntSearchParam(url, "limit", { min: 1, max: MAX_LIMIT });
+  const offset = optionalIntSearchParam(url, "offset", { min: 0, max: MAX_OFFSET });
 
-  const recipes = await listRecipes(filter, {
-    limit: optionalIntSearchParam(url, "limit", { min: 1, max: MAX_LIMIT }),
-    offset: optionalIntSearchParam(url, "offset", { min: 0, max: MAX_OFFSET }),
-    includeLastCookedAt: include.includes("lastCookedAt"),
-  });
+  // Concurrent, because the two are independent: the count does not need the
+  // page and the page does not need the count. Serially this endpoint would
+  // pay a full round trip for a number nobody waits on.
+  //
+  // The cost is honest and worth naming: `total` is UNCONDITIONAL, so every
+  // list read is now one query more than it was. That is deliberate rather
+  // than another `?include=` knob -- a count a caller has to know to ask for
+  // is a count most callers will not have, and the alternative (inferring it
+  // from `data.length`) is wrong precisely when it matters. The count runs the
+  // same predicate the list just ran, over the same indexes, and materialises
+  // no rows -- cheap next to serialising the page itself.
+  //
+  // The two statements are not one snapshot, so under concurrent writes
+  // `total` can disagree with the page by a row. At family scale that is
+  // invisible; it is the same instability `?offset` already has, and fixing
+  // either one properly means a cursor rather than a transaction.
+  const [recipes, total] = await Promise.all([
+    listRecipes(filter, {
+      limit,
+      offset,
+      includeLastCookedAt: include.includes("lastCookedAt"),
+    }),
+    countRecipes(filter),
+  ]);
 
-  return jsonOk(recipes);
+  // `limit`/`offset` are echoed ONLY when the caller supplied them. Inventing
+  // values for them would be a lie in the one case that matters: this endpoint
+  // returns every matching recipe when `limit` is absent, and `limit: 200` in
+  // the meta of an unbounded response tells a client to stop reading at 200.
+  const meta: ResponseMeta = { total };
+  if (limit !== undefined) meta.limit = limit;
+  if (offset !== undefined) meta.offset = offset;
+
+  return jsonCached(request, recipes, meta);
 });
 
 /** POST /api/recipes -- body validated by createRecipeSchema. */

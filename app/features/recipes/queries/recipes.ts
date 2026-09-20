@@ -314,11 +314,6 @@ export interface ListRecipesOptions {
 }
 
 /**
- * TWO queries, always -- three with `includeLastCookedAt`. Never N+1:
- * the page of recipes is fetched first, then the tags for exactly those ids in
- * a single batched query, and the two are merged in memory.
- */
-/**
  * Escape the LIKE/ILIKE metacharacters so a search term is matched literally.
  * Pairs with `ESCAPE '\'` on the comparison; the backslash itself has to be
  * escaped first or it would escape whatever followed it.
@@ -327,10 +322,26 @@ function escapeLikePattern(value: string): string {
   return value.replace(/[\\%_]/g, "\\$&");
 }
 
-export async function listRecipes(
-  filter?: RecipeFilter,
-  options?: ListRecipesOptions
-): Promise<RecipeListItem[]> {
+/**
+ * The WHERE clause, and only the WHERE clause, that "which recipes match this
+ * filter" means. Shared verbatim by `listRecipes` and `countRecipes`.
+ *
+ * EXTRACTED RATHER THAN COPIED, because a count that disagrees with the page
+ * it describes is worse than no count at all. `meta.total` exists so a client
+ * can say "42 recipes" or size a scrollbar; a second, hand-maintained copy of
+ * this filter logic would keep answering confidently after the two drifted --
+ * a new filter dimension added to the list and forgotten in the count reads as
+ * a correct number, not as a bug. One builder makes that class of drift
+ * impossible rather than merely unlikely.
+ *
+ * Returns the next free placeholder index alongside the clause because the
+ * list appends LIMIT/OFFSET after these parameters and the count does not.
+ */
+function recipeFilterClause(filter?: RecipeFilter): {
+  where: string;
+  params: QueryParam[];
+  nextParamIndex: number;
+} {
   const conditions: string[] = [];
   const params: QueryParam[] = [];
   let paramIndex = 1;
@@ -380,7 +391,53 @@ export async function listRecipes(
     paramIndex++;
   }
 
-  const where = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+  return {
+    where: conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "",
+    params,
+    nextParamIndex: paramIndex,
+  };
+}
+
+/**
+ * How many recipes match `filter` -- the whole matching set, DELIBERATELY
+ * ignoring limit/offset.
+ *
+ * That is the entire value of the number: `data.length` already tells a caller
+ * how many rows are on the page, and stops meaning anything larger the moment
+ * `limit` is in play. A client sizing a scroll, showing "42 recipes", or
+ * deciding whether another page exists needs the size of the set, not the size
+ * of the window onto it.
+ *
+ * `::int` is load-bearing. COUNT is int8, and `pg` hands int8 back as a STRING
+ * -- the global type-parser override in db/connection.ts covers NUMERIC only
+ * -- so without the cast `total` serialises into the JSON body as "42" and
+ * every arithmetic a client does on it is string concatenation. Same treatment
+ * as `getAllTags`' recipeCount, for the same reason.
+ */
+export async function countRecipes(filter?: RecipeFilter): Promise<number> {
+  const { where, params } = recipeFilterClause(filter);
+
+  // The `r` alias is not decoration: the shared conditions above are written
+  // against `r.name` / `r.id` so that they read identically in both queries.
+  const row = await DB.queryOne<{ total: number }>(
+    `SELECT COUNT(*)::int as total FROM recipes r ${where}`,
+    params
+  );
+
+  return row?.total ?? 0;
+}
+
+/**
+ * TWO queries, always -- three with `includeLastCookedAt`. Never N+1:
+ * the page of recipes is fetched first, then the tags for exactly those ids in
+ * a single batched query, and the two are merged in memory.
+ */
+export async function listRecipes(
+  filter?: RecipeFilter,
+  options?: ListRecipesOptions
+): Promise<RecipeListItem[]> {
+  const { where, params, nextParamIndex } = recipeFilterClause(filter);
+  let paramIndex = nextParamIndex;
 
   // LIMIT/OFFSET are parameterized, never interpolated, and are appended only
   // when asked for so the default statement is byte-for-byte the one this
