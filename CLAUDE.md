@@ -31,14 +31,14 @@ dbmate rollback          # Undo the latest migration
 npm run db:seed          # Load units + ingredients (idempotent)
 
 npm run typecheck        # tsc
-npm test                 # Vitest (src/**/*.test.ts)
+npm test                 # Vitest; needs Postgres running, recreates rotisserie_test each run
 npx tsx <file.ts>        # Run a TypeScript file directly
 ```
 
 ## Structure
 
 ```
-db/migrations/      SQL migrations (dbmate). The comments in them explain each table.
+db/migrations/      SQL migrations (dbmate)
 db/seeds/           Units and ingredient vocabulary
 db/seed.mjs         Applies the seeds
 src/db/connection.ts  pg pool, DB.query / queryOne / withTransaction, checkDatabase

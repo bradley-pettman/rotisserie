@@ -32,7 +32,7 @@ npm run db:seed          # Load common units and ingredients
 
 ```bash
 npm run typecheck        # TypeScript check
-npm test                 # Unit tests (Vitest)
+npm test                 # Tests (Vitest); needs Postgres running, recreates rotisserie_test
 npm run test:watch       # Unit tests in watch mode
 npm run db:seed          # (Re)load db/seeds/*.sql
 ```

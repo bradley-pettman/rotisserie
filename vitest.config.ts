@@ -1,5 +1,6 @@
 import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'vitest/config'
+import { TEST_DATABASE_URL } from './src/test/database-url'
 
 export default defineConfig({
   resolve: {
@@ -10,6 +11,10 @@ export default defineConfig({
   },
   test: {
     include: ['src/**/*.test.ts', 'packages/**/*.test.ts'],
-    environment: 'node'
+    environment: 'node',
+    env: { DATABASE_URL: TEST_DATABASE_URL },
+    globalSetup: ['./src/test/global-setup.ts'],
+    setupFiles: ['./src/test/setup.ts'],
+    fileParallelism: false
   }
 })

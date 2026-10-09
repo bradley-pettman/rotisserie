@@ -10,8 +10,25 @@ permissions:
 
 jobs:
   verify:
-    name: Format, typecheck and unit tests
+    name: Format, typecheck and tests
     runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/rotisserie_test?sslmode=disable
 
     steps:
       - name: Checkout
@@ -32,7 +49,7 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
-      - name: Unit tests
+      - name: Tests
         run: npm test
 
   migrations:
