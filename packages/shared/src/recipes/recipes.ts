@@ -58,6 +58,8 @@ const UpsertRecipeInput = z.object({
   tags: z.string().trim().min(1).max(100).array()
 })
 
+const RecipeSort = z.enum(['recentlyMade', 'longestAgo', 'name', 'rating'])
+
 const RecipePage = z.object({
   recipes: RecipeRaw.array(),
   nextCursor: z.string().nullable()
@@ -73,6 +75,7 @@ export const RecipeSchemas = {
   RecipeStats,
   RecipeWithStats,
   UpsertRecipeInput,
+  RecipeSort,
   RecipePage,
   RecipeWithStatsPage
 }
