@@ -19,7 +19,7 @@ The target system:
 |---|---|
 | Schema and migrations (`db/migrations`) | Done in Phase 0. Changes are discussed first. |
 | Zod schemas, TS types, SQL query functions, their tests | **Built by hand.** Claude explains and reviews, and doesn't write it. |
-| Use cases (`src/use-cases`), HTTP API, mobile app, deployment, builds | Claude can own it, with review. |
+| Use cases (`apps/api/src/use-cases`), HTTP API, mobile app, deployment, builds | Claude can own it, with review. |
 
 The line sits at the query functions on purpose. Below it is where the domain
 rules live: canonical names, snapshots, transactions. Above it is mostly wiring.
@@ -30,7 +30,7 @@ rules live: canonical names, snapshots, transactions. Above it is mostly wiring.
 
 - [x] Schema: 10 tables across the recipe book, planned meals and cooked meals (`db/migrations`)
 - [x] Seeds: units and ingredients (`npm run db:seed`)
-- [x] Connection pool, query helpers and `withTransaction` (`src/db/connection.ts`)
+- [x] Connection pool, query helpers and `withTransaction` (`apps/api/src/db/connection.ts`)
 - [x] CI: typecheck, unit tests, and migrations applied, seeded, rolled back and re-applied
 
 **Local setup after this commit.** The old tables are still in your dev
@@ -82,7 +82,7 @@ eat meatloaf) from TypeScript, with no HTTP involved.
   `packages/shared/src/base/vocabulary.ts`; the old `parse-ingredient.ts` is in
   git history (see below).
 
-**Done when:** a script (`npx tsx src/scripts/friday.ts`) plans the meal, logs what
+**Done when:** a script (`npx tsx apps/api/src/scripts/friday.ts`) plans the meal, logs what
 was actually eaten, and prints plan versus reality.
 
 ## Phase 2: HTTP API
@@ -90,12 +90,14 @@ was actually eaten, and prints plan versus reality.
 Requests flow through three layers, each doing one job:
 
 ```
-route (src/api/routes)        HTTP: validate params, query and body; pick the status code
-  → use case (src/use-cases)  one application action, e.g. GetRecipeById
-    → provider (src/providers) one data operation: SQL in, rows out
+route (api/routes)        HTTP: validate params, query and body; pick the status code
+  → use case (use-cases)  one application action, e.g. GetRecipeById
+    → provider (providers) one data operation: SQL in, rows out
+
+All three under apps/api/src/.
 ```
 
-- [x] Hono on Node (`@hono/node-server`); `npm run dev` runs `tsx watch src/server.ts`
+- [x] Hono on Node (`@hono/node-server`); `npm run dev` runs `tsx watch` on `apps/api/src/server.ts`
 - [x] **Use cases** are built with `defineUseCase({ input, output, implementation })`, a
       `z.function` that validates its input and output. They're the home for
       anything beyond fetching data: not-found decisions, ownership checks, and
@@ -119,21 +121,28 @@ route (src/api/routes)        HTTP: validate params, query and body; pick the st
 
 **Done when:** the Friday scenario runs end to end with `curl` (or a `.http` file).
 
-## Phase 3: Monorepo
-
-Do this before the first line of mobile code so the shared types exist from day one.
+## Phase 3: Monorepo ✅
 
 ```
-apps/api/          ← src/ moves here
-apps/mobile/       ← new Expo app
-packages/shared/   ← already here: Zod schemas, types and vocabulary helpers
-db/                ← stays at the root
+apps/api/          @rotisserie/api: the former src/
+apps/mobile/       new Expo app (created in Phase 4)
+packages/shared/   @rotisserie/shared: Zod schemas, types and vocabulary helpers
+db/                stays at the root
 ```
 
-npm workspaces. Expo's Metro bundler supports workspaces without extra configuration on current SDKs.
-`packages/shared` is already imported as `@rotisserie/shared/*` through a path
-alias; this phase makes it a real workspace package. Check that the `~/` alias
-still resolves in both apps.
+- [x] npm workspaces (`apps/*`, `packages/*`); root scripts run each workspace's
+      `typecheck` and `test`
+- [x] `@rotisserie/shared` is a real package. Its `exports` map points
+      `@rotisserie/shared/<area>` at TypeScript source, so there's no build
+      step; tsx, Vitest and TypeScript all read it directly, and so will Metro
+- [x] Compiler options shared through `tsconfig.base.json`; each workspace has its
+      own `tsconfig.json` and runs its own tests (only the API's need Postgres)
+- [x] One copy of `zod` across the workspaces (`npm ls zod`), so schemas and
+      error classes are the same objects everywhere
+
+When `apps/mobile` arrives: Expo's Metro bundler supports workspaces without
+extra configuration on current SDKs. Keep `packages/shared` free of Node and
+server-only dependencies.
 
 ## Phase 4: Mobile app v1, read and log
 
@@ -159,14 +168,57 @@ still resolves in both apps.
 
 ## Phase 6: Deploy and auth
 
-Needed once the app has to work away from home Wi-Fi.
+Needed once the app has to work away from home Wi-Fi. AWS on purpose, as a
+learning exercise: Fly.io with Neon would be cheaper (about $0–5 a month) and
+simpler.
 
-- Host the API and a managed Postgres (Fly.io, Railway or Render, plus Neon or
-  the host's own Postgres). Run migrations as a release step.
-- Auth, in increasing order of effort:
+```
+Expo app ──HTTPS──▶ API Gateway (HTTP API) ──▶ Lambda (Hono) ──VPC──▶ RDS Postgres
+                                                     │                    ▲
+                                                     └── IAM auth token ──┘
+```
+
+| Piece | Choice | ~Monthly |
+|---|---|---|
+| API | API Gateway **HTTP API** (v2), not REST API | pennies |
+| Compute | Lambda, arm64, Node, `handle(app)` from `hono/aws-lambda` | ~$0 |
+| Database | RDS Postgres `db.t4g.micro`, single-AZ, 20 GB gp3, private subnet, no public IP | ~$14 (~$8–10 reserved for a year) |
+| Credentials | RDS IAM authentication (`@aws-sdk/rds-signer`) | $0 |
+| Logs | CloudWatch Logs, 1–2 week retention | pennies |
+| Infrastructure | AWS CDK in TypeScript, as `apps/infra` | $0 |
+
+Total about $15 a month, less while the new-account credits last.
+
+- **Infrastructure as code:** one CDK stack in `apps/infra` for the VPC, RDS,
+  Lambda and HTTP API. Nothing is created by clicking in the console.
+- **Networking:** the Lambda runs in the VPC's private subnets so it can reach
+  RDS. No NAT gateway (~$32 a month): the API only talks to Postgres, and
+  anything else it needs is resolved at deploy time and passed in as
+  environment variables, so no VPC endpoints either.
+- **Database access:** the Lambda's role signs a short-lived IAM token as the
+  Postgres password. Signing is local, so it needs no network call and there
+  is no stored password.
+- **Connections:** the `pg` pool is created outside the handler with `max: 1`
+  so warm invocations reuse it. No RDS Proxy (~$22 a month) at this scale.
+- **Migrations:** a small migration Lambda in the same VPC runs dbmate's
+  migrations and is invoked as a deploy step, since the database isn't
+  reachable from a laptop or CI.
+- **Deploys:** GitHub Actions authenticates to AWS with OIDC (no long-lived
+  keys), runs `cdk deploy`, then invokes the migration Lambda.
+- **Backups:** RDS automated backups with 7-day retention; a point-in-time
+  restore to a new instance tested once.
+- **Auth**, in increasing order of effort:
   1. One long random API token, stored on the phone with `expo-secure-store`
   2. Real accounts, once more than one person needs their own login
-- HTTPS only; database backups switched on and a restore tested once
+- HTTPS only (API Gateway provides it); a custom domain is optional
+
+Things to avoid: a NAT gateway, RDS Proxy, Secrets Manager (SSM Parameter Store
+or IAM auth instead), a public IP on the database, Aurora DSQL (no foreign
+keys, and the schema depends on them), and Aurora Serverless v2 scaled to zero
+(its ~15s resume would hit almost every time the app is opened).
+
+**Done when:** the phone talks to the deployed API over cellular data, and a
+restore has been tested.
 
 ## Phase 7: On your phone for real
 

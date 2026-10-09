@@ -34,7 +34,7 @@ npm run dev              # API on http://localhost:3000
 ```bash
 npm run typecheck        # TypeScript check
 npm test                 # Tests (Vitest); needs Postgres running, recreates rotisserie_test
-npm run test:watch       # Tests in watch mode
+npm run test:watch -w @rotisserie/api   # API tests in watch mode
 npm run dev              # API with reload on save
 npm start                # API without reload
 npm run db:seed          # (Re)load db/seeds/*.sql

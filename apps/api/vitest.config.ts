@@ -5,12 +5,11 @@ import { TEST_DATABASE_URL } from './src/test/database-url'
 export default defineConfig({
   resolve: {
     alias: {
-      '~': fileURLToPath(new URL('./src', import.meta.url)),
-      '@rotisserie/shared': fileURLToPath(new URL('./packages/shared/src', import.meta.url))
+      '~': fileURLToPath(new URL('./src', import.meta.url))
     }
   },
   test: {
-    include: ['src/**/*.test.ts', 'packages/**/*.test.ts'],
+    include: ['src/**/*.test.ts'],
     environment: 'node',
     env: { DATABASE_URL: TEST_DATABASE_URL },
     globalSetup: ['./src/test/global-setup.ts'],

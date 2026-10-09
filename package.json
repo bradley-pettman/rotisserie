@@ -2,31 +2,22 @@
   "name": "rotisserie",
   "private": true,
   "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "scripts": {
-    "typecheck": "tsc",
-    "test": "vitest run --passWithNoTests",
-    "test:watch": "vitest",
+    "dev": "npm run dev -w @rotisserie/api",
+    "start": "npm start -w @rotisserie/api",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm test --workspaces --if-present",
     "db:seed": "node db/seed.mjs",
     "format": "oxfmt --write .",
-    "format:check": "oxfmt --check .",
-    "dev": "tsx watch --env-file-if-exists=.env src/server.ts",
-    "start": "tsx --env-file-if-exists=.env src/server.ts"
-  },
-  "dependencies": {
-    "@hono/node-server": "^2.1.4",
-    "@hono/zod-validator": "^0.9.1",
-    "hono": "^4.13.13",
-    "lodash-es": "^4.18.1",
-    "pg": "^8.17.2",
-    "zod": "^4.3.6"
+    "format:check": "oxfmt --check ."
   },
   "devDependencies": {
-    "@types/lodash-es": "^4.17.12",
-    "@types/node": "^22",
-    "@types/pg": "^8.16.0",
     "oxfmt": "^0.54.0",
-    "tsx": "^4.20.6",
-    "typescript": "^5.9.2",
-    "vitest": "^5.0.1"
+    "pg": "^8.17.2",
+    "typescript": "^5.9.2"
   }
 }

@@ -30,29 +30,39 @@ dbmate rollback          # Undo the latest migration
 npm run db:seed          # Load units + ingredients (idempotent)
 
 npm run dev              # API on http://localhost:3000 (PORT to change), restarts on save
-npm run typecheck        # tsc
-npm test                 # Vitest; needs Postgres running, recreates rotisserie_test each run
+npm run typecheck        # tsc in every workspace
+npm test                 # Vitest in every workspace; the API's needs Postgres and recreates rotisserie_test
+npm test -w @rotisserie/api      # One workspace (also @rotisserie/shared)
+npm install <pkg> -w @rotisserie/api   # Add a dependency to one workspace
 npx tsx <file.ts>        # Run a TypeScript file directly
 ```
 
 ## Structure
 
 ```
-db/migrations/      SQL migrations (dbmate)
-db/seeds/           Units and ingredient vocabulary
-db/seed.mjs         Applies the seeds
-src/db/connection.ts  pg pool, DB.query / queryOne / withTransaction, checkDatabase
-src/providers/      SQL query functions, one file per area (sql.ts: generic SQL helpers; errors.ts: NotFoundError and strict)
-src/use-cases/      One file per use case, built with defineUseCase
-src/api/            Hono app, error envelope, routes/ (one file per resource)
-src/server.ts       Starts the API
-src/test/           Vitest global setup, per-test reset, factories, API request helper
-packages/shared/    Zod schemas, types and pure domain helpers, one folder per area
-docs/ROADMAP.md     Phases from here to an app on a phone
-docs/SPEC.md        Product spec (features, not implementation)
+npm workspaces: `apps/*` and `packages/*`. Shared compiler options live in
+`tsconfig.base.json`; formatting, `db/` and `.env` stay at the root.
+
+```
+db/migrations/        SQL migrations (dbmate)
+db/seeds/             Units and ingredient vocabulary
+db/seed.mjs           Applies the seeds
+apps/api/             @rotisserie/api
+  src/db/connection.ts  pg pool, DB.query / queryOne / withTransaction, checkDatabase
+  src/providers/      SQL query functions, one file per area (sql.ts: generic SQL helpers; errors.ts: NotFoundError and strict)
+  src/use-cases/      One file per use case, built with defineUseCase
+  src/api/            Hono app, error envelope, routes/ (one file per resource)
+  src/server.ts       Starts the API
+  src/test/           Vitest global setup, per-test reset, factories, API request helper
+packages/shared/      @rotisserie/shared: Zod schemas, types and pure domain helpers, one folder per area
+docs/ROADMAP.md       Phases from here to an app on a phone
+docs/SPEC.md          Product spec (features, not implementation)
 ```
 
-Path aliases: `~/` maps to `src/`, `@rotisserie/shared/*` to `packages/shared/src/*`.
+Imports: `~/` maps to `apps/api/src/` inside the API. `@rotisserie/shared/<area>`
+resolves through the workspace package's `exports` to `packages/shared/src/<area>/index.ts`
+(TypeScript source, no build step). `packages/shared` must stay free of Node and
+server dependencies so the Expo app can import it.
 
 ## Layers
 

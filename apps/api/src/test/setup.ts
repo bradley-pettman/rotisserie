@@ -3,7 +3,7 @@ import { join } from 'node:path'
 import { afterAll, beforeEach } from 'vitest'
 import { pool } from '~/db/connection'
 
-const SEEDS_DIR = join(import.meta.dirname, '../../db/seeds')
+const SEEDS_DIR = join(import.meta.dirname, '../../../../db/seeds')
 const seeds = await Promise.all(['units.sql', 'ingredients.sql'].map((file) => readFile(join(SEEDS_DIR, file), 'utf8')))
 
 beforeEach(async () => {

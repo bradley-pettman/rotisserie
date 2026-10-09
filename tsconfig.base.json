@@ -1,16 +1,9 @@
 {
-  "include": ["src/**/*", "packages/**/*"],
   "compilerOptions": {
     "lib": ["ES2022"],
-    "types": ["node"],
     "target": "ES2022",
     "module": "ESNext",
     "moduleResolution": "bundler",
-    "baseUrl": ".",
-    "paths": {
-      "~/*": ["./src/*"],
-      "@rotisserie/shared/*": ["./packages/shared/src/*"]
-    },
     "esModuleInterop": true,
     "verbatimModuleSyntax": true,
     "noEmit": true,

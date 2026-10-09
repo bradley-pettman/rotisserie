@@ -3,7 +3,7 @@ import { join } from 'node:path'
 import pg from 'pg'
 import { TEST_DATABASE_URL } from './database-url'
 
-const MIGRATIONS_DIR = join(import.meta.dirname, '../../db/migrations')
+const MIGRATIONS_DIR = join(import.meta.dirname, '../../../../db/migrations')
 
 export default async function setup(): Promise<void> {
   const url = new URL(TEST_DATABASE_URL)
