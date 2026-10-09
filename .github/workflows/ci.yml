@@ -5,7 +5,6 @@ on:
   push:
     branches: [main]
 
-# Least privilege for GITHUB_TOKEN: no job here writes back to GitHub.
 permissions:
   contents: read
 
@@ -40,7 +39,6 @@ jobs:
     name: Migrations apply, seed and roll back
     runs-on: ubuntu-latest
 
-    # A database created and destroyed with the job, so nothing else writes to it.
     services:
       postgres:
         image: postgres:16
@@ -59,7 +57,6 @@ jobs:
     env:
       DATABASE_URL: postgres://postgres:postgres@localhost:5432/rotisserie_dev?sslmode=disable
       DBMATE_VERSION: '2.36.0'
-      # sha256 of the v2.36.0 linux-amd64 release asset. Update both together.
       DBMATE_SHA256: '47e284b3d8cbad1ba5f090495aa05afd1bbd5f35e2ed5577aad06da74ce780ce'
 
     steps:
@@ -75,8 +72,6 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # dbmate is not an npm package: fetch the pinned release binary and check
-      # its digest.
       - name: Install dbmate
         run: |
           mkdir -p "$RUNNER_TEMP/bin"
@@ -86,16 +81,12 @@ jobs:
           chmod +x "$RUNNER_TEMP/bin/dbmate"
           echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
 
-      # --no-dump-schema: dbmate would otherwise shell out to pg_dump, tying the
-      # job to the runner shipping a pg_dump at least as new as the server.
       - name: Apply migrations
         run: dbmate --wait --no-dump-schema up
 
       - name: Load seed data
         run: npm run db:seed
 
-      # Every down migration must work, or a bad deploy cannot be undone.
-      # Roll everything back, then apply it again from empty.
       - name: Roll back and re-apply
         run: |
           while [ -n "$(dbmate --no-dump-schema status | grep '^\[X\]')" ]; do

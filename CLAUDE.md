@@ -18,6 +18,10 @@ review, answer questions and point at the relevant migration instead.
 From the HTTP API upward (routes, the Expo app, deployment, builds), Claude may
 write code. See "Who builds what" in `docs/ROADMAP.md`.
 
+**Never write code comments** (TS, SQL, YAML, config). The owner writes them or
+asks for a specific one. Explain in the conversation instead. Tool-required
+markers such as dbmate's `-- migrate:up` / `-- migrate:down` stay.
+
 ## Commands
 
 ```bash

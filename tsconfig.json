@@ -1,5 +1,5 @@
 {
-  "include": ["src/**/*"],
+  "include": ["src/**/*", "packages/**/*"],
   "compilerOptions": {
     "lib": ["ES2022"],
     "types": ["node"],
@@ -8,7 +8,8 @@
     "moduleResolution": "bundler",
     "baseUrl": ".",
     "paths": {
-      "~/*": ["./src/*"]
+      "~/*": ["./src/*"],
+      "@rotisserie/shared/*": ["./packages/shared/src/*"]
     },
     "esModuleInterop": true,
     "verbatimModuleSyntax": true,

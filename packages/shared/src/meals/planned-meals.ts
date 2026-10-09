@@ -17,7 +17,6 @@ const PlannedMeal = PlannedMealRaw.extend({
   dishes: z
     .object({
       id: z.string(),
-      // A plan reads the recipe as it is today, so the recipe is joined live.
       recipe: RecipeSchemas.RecipeRaw.nullable(),
       customText: z.string().nullable(),
       notes: z.string().nullable(),

@@ -16,8 +16,6 @@ const CookedMeal = CookedMealRaw.extend({
   dishes: z
     .object({
       id: z.string(),
-      // History never joins the recipe: `label` is the name snapshot from the
-      // day, and recipeId is kept only to link back (and for "last made").
       recipeId: z.string().nullable(),
       label: z.string(),
       isLeftovers: z.boolean(),
