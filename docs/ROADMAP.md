@@ -15,14 +15,9 @@ The target system:
 
 ## Who builds what
 
-| Layer | Owner |
-|---|---|
-| Schema and migrations (`db/migrations`) | Done in Phase 0. Changes are discussed first. |
-| Zod schemas, TS types, SQL query functions, their tests | **Built by hand.** Claude explains and reviews, and doesn't write it. |
-| Use cases (`apps/api/src/use-cases`), HTTP API, mobile app, deployment, builds | Claude can own it, with review. |
-
-The line sits at the query functions on purpose. Below it is where the domain
-rules live: canonical names, snapshots, transactions. Above it is mostly wiring.
+Claude can write any layer, with review. The owner says which pieces they
+want to implement by hand, and commits every change themselves after
+reviewing it. Schema changes are discussed before they're written.
 
 ---
 
@@ -145,7 +140,7 @@ When `apps/mobile` arrives: Expo's Metro bundler supports workspaces without
 extra configuration on current SDKs. Keep `packages/shared` free of Node and
 server-only dependencies.
 
-## Phase 4: Mobile app v1: plan, cook and log
+## Phase 4: Mobile app v1: plan and log
 
 - Expo with **Expo Router** (file-based navigation) and **TanStack Query** for
   server state (caching, refetch, loading and error states)
@@ -160,15 +155,19 @@ server-only dependencies.
      scheduled offers the Planned meals to pick from
   2. **Planned meal:** its dishes and headcount, with "Made it" and "Made something else"
   3. **Recipes:** searchable list
-  4. **Recipe:** ingredients scaled to a headcount, "last made" date
-  5. **Cook mode:** one dish at a time, one step at a time, large text, screen
-     kept awake (`expo-keep-awake`). Starts from a recipe or a planned meal's dish
-  6. **Log a meal:** record what you ate, planned or not ("Made it" pre-fills it from the plan)
-  7. **Plan a meal:** one meal at a time: slot (dinner by default), dishes
+  4. **Recipe:** ingredients scaled to a headcount, the instructions, the
+     website it came from, and stats (average rating with its count, times
+     made, last made). A **+ Tag** chip adds tags in a bottom sheet without
+     opening the editor. **Add to Planned** is the main action
+  5. **Log a meal:** record what you ate, planned or not ("Made it" pre-fills it from the plan)
+  6. **Plan a meal:** one meal at a time: slot (dinner by default), dishes
      (recipe search or free text), headcount, and an optional day. Without a
      day it goes to Planned. Days in the past can't be planned (they show greyed out)
-  8. **Recipe editor:** create or edit a recipe: ingredient lines with
-     autocomplete, steps, times, servings, tags
+  7. **Recipe editor:** create or edit a recipe. Ingredients are typed one
+     line at a time ("2 tbsp chili powder") with autocomplete; each line turns
+     into chips (quantity and unit, ingredient, notes) and pasting a list
+     splits it into lines. Also instructions, times, servings, tags (with
+     suggestions), website and notes
 
 - On open and on returning to the foreground, the app calls
   `POST /cooked-meals/settle` with its local today, so plans whose day has
@@ -254,6 +253,9 @@ restore has been tested.
 - **Recipe import from a URL:** the old scraper and parsers are in git history
 - **Grocery list** generated from a week of planned meals
 - **Tags UI**, a web client (just another API client)
+- **Cook mode:** one dish and one step at a time, large text, screen kept awake
+  (`expo-keep-awake`), started from a recipe or a planned meal's dish. Needs
+  `instructions` split into steps first
 
 ## Open decisions
 

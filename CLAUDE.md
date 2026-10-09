@@ -9,13 +9,12 @@ API are in place; the Expo app is next. The plan is in `docs/ROADMAP.md`.
 
 ## Ownership — read before writing code
 
-The owner is writing the **Zod schemas, TypeScript types, SQL query functions
-and their tests** by hand, to learn them. In that layer, do not write or
-generate code unless explicitly asked for that specific piece. Explain,
-review, answer questions and point at the relevant migration instead.
+Claude may write code in every layer. The owner will say when they want to
+implement a piece themselves; leave that piece alone and explain or review
+instead.
 
-From the HTTP API upward (routes, the Expo app, deployment, builds), Claude may
-write code. See "Who builds what" in `docs/ROADMAP.md`.
+**Never commit, push or open a PR in this project.** The owner reviews every
+change first and commits it themselves.
 
 **Never write code comments** (TS, SQL, YAML, config). The owner writes them or
 asks for a specific one. Explain in the conversation instead. Tool-required
