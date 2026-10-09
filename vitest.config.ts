@@ -1,13 +1,13 @@
+import { fileURLToPath } from "node:url";
 import { defineConfig } from "vitest/config";
-import tsconfigPaths from "vite-tsconfig-paths";
 
 export default defineConfig({
-  plugins: [tsconfigPaths()],
+  resolve: {
+    alias: { "~": fileURLToPath(new URL("./src", import.meta.url)) },
+  },
   test: {
-    // Unit tests only. `tests/` holds the Playwright E2E suite, which must not
-    // be picked up by Vitest (it uses @playwright/test's own runner).
-    include: ["app/**/*.test.ts"],
-    exclude: ["tests/**", "node_modules/**", "build/**", ".react-router/**"],
+    // Unit tests sit next to the code they test.
+    include: ["src/**/*.test.ts"],
     environment: "node",
   },
 });
