@@ -1,9 +1,6 @@
 import z from 'zod'
 import type { InferSchemas } from '../lib/schemas'
-import { IngredientSchemas, UnitSchemas } from '../base'
-
-// "Raw" zod models are the raw form from the database
-// Named zod models are the parsed form used by the app
+import { IngredientSchemas, TagSchemas, UnitSchemas } from '../base'
 
 const RecipeRaw = z.object({
   id: z.string(),
@@ -19,7 +16,17 @@ const RecipeRaw = z.object({
 })
 
 const Recipe = RecipeRaw.extend({
-  recipeIngredients: z.object({ ingredient: IngredientSchemas.Ingredient, quantity: z.number(), unit: UnitSchemas.Unit })
+  ingredients: z
+    .object({
+      id: z.string(),
+      ingredient: IngredientSchemas.Ingredient,
+      quantity: z.number().nullable(),
+      unit: UnitSchemas.Unit.nullable(),
+      notes: z.string().nullable(),
+      sortOrder: z.number().int()
+    })
+    .array(),
+  tags: TagSchemas.Tag.array()
 })
 
 export const RecipeSchemas = {
