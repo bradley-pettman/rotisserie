@@ -5,9 +5,9 @@ import { cookedMealInput, plannedMealInput, recipeInput } from '~/test/factories
 import {
   deleteCookedMeal,
   getCookedMeal,
-  lastMade,
   listCookedMeals,
   listCookedMealsWithinDateRange,
+  listRecipeStats,
   settlePlannedMealsBefore,
   upsertCookedMeal
 } from './cooked-meals'
@@ -160,31 +160,59 @@ describe('deleteCookedMeal', () => {
   })
 })
 
-describe('lastMade', () => {
-  it('returns the latest day each recipe was freshly made, ignoring leftovers', async () => {
+describe('listRecipeStats', () => {
+  const made = (recipeId: string) => ({ recipeId, isLeftovers: false, notes: null })
+  const leftovers = (recipeId: string) => ({ recipeId, isLeftovers: true, notes: null })
+
+  it('averages ratings to one decimal and counts unrated meals as made but not rated', async () => {
     const meatloaf = await upsertRecipe(recipeInput({ name: 'Turkey Meatloaf' }))
+    await upsertCookedMeal(cookedMealInput({ cookedOn: '2026-10-01', starRating: 4, dishes: [made(meatloaf.id)] }))
+    await upsertCookedMeal(cookedMealInput({ cookedOn: '2026-10-02', starRating: 5, dishes: [made(meatloaf.id)] }))
+    await upsertCookedMeal(cookedMealInput({ cookedOn: '2026-10-03', starRating: 5, dishes: [made(meatloaf.id)] }))
+    await upsertCookedMeal(cookedMealInput({ cookedOn: '2026-10-04', starRating: null, dishes: [made(meatloaf.id)] }))
+
+    expect(await listRecipeStats([meatloaf.id])).toEqual([
+      { recipeId: meatloaf.id, averageRating: 4.7, ratingCount: 3, timesMade: 4, lastMadeOn: '2026-10-04' }
+    ])
+  })
+
+  it('ignores leftovers and counts a recipe once per meal', async () => {
+    const meatloaf = await upsertRecipe(recipeInput({ name: 'Turkey Meatloaf' }))
+    await upsertCookedMeal(
+      cookedMealInput({ cookedOn: '2026-10-01', starRating: 2, dishes: [made(meatloaf.id), made(meatloaf.id)] })
+    )
+    await upsertCookedMeal(
+      cookedMealInput({ cookedOn: '2026-10-09', mealSlot: 'lunch', starRating: 5, dishes: [leftovers(meatloaf.id)] })
+    )
+
+    expect(await listRecipeStats([meatloaf.id])).toEqual([
+      { recipeId: meatloaf.id, averageRating: 2, ratingCount: 1, timesMade: 1, lastMadeOn: '2026-10-01' }
+    ])
+  })
+
+  it('answers several recipes in one call, with zeros and nulls for one never made', async () => {
+    const meatloaf = await upsertRecipe(recipeInput({ name: 'Turkey Meatloaf' }))
+    const chili = await upsertRecipe(recipeInput({ name: 'Chili' }))
     const neverMade = await upsertRecipe(recipeInput({ name: 'Beef Wellington' }))
     await upsertCookedMeal(
-      cookedMealInput({ cookedOn: '2026-10-01', dishes: [{ recipeId: meatloaf.id, isLeftovers: false, notes: null }] })
+      cookedMealInput({ cookedOn: '2026-10-05', starRating: 3, dishes: [made(meatloaf.id), made(chili.id)] })
     )
-    await upsertCookedMeal(
-      cookedMealInput({ cookedOn: '2026-10-09', dishes: [{ recipeId: meatloaf.id, isLeftovers: false, notes: null }] })
-    )
-    await upsertCookedMeal(
-      cookedMealInput({
-        cookedOn: '2026-10-10',
-        mealSlot: 'lunch',
-        dishes: [{ recipeId: meatloaf.id, isLeftovers: true, notes: null }]
-      })
-    )
+    await upsertCookedMeal(cookedMealInput({ cookedOn: '2026-10-07', dishes: [made(chili.id)] }))
 
-    const result = await lastMade([meatloaf.id, neverMade.id])
+    const result = await listRecipeStats([meatloaf.id, chili.id, neverMade.id])
 
-    expect(result).toEqual([{ recipeId: meatloaf.id, cookedOn: '2026-10-09' }])
+    expect(result).toHaveLength(3)
+    expect(result).toEqual(
+      expect.arrayContaining([
+        { recipeId: meatloaf.id, averageRating: 3, ratingCount: 1, timesMade: 1, lastMadeOn: '2026-10-05' },
+        { recipeId: chili.id, averageRating: 3, ratingCount: 1, timesMade: 2, lastMadeOn: '2026-10-07' },
+        { recipeId: neverMade.id, averageRating: null, ratingCount: 0, timesMade: 0, lastMadeOn: null }
+      ])
+    )
   })
 
   it('returns nothing for no recipes', async () => {
-    expect(await lastMade([])).toEqual([])
+    expect(await listRecipeStats([])).toEqual([])
   })
 })
 

@@ -2,11 +2,16 @@ import { randomUUID } from 'node:crypto'
 import { RecipeSchemas } from '@rotisserie/shared/recipes'
 import { describe, expect, it } from 'vitest'
 import { send } from '~/test/api'
-import { recipeInput } from '~/test/factories'
+import { cookedMealInput, recipeInput } from '~/test/factories'
 
 async function putRecipe(overrides: Parameters<typeof recipeInput>[0] = {}) {
   const { id, ...body } = recipeInput(overrides)
   return send('PUT', `/recipes/${id}`, body)
+}
+
+async function putCookedMeal(recipeId: string, cookedOn: string, starRating: number) {
+  const { id, ...body } = cookedMealInput({ cookedOn, starRating, dishes: [{ recipeId, isLeftovers: false, notes: null }] })
+  return send('PUT', `/cooked-meals/${id}`, body)
 }
 
 describe('GET /recipes', () => {
@@ -20,6 +25,20 @@ describe('GET /recipes', () => {
 
     expect(first.body.recipes).toHaveLength(2)
     expect(second.body).toMatchObject({ recipes: [{}], nextCursor: null })
+  })
+
+  it('includes stats on each recipe', async () => {
+    const made = await putRecipe({ name: 'Turkey Meatloaf' })
+    await putRecipe({ name: 'Lasagne' })
+    await putCookedMeal(made.body.id, '2026-10-05', 5)
+
+    const response = await send('GET', '/recipes')
+    const page = RecipeSchemas.RecipeWithStatsPage.parse(response.body)
+
+    expect(page.recipes.map(({ name, stats }) => ({ name, stats }))).toEqual([
+      { name: 'Lasagne', stats: { averageRating: null, ratingCount: 0, timesMade: 0, lastMadeOn: null } },
+      { name: 'Turkey Meatloaf', stats: { averageRating: 5, ratingCount: 1, timesMade: 1, lastMadeOn: '2026-10-05' } }
+    ])
   })
 
   it('filters by q', async () => {
@@ -41,13 +60,17 @@ describe('GET /recipes', () => {
 })
 
 describe('GET /recipes/:id', () => {
-  it('returns the recipe with ingredients and tags', async () => {
+  it('returns the recipe with ingredients, tags and stats', async () => {
     const created = await putRecipe()
+    await putCookedMeal(created.body.id, '2026-10-05', 4)
 
     const response = await send('GET', `/recipes/${created.body.id}`)
 
     expect(response.status).toBe(200)
-    expect(RecipeSchemas.Recipe.parse(response.body)).toEqual(created.body)
+    expect(RecipeSchemas.RecipeWithStats.parse(response.body)).toEqual({
+      ...created.body,
+      stats: { averageRating: 4, ratingCount: 1, timesMade: 1, lastMadeOn: '2026-10-05' }
+    })
   })
 
   it('returns 404 for an unknown id and 400 for a malformed one', async () => {

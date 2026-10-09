@@ -61,8 +61,8 @@ eat meatloaf) from TypeScript, with no HTTP involved.
      query, not one per dish
    - `upsertCookedMeal(input)`: copy each recipe's current name into
      `label` inside the same transaction; optionally link `planned_meal_id`
-   - `lastMade(recipeIds[])`: `MAX(cooked_on)` excluding leftovers, batched
-     with `= ANY($1::uuid[])`
+   - `listRecipeStats(recipeIds[])`: average rating, rating count, times made
+     and last made per recipe, excluding leftovers, batched with `= ANY($1::uuid[])`
 3. **Tests.** Unit tests for pure helpers (canonicalizing names, scaling).
    Integration tests for query functions against a real Postgres: a separate
    `rotisserie_test` database, recreated and migrated once per run, with every

@@ -1,4 +1,5 @@
 import type { CookedMealSchemas } from '@rotisserie/shared/meals'
+import type { RecipeSchemas } from '@rotisserie/shared/recipes'
 import { uniq } from 'lodash-es'
 import { DB, type QueryFns } from '~/db/connection'
 import { strict } from './errors'
@@ -170,20 +171,26 @@ export async function deleteCookedMeal(id: string): Promise<{ id: string } | nul
 
 export const deleteCookedMealStrict = strict(deleteCookedMeal, 'Cooked meal')
 
-export type LastMade = {
-  recipeId: string
-  cookedOn: string
-}
+export type RecipeStatsRow = RecipeSchemas['RecipeStats'] & { recipeId: string }
 
-export async function lastMade(recipeIds: string[]): Promise<LastMade[]> {
+export async function listRecipeStats(recipeIds: string[]): Promise<RecipeStatsRow[]> {
   if (recipeIds.length === 0) return []
 
-  return DB.query<LastMade>(
-    `SELECT d.recipe_id AS "recipeId", ${isoDate('MAX(cm.cooked_on)')} AS "cookedOn"
-     FROM cooked_meal_dishes d
-     JOIN cooked_meals cm ON cm.id = d.cooked_meal_id
-     WHERE d.recipe_id = ANY($1::uuid[]) AND NOT d.is_leftovers
-     GROUP BY d.recipe_id`,
-    [recipeIds]
+  return DB.query<RecipeStatsRow>(
+    `SELECT
+       ids.id AS "recipeId",
+       ROUND(AVG(made.star_rating), 1) AS "averageRating",
+       COUNT(made.star_rating)::int AS "ratingCount",
+       COUNT(made.id)::int AS "timesMade",
+       ${isoDate('MAX(made.cooked_on)')} AS "lastMadeOn"
+     FROM unnest($1::uuid[]) AS ids(id)
+     LEFT JOIN (
+       SELECT DISTINCT d.recipe_id, cm.id, cm.star_rating, cm.cooked_on
+       FROM cooked_meal_dishes d
+       JOIN cooked_meals cm ON cm.id = d.cooked_meal_id
+       WHERE d.recipe_id = ANY($1::uuid[]) AND NOT d.is_leftovers
+     ) made ON made.recipe_id = ids.id
+     GROUP BY ids.id`,
+    [uniq(recipeIds)]
   )
 }

@@ -29,6 +29,15 @@ const Recipe = RecipeRaw.extend({
   tags: TagSchemas.Tag.array()
 })
 
+const RecipeStats = z.object({
+  averageRating: z.number().nullable(),
+  ratingCount: z.number().int(),
+  timesMade: z.number().int(),
+  lastMadeOn: z.iso.date().nullable()
+})
+
+const RecipeWithStats = Recipe.extend({ stats: RecipeStats })
+
 const UpsertRecipeInput = z.object({
   id: z.uuid(),
   name: z.string().trim().min(1).max(255),
@@ -54,11 +63,18 @@ const RecipePage = z.object({
   nextCursor: z.string().nullable()
 })
 
+const RecipeWithStatsPage = RecipePage.extend({
+  recipes: RecipeRaw.extend({ stats: RecipeStats }).array()
+})
+
 export const RecipeSchemas = {
   RecipeRaw,
   Recipe,
+  RecipeStats,
+  RecipeWithStats,
   UpsertRecipeInput,
-  RecipePage
+  RecipePage,
+  RecipeWithStatsPage
 }
 
 export type RecipeSchemas = InferSchemas<typeof RecipeSchemas>
