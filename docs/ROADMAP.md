@@ -165,7 +165,7 @@ server-only dependencies.
   6. **Log a meal:** record what you ate, planned or not ("Made it" pre-fills it from the plan)
   7. **Plan a meal:** one meal at a time: slot (dinner by default), dishes
      (recipe search or free text), headcount, and an optional day. Without a
-     day it goes to Planned
+     day it goes to Planned. Days in the past can't be planned (they show greyed out)
   8. **Recipe editor:** create or edit a recipe: ingredient lines with
      autocomplete, steps, times, servings, tags
 
@@ -173,8 +173,9 @@ server-only dependencies.
 
 ## Phase 5: Planning on the phone
 
-- Calendar view, toggled from the Meals timeline: planned meals and what you
-  actually ate, side by side
+- Calendar view, toggled from the Meals timeline, for looking ahead ("what are
+  we having next Thursday?"): a month grid, with the selected day's meals and
+  its Pick from Planned choices below
 - Plan a meal from an empty day in the calendar
 - Move a meal (one `PUT`), remove a dish
 - Cooked meal detail: rating and notes

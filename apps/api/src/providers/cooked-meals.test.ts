@@ -87,6 +87,24 @@ describe('upsertCookedMeal', () => {
     expect(corrected).toMatchObject({ id: first.id, cookedOn: '2026-10-08', dishes: [{ label: 'burritos' }] })
   })
 
+  it('saves a star rating, then changes or clears it on a later upsert', async () => {
+    const rated = await upsertCookedMeal(cookedMealInput({ starRating: 5 }))
+    expect(rated.starRating).toBe(5)
+
+    const changed = await upsertCookedMeal(cookedMealInput({ id: rated.id, starRating: 2 }))
+    expect(changed.starRating).toBe(2)
+
+    const cleared = await upsertCookedMeal(cookedMealInput({ id: rated.id, starRating: null }))
+    expect(cleared.starRating).toBeNull()
+  })
+
+  it('rejects a star rating outside 1 to 5', async () => {
+    const input = cookedMealInput({ starRating: 6 })
+
+    await expect(upsertCookedMeal(input)).rejects.toMatchObject({ code: '23514' })
+    expect(await getCookedMeal(input.id)).toBeNull()
+  })
+
   it('rejects a second cooked meal for the same plan', async () => {
     const plan = await upsertPlannedMeal(plannedMealInput())
     await upsertCookedMeal(cookedMealInput({ plannedMealId: plan.id }))

@@ -45,6 +45,7 @@ export function cookedMealInput(overrides: Partial<CookedMealInput> = {}): Cooke
     mealSlot: 'dinner',
     headcount: 4,
     notes: null,
+    starRating: null,
     dishes: [],
     ...overrides
   }

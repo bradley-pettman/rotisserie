@@ -9,6 +9,7 @@ const CookedMealRaw = z.object({
   mealSlot: MealSlot,
   headcount: z.number().int().nullable(),
   notes: z.string().nullable(),
+  starRating: z.number().int().nullable(),
   createdAt: z.iso.datetime()
 })
 
@@ -44,6 +45,7 @@ const CookedMealInput = z.object({
   mealSlot: MealSlot,
   headcount: z.number().int().positive().nullable(),
   notes: z.string().nullable(),
+  starRating: z.number().int().min(1).max(5).nullable(),
   dishes: CookedDishInput.array()
 })
 

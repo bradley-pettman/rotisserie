@@ -26,6 +26,16 @@ describe('PUT /cooked-meals/:id', () => {
     })
   })
 
+  it('saves a star rating', async () => {
+    expect(await putCookedMeal({ starRating: 4 })).toMatchObject({ status: 200, body: { starRating: 4 } })
+  })
+
+  it('returns 400 for a star rating that is not a whole number from 1 to 5', async () => {
+    expect((await putCookedMeal({ starRating: 0 })).status).toBe(400)
+    expect((await putCookedMeal({ starRating: 6 })).status).toBe(400)
+    expect((await putCookedMeal({ starRating: 3.5 })).status).toBe(400)
+  })
+
   it('returns 409 for a second cooked meal on the same plan', async () => {
     const { id: plannedMealId, ...plan } = plannedMealInput()
     await send('PUT', `/planned-meals/${plannedMealId}`, plan)

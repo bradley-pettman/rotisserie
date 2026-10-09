@@ -12,6 +12,7 @@ const COOKED_MEAL_SELECT = `
     cm.meal_slot AS "mealSlot",
     cm.headcount,
     cm.notes,
+    cm.star_rating AS "starRating",
     ${isoTimestamp('cm.created_at')} AS "createdAt",
     COALESCE(
       (
@@ -51,15 +52,16 @@ export async function upsertCookedMeal(
             recipeIdsNeedingLabels
           ])
     await tx.query(
-      `INSERT INTO cooked_meals (id, planned_meal_id, cooked_on, meal_slot, headcount, notes)
-       VALUES ($1, $2, $3, $4, $5, $6)
+      `INSERT INTO cooked_meals (id, planned_meal_id, cooked_on, meal_slot, headcount, notes, star_rating)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
        ON CONFLICT (id) DO UPDATE SET
          planned_meal_id = EXCLUDED.planned_meal_id,
          cooked_on = EXCLUDED.cooked_on,
          meal_slot = EXCLUDED.meal_slot,
          headcount = EXCLUDED.headcount,
-         notes = EXCLUDED.notes`,
-      [input.id, input.plannedMealId, input.cookedOn, input.mealSlot, input.headcount, input.notes]
+         notes = EXCLUDED.notes,
+         star_rating = EXCLUDED.star_rating`,
+      [input.id, input.plannedMealId, input.cookedOn, input.mealSlot, input.headcount, input.notes, input.starRating]
     )
 
     const dishes = input.dishes.map((dish, index) => ({
