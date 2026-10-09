@@ -1,8 +1,8 @@
 import { useRouter } from 'expo-router'
-import { useDeferredValue, useMemo, useState } from 'react'
-import { FlatList, Pressable, View } from 'react-native'
+import { useDeferredValue, useState } from 'react'
+import { ActivityIndicator, FlatList, Pressable, ScrollView, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { useRecipeSearch } from '~/api/queries'
+import { useRecipeList, useTags, type RecipeSort } from '~/api/queries'
 import { Field } from '~/components/controls'
 import { Icon } from '~/components/Icon'
 import { Sheet } from '~/components/Sheet'
@@ -10,42 +10,27 @@ import { ErrorState, Loading, Text } from '~/components/ui'
 import { madeLabel, ratingLabel } from '~/lib/recipes'
 import { useColors } from '~/theme'
 
-type Sort = 'recentlyMade' | 'longestAgo' | 'name' | 'rating'
-
-const SORTS: { value: Sort; label: string }[] = [
+const SORTS: { value: RecipeSort; label: string }[] = [
   { value: 'recentlyMade', label: 'Recently made' },
   { value: 'longestAgo', label: 'Longest since made' },
   { value: 'name', label: 'Name' },
   { value: 'rating', label: 'Rating' }
 ]
 
-type Row = NonNullable<ReturnType<typeof useRecipeSearch>['data']>['recipes'][number]
-
-function compare(sort: Sort): (a: Row, b: Row) => number {
-  const byName = (a: Row, b: Row) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
-  const nullsLast = (a: string | number | null, b: string | number | null, direction: 1 | -1) => {
-    if (a === b) return 0
-    if (a === null) return 1
-    if (b === null) return -1
-    return a < b ? -direction : direction
-  }
-  if (sort === 'name') return byName
-  if (sort === 'rating') return (a, b) => nullsLast(a.stats.averageRating, b.stats.averageRating, -1) || byName(a, b)
-  if (sort === 'longestAgo') return (a, b) => nullsLast(a.stats.lastMadeOn, b.stats.lastMadeOn, 1) || byName(a, b)
-  return (a, b) => nullsLast(a.stats.lastMadeOn, b.stats.lastMadeOn, -1) || byName(a, b)
-}
-
 export default function RecipesScreen() {
   const colors = useColors()
   const insets = useSafeAreaInsets()
   const router = useRouter()
   const [query, setQuery] = useState('')
-  const [sort, setSort] = useState<Sort>('recentlyMade')
+  const [sort, setSort] = useState<RecipeSort>('recentlyMade')
+  const [tag, setTag] = useState('')
   const [choosingSort, setChoosingSort] = useState(false)
   const deferredQuery = useDeferredValue(query.trim())
-  const recipes = useRecipeSearch(deferredQuery)
+  const recipes = useRecipeList({ q: deferredQuery, tag, sort })
+  const tags = useTags()
 
-  const rows = useMemo(() => [...(recipes.data?.recipes ?? [])].sort(compare(sort)), [recipes.data, sort])
+  const rows = recipes.data?.pages.flatMap((page) => page.recipes) ?? []
+  const tagNames = [...(tags.data ?? []).map((option) => option.name)].sort()
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
@@ -76,6 +61,39 @@ export default function RecipesScreen() {
         />
       </View>
 
+      {tagNames.length > 0 ? (
+        <View>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ gap: 8, paddingHorizontal: 20, paddingVertical: 8 }}
+          >
+            {['', ...tagNames].map((name) => {
+              const selected = name === tag
+              return (
+                <Pressable
+                  key={name || 'all'}
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected }}
+                  onPress={() => setTag(name)}
+                  style={{
+                    minHeight: 36,
+                    paddingHorizontal: 14,
+                    borderRadius: 18,
+                    justifyContent: 'center',
+                    backgroundColor: selected ? colors.gold : colors.chip
+                  }}
+                >
+                  <Text variant="captionStrong" tone={selected ? 'onGold' : 'chipInk'}>
+                    {name || 'All'}
+                  </Text>
+                </Pressable>
+              )
+            })}
+          </ScrollView>
+        </View>
+      ) : null}
+
       {recipes.isPending ? (
         <Loading />
       ) : recipes.isError ? (
@@ -86,9 +104,20 @@ export default function RecipesScreen() {
           keyExtractor={(row) => row.id}
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 32 }}
+          onEndReachedThreshold={0.5}
+          onEndReached={() => {
+            if (recipes.hasNextPage && !recipes.isFetchingNextPage) recipes.fetchNextPage()
+          }}
+          ListFooterComponent={
+            recipes.isFetchingNextPage ? <ActivityIndicator color={colors.ink2} style={{ paddingVertical: 16 }} /> : null
+          }
           ListEmptyComponent={
             <Text tone="ink2" style={{ paddingVertical: 24, textAlign: 'center' }}>
-              {deferredQuery ? `No recipes match “${deferredQuery}”.` : 'No recipes yet. Tap + to create one.'}
+              {deferredQuery
+                ? `No recipes match “${deferredQuery}”${tag ? ` in ${tag}` : ''}.`
+                : tag
+                  ? `No recipes tagged ${tag}.`
+                  : 'No recipes yet. Tap + to create one.'}
             </Text>
           }
           renderItem={({ item }) => {

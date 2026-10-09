@@ -1,7 +1,7 @@
 import { CookedMealSchemas, PlannedMealSchemas } from '@rotisserie/shared/meals'
 import { IngredientSchemas, TagSchemas, UnitSchemas } from '@rotisserie/shared/base'
 import { RecipeSchemas } from '@rotisserie/shared/recipes'
-import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import z from 'zod'
 import { api } from './client'
 
@@ -11,6 +11,8 @@ export type CookedMeal = CookedMealSchemas['CookedMeal']
 export type CookedMealInput = z.input<typeof CookedMealSchemas.CookedMealInput>
 export type Recipe = RecipeSchemas['RecipeWithStats']
 export type RecipeInput = z.input<typeof RecipeSchemas.UpsertRecipeInput>
+export type RecipeSort = RecipeSchemas['RecipeSort']
+export type RecipeListItem = RecipeSchemas['RecipeWithStatsPage']['recipes'][number]
 
 const MealsInRange = z.object({
   planned: PlannedMealSchemas.PlannedMeal.array(),
@@ -24,7 +26,8 @@ export const keys = {
   planned: (id: string) => ['planned', id] as const,
   cooked: (id: string) => ['cooked', id] as const,
   recipes: ['recipes'] as const,
-  recipeList: (q: string) => ['recipes', 'list', q] as const,
+  recipeSearch: (q: string) => ['recipes', 'search', q] as const,
+  recipeList: (q: string, tag: string, sort: RecipeSort) => ['recipes', 'list', q, tag, sort] as const,
   recipe: (id: string) => ['recipes', id] as const,
   tags: ['tags'] as const,
   units: ['units'] as const,
@@ -72,8 +75,26 @@ export function useRecipe(id: string | undefined) {
 
 export function useRecipeSearch(q: string) {
   return useQuery({
-    queryKey: keys.recipeList(q),
-    queryFn: () => api.get(RecipeSchemas.RecipeWithStatsPage, '/recipes', { q: q || undefined, limit: 100 }),
+    queryKey: keys.recipeSearch(q),
+    queryFn: () => api.get(RecipeSchemas.RecipeWithStatsPage, '/recipes', { q, limit: 5 }),
+    enabled: q.length > 0,
+    placeholderData: keepPreviousData
+  })
+}
+
+export function useRecipeList({ q, tag, sort }: { q: string; tag: string; sort: RecipeSort }) {
+  return useInfiniteQuery({
+    queryKey: keys.recipeList(q, tag, sort),
+    queryFn: ({ pageParam }) =>
+      api.get(RecipeSchemas.RecipeWithStatsPage, '/recipes', {
+        q: q || undefined,
+        tag: tag || undefined,
+        sort,
+        limit: 30,
+        cursor: pageParam
+      }),
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (page) => page.nextCursor ?? undefined,
     placeholderData: keepPreviousData
   })
 }

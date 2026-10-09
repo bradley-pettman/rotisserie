@@ -41,7 +41,7 @@ export function DishSearch({ onPick, label = 'Add a dish' }: { onPick: (dish: Pi
   const [text, setText] = useState('')
   const query = useDeferredValue(text.trim())
   const search = useRecipeSearch(query)
-  const matches = query ? (search.data?.recipes ?? []).slice(0, 5) : []
+  const matches = query ? (search.data?.recipes ?? []) : []
   const exact = matches.some((recipe) => recipe.name.toLowerCase() === query.toLowerCase())
 
   function pick(dish: PickedDish) {
