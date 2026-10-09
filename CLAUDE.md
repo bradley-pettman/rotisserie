@@ -81,7 +81,9 @@ Three areas, ten tables:
   shared vocabularies `ingredients`, `units` and `tags`.
 - **Plan (intention):** `planned_meals` and `planned_meal_dishes`. These are
   mutable. There is no plan table; a week is a date range over
-  `planned_meals`.
+  `planned_meals`. A planned meal with no `planned_on` is unscheduled: it
+  sits in the "Planned" pool (shopped for, not yet given a day) until it gets
+  a date or a cooked meal links to it.
 - **History (fact):** `cooked_meals` and `cooked_meal_dishes`. What was
   actually eaten. `cooked_meals.planned_meal_id` (nullable, unique) links it
   to the plan it fulfilled or replaced.

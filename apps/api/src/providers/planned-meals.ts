@@ -65,6 +65,15 @@ export async function listPlannedMealsWithinDateRange(
   )
 }
 
+export async function listUnscheduledPlannedMeals(): Promise<PlannedMealSchemas['PlannedMeal'][]> {
+  return DB.query<PlannedMealSchemas['PlannedMeal']>(
+    `${PLANNED_MEAL_SELECT}
+     WHERE pm.planned_on IS NULL
+       AND NOT EXISTS (SELECT 1 FROM cooked_meals cm WHERE cm.planned_meal_id = pm.id)
+     ORDER BY pm.created_at, pm.id`
+  )
+}
+
 export async function getPlannedMeal(id: string): Promise<PlannedMealSchemas['PlannedMeal'] | null> {
   return fetchPlannedMeal(DB, id)
 }

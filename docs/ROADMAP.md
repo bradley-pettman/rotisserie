@@ -114,7 +114,7 @@ All three under apps/api/src/.
   - `GET /recipes?q=&limit=&cursor=`, `GET/PUT/DELETE /recipes/:id`
   - `GET /ingredients?q=` (autocomplete), `GET /units`, `GET /tags`
   - `GET /meals?from=&to=` (planned and cooked meals for a range, side by side)
-  - `GET/PUT/DELETE /planned-meals/:id`, `POST /planned-meals/:id/dishes`,
+  - `GET /planned-meals/unscheduled` (the Planned pool), `GET/PUT/DELETE /planned-meals/:id`, `POST /planned-meals/:id/dishes`,
     `DELETE /planned-meals/:id/dishes/:dishId`
   - `GET /cooked-meals?limit=&cursor=` (history, paged), `GET/PUT/DELETE /cooked-meals/:id`
 - [x] Tests: Hono's `app.request()` against the test database, with no server process
@@ -144,26 +144,40 @@ When `apps/mobile` arrives: Expo's Metro bundler supports workspaces without
 extra configuration on current SDKs. Keep `packages/shared` free of Node and
 server-only dependencies.
 
-## Phase 4: Mobile app v1, read and log
+## Phase 4: Mobile app v1: plan, cook and log
 
 - Expo with **Expo Router** (file-based navigation) and **TanStack Query** for
   server state (caching, refetch, loading and error states)
 - `EXPO_PUBLIC_API_URL` set to your laptop's LAN IP during development; run on
   your phone through Expo Go
+- Navigation (the app map lives at https://claude.ai/artifact/MxAeVQVxcGtLTYXfCdsZTE):
+  tabs for **Meals** and **Recipes**, plus a **+ Create** button that opens a
+  menu of Log a meal, Plan a meal and Create a recipe
 - Screens:
-  1. **Tonight:** today's planned meals, each with a "Made it" button
-  2. **Recipes:** searchable list
-  3. **Recipe:** ingredients scaled to a headcount, "last made" date
-  4. **Cook mode:** one step at a time, large text, screen kept awake (`expo-keep-awake`)
-  5. **Log a meal:** record what you ate, planned or not ("Made it" pre-fills it from the plan)
+  1. **Meals (home):** a week strip over a scroll of days that opens on today,
+     plus the **Planned** tray: meals planned without a day. Today with nothing
+     scheduled offers the Planned meals to pick from
+  2. **Planned meal:** its dishes and headcount, with "Made it" and "Made something else"
+  3. **Recipes:** searchable list
+  4. **Recipe:** ingredients scaled to a headcount, "last made" date
+  5. **Cook mode:** one dish at a time, one step at a time, large text, screen
+     kept awake (`expo-keep-awake`). Starts from a recipe or a planned meal's dish
+  6. **Log a meal:** record what you ate, planned or not ("Made it" pre-fills it from the plan)
+  7. **Plan a meal:** one meal at a time: slot (dinner by default), dishes
+     (recipe search or free text), headcount, and an optional day. Without a
+     day it goes to Planned
+  8. **Recipe editor:** create or edit a recipe: ingredient lines with
+     autocomplete, steps, times, servings, tags
 
 **Done when:** you use it to cook dinner on a real night.
 
 ## Phase 5: Planning on the phone
 
-- Week view: planned meals and what you actually ate, side by side
-- Plan a meal: pick a slot, add dishes (recipe search or free text), set headcount
+- Calendar view, toggled from the Meals timeline: planned meals and what you
+  actually ate, side by side
+- Plan a meal from an empty day in the calendar
 - Move a meal (one `PUT`), remove a dish
+- Cooked meal detail: rating and notes
 - Plan versus reality: replaced meals, skipped meals, unplanned meals
 
 ## Phase 6: Deploy and auth

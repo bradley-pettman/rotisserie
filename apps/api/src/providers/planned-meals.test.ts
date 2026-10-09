@@ -8,6 +8,7 @@ import {
   deletePlannedMeal,
   getPlannedMeal,
   listPlannedMealsWithinDateRange,
+  listUnscheduledPlannedMeals,
   removePlannedDish,
   upsertPlannedMeal
 } from './planned-meals'
@@ -60,6 +61,13 @@ describe('upsertPlannedMeal', () => {
     await expect(upsertPlannedMeal(plannedMealInput())).rejects.toMatchObject({ code: '23505' })
   })
 
+  it('plans several meals for the same slot without a date', async () => {
+    await upsertPlannedMeal(plannedMealInput({ plannedOn: null }))
+    const second = await upsertPlannedMeal(plannedMealInput({ plannedOn: null }))
+
+    expect(second).toMatchObject({ plannedOn: null, mealSlot: 'dinner' })
+  })
+
   it('rejects a dish that names nothing', async () => {
     const input = plannedMealInput({ dishes: [{ id: randomUUID(), recipeId: null, customText: null, notes: null }] })
 
@@ -93,6 +101,35 @@ describe('listPlannedMealsWithinDateRange', () => {
       '2026-10-09 dinner',
       '2026-10-10 breakfast'
     ])
+  })
+})
+
+describe('listUnscheduledPlannedMeals', () => {
+  it('returns meals with no date that have not been cooked, oldest first', async () => {
+    const spaghetti = await upsertPlannedMeal(
+      plannedMealInput({ plannedOn: null, dishes: [{ id: randomUUID(), recipeId: null, customText: 'spaghetti', notes: null }] })
+    )
+    const tacos = await upsertPlannedMeal(
+      plannedMealInput({ plannedOn: null, dishes: [{ id: randomUUID(), recipeId: null, customText: 'tacos', notes: null }] })
+    )
+    const chili = await upsertPlannedMeal(
+      plannedMealInput({ plannedOn: null, dishes: [{ id: randomUUID(), recipeId: null, customText: 'chili', notes: null }] })
+    )
+    await upsertPlannedMeal(plannedMealInput({ plannedOn: '2026-10-12' }))
+    await upsertCookedMeal(cookedMealInput({ plannedMealId: tacos.id }))
+
+    expect((await listUnscheduledPlannedMeals()).map((meal) => meal.id)).toEqual([spaghetti.id, chili.id])
+  })
+
+  it('drops a meal once it is scheduled and takes it back when unscheduled', async () => {
+    const chili = await upsertPlannedMeal(plannedMealInput({ plannedOn: null }))
+
+    await upsertPlannedMeal(plannedMealInput({ id: chili.id, plannedOn: '2026-10-12' }))
+    expect(await listUnscheduledPlannedMeals()).toEqual([])
+    expect(await listPlannedMealsWithinDateRange('2026-10-12', '2026-10-12')).toMatchObject([{ id: chili.id }])
+
+    await upsertPlannedMeal(plannedMealInput({ id: chili.id, plannedOn: null }))
+    expect(await listUnscheduledPlannedMeals()).toMatchObject([{ id: chili.id }])
   })
 })
 

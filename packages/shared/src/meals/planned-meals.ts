@@ -5,7 +5,7 @@ import { MealSlot } from './meal-slot'
 
 const PlannedMealRaw = z.object({
   id: z.string(),
-  plannedOn: z.iso.date(),
+  plannedOn: z.iso.date().nullable(),
   mealSlot: MealSlot,
   headcount: z.number().int().nullable(),
   notes: z.string().nullable(),
@@ -39,8 +39,8 @@ const PlannedDishInput = z
 
 const PlannedMealInput = z.object({
   id: z.uuid(),
-  plannedOn: z.iso.date(),
-  mealSlot: MealSlot,
+  plannedOn: z.iso.date().nullable(),
+  mealSlot: MealSlot.default('dinner'),
   headcount: z.number().int().positive().nullable(),
   notes: z.string().nullable(),
   dishes: PlannedDishInput.array()

@@ -18,6 +18,14 @@ describe('PUT /planned-meals/:id', () => {
     expect(replaced).toMatchObject({ status: 200, body: { id, headcount: 6, notes: 'grandparents' } })
   })
 
+  it('plans a meal with no date, as dinner unless a slot is given', async () => {
+    const { id, mealSlot, ...body } = plannedMealInput({ plannedOn: null })
+
+    const response = await send('PUT', `/planned-meals/${id}`, body)
+
+    expect(response).toMatchObject({ status: 200, body: { id, plannedOn: null, mealSlot: 'dinner' } })
+  })
+
   it('returns 409 when the slot is already planned', async () => {
     await putPlannedMeal()
 
@@ -38,6 +46,18 @@ describe('PUT /planned-meals/:id', () => {
     expect(response).toMatchObject({
       status: 400,
       body: { error: { fields: { 'dishes.0.customText': [expect.any(String)] } } }
+    })
+  })
+})
+
+describe('GET /planned-meals/unscheduled', () => {
+  it('returns the planned meals that have no date yet', async () => {
+    const unscheduled = await putPlannedMeal({ plannedOn: null })
+    await putPlannedMeal()
+
+    expect(await send('GET', '/planned-meals/unscheduled')).toMatchObject({
+      status: 200,
+      body: [{ id: unscheduled.body.id, plannedOn: null }]
     })
   })
 })

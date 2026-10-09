@@ -5,12 +5,16 @@ import {
   AddPlannedDish,
   DeletePlannedMeal,
   GetPlannedMealById,
+  ListUnscheduledPlannedMeals,
   RemovePlannedDish,
   UpsertPlannedMeal
 } from '~/use-cases/planned-meals'
 import { rejectInvalid } from '../errors'
 
 export const plannedMeals = new Hono()
+  .get('/unscheduled', async (c) => {
+    return c.json(await ListUnscheduledPlannedMeals({}))
+  })
   .get('/:id', zValidator('param', GetPlannedMealById.input, rejectInvalid), async (c) => {
     return c.json(await GetPlannedMealById(c.req.valid('param')))
   })
