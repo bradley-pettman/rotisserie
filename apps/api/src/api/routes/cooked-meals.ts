@@ -1,11 +1,20 @@
 import { zValidator } from '@hono/zod-validator'
 import { Hono } from 'hono'
-import { DeleteCookedMeal, GetCookedMealById, ListCookedMeals, UpsertCookedMeal } from '~/use-cases/cooked-meals'
+import {
+  DeleteCookedMeal,
+  GetCookedMealById,
+  ListCookedMeals,
+  SettlePlannedMeals,
+  UpsertCookedMeal
+} from '~/use-cases/cooked-meals'
 import { rejectInvalid } from '../errors'
 
 export const cookedMeals = new Hono()
   .get('/', zValidator('query', ListCookedMeals.input, rejectInvalid), async (c) => {
     return c.json(await ListCookedMeals(c.req.valid('query')))
+  })
+  .post('/settle', zValidator('json', SettlePlannedMeals.input, rejectInvalid), async (c) => {
+    return c.json(await SettlePlannedMeals(c.req.valid('json')))
   })
   .get('/:id', zValidator('param', GetCookedMealById.input, rejectInvalid), async (c) => {
     return c.json(await GetCookedMealById(c.req.valid('param')))

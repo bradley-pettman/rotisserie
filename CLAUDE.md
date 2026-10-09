@@ -86,7 +86,11 @@ Three areas, ten tables:
   a date or a cooked meal links to it.
 - **History (fact):** `cooked_meals` and `cooked_meal_dishes`. What was
   actually eaten. `cooked_meals.planned_meal_id` (nullable, unique) links it
-  to the plan it fulfilled or replaced.
+  to the plan it fulfilled or replaced. `POST /cooked-meals/settle` (called by
+  the app on open, with the phone's today) logs every past-dated, uncooked
+  plan as a cooked meal with `settled_on` set to that day; any edit through
+  the upsert confirms it (`settled_on` back to NULL). To undo a settled meal,
+  move or delete its plan, or settle recreates it.
 
 Intent and fact are separate tables on purpose: when plan and reality differ,
 both must survive, and they need opposite delete rules:

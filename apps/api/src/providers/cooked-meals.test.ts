@@ -8,9 +8,10 @@ import {
   lastMade,
   listCookedMeals,
   listCookedMealsWithinDateRange,
+  settlePlannedMealsBefore,
   upsertCookedMeal
 } from './cooked-meals'
-import { getPlannedMeal, upsertPlannedMeal } from './planned-meals'
+import { getPlannedMeal, listUnscheduledPlannedMeals, upsertPlannedMeal } from './planned-meals'
 import { deleteRecipe, upsertRecipe } from './recipes'
 
 describe('upsertCookedMeal', () => {
@@ -184,5 +185,74 @@ describe('lastMade', () => {
 
   it('returns nothing for no recipes', async () => {
     expect(await lastMade([])).toEqual([])
+  })
+})
+
+describe('settlePlannedMealsBefore', () => {
+  const dish = (customText: string) => ({ id: randomUUID(), recipeId: null, customText, notes: null })
+
+  it('logs a past plan as a settled cooked meal, labelling dishes with current names', async () => {
+    const chili = await upsertRecipe(recipeInput({ name: 'Chili' }))
+    const plan = await upsertPlannedMeal(
+      plannedMealInput({
+        plannedOn: '2026-10-08',
+        headcount: 4,
+        dishes: [{ id: randomUUID(), recipeId: chili.id, customText: null, notes: null }, dish('cornbread')]
+      })
+    )
+
+    const settled = await settlePlannedMealsBefore('2026-10-09')
+
+    expect(() => CookedMealSchemas.CookedMeal.array().parse(settled)).not.toThrow()
+    expect(settled).toMatchObject([
+      {
+        plannedMealId: plan.id,
+        cookedOn: '2026-10-08',
+        mealSlot: 'dinner',
+        headcount: 4,
+        starRating: null,
+        settledOn: '2026-10-09',
+        dishes: [
+          { recipeId: chili.id, label: 'Chili', sortOrder: 0 },
+          { recipeId: null, label: 'cornbread', sortOrder: 1 }
+        ]
+      }
+    ])
+  })
+
+  it('leaves today, unscheduled, empty, already cooked and already logged plans alone', async () => {
+    await upsertPlannedMeal(plannedMealInput({ plannedOn: '2026-10-09', dishes: [dish('tacos')] }))
+    await upsertPlannedMeal(plannedMealInput({ plannedOn: null, dishes: [dish('spaghetti')] }))
+    await upsertPlannedMeal(plannedMealInput({ plannedOn: '2026-10-07', dishes: [] }))
+    const cooked = await upsertPlannedMeal(plannedMealInput({ plannedOn: '2026-10-06', dishes: [dish('wings')] }))
+    await upsertCookedMeal(cookedMealInput({ plannedMealId: cooked.id, cookedOn: '2026-10-06' }))
+    await upsertPlannedMeal(plannedMealInput({ plannedOn: '2026-10-05', dishes: [dish('stir fry')] }))
+    await upsertCookedMeal(cookedMealInput({ cookedOn: '2026-10-05', dishes: [] }))
+
+    expect(await settlePlannedMealsBefore('2026-10-09')).toEqual([])
+  })
+
+  it('settles each plan once, and an edit confirms the settled meal', async () => {
+    const plan = await upsertPlannedMeal(plannedMealInput({ plannedOn: '2026-10-08', dishes: [dish('chili')] }))
+    const [settled] = await settlePlannedMealsBefore('2026-10-09')
+
+    expect(await settlePlannedMealsBefore('2026-10-10')).toEqual([])
+
+    const confirmed = await upsertCookedMeal(
+      cookedMealInput({ id: settled?.id, plannedMealId: plan.id, cookedOn: '2026-10-08', starRating: 5 })
+    )
+
+    expect(confirmed).toMatchObject({ settledOn: null, starRating: 5 })
+  })
+
+  it('does not bring back a plan that was put back in Planned after all', async () => {
+    const plan = await upsertPlannedMeal(plannedMealInput({ plannedOn: '2026-10-08', dishes: [dish('chili')] }))
+    const [settled] = await settlePlannedMealsBefore('2026-10-09')
+
+    await deleteCookedMeal(settled?.id ?? '')
+    await upsertPlannedMeal(plannedMealInput({ id: plan.id, plannedOn: null, dishes: [dish('chili')] }))
+
+    expect(await settlePlannedMealsBefore('2026-10-09')).toEqual([])
+    expect(await listUnscheduledPlannedMeals()).toMatchObject([{ id: plan.id }])
   })
 })

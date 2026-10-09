@@ -10,6 +10,7 @@ const CookedMealRaw = z.object({
   headcount: z.number().int().nullable(),
   notes: z.string().nullable(),
   starRating: z.number().int().nullable(),
+  settledOn: z.iso.date().nullable(),
   createdAt: z.iso.datetime()
 })
 

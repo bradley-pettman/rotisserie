@@ -86,3 +86,22 @@ describe('DELETE /cooked-meals/:id', () => {
     expect((await send('DELETE', `/cooked-meals/${created.body.id}`)).status).toBe(404)
   })
 })
+
+describe('POST /cooked-meals/settle', () => {
+  it('logs past plans as settled cooked meals', async () => {
+    const { id, ...plan } = plannedMealInput({
+      plannedOn: '2026-10-08',
+      dishes: [{ id: randomUUID(), recipeId: null, customText: 'chili', notes: null }]
+    })
+    await send('PUT', `/planned-meals/${id}`, plan)
+
+    expect(await send('POST', '/cooked-meals/settle', { before: '2026-10-09' })).toMatchObject({
+      status: 200,
+      body: [{ plannedMealId: id, cookedOn: '2026-10-08', settledOn: '2026-10-09', dishes: [{ label: 'chili' }] }]
+    })
+  })
+
+  it('returns 400 when before is not a date', async () => {
+    expect((await send('POST', '/cooked-meals/settle', { before: 'yesterday' })).status).toBe(400)
+  })
+})

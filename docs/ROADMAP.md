@@ -116,7 +116,8 @@ All three under apps/api/src/.
   - `GET /meals?from=&to=` (planned and cooked meals for a range, side by side)
   - `GET /planned-meals/unscheduled` (the Planned pool), `GET/PUT/DELETE /planned-meals/:id`, `POST /planned-meals/:id/dishes`,
     `DELETE /planned-meals/:id/dishes/:dishId`
-  - `GET /cooked-meals?limit=&cursor=` (history, paged), `GET/PUT/DELETE /cooked-meals/:id`
+  - `GET /cooked-meals?limit=&cursor=` (history, paged), `GET/PUT/DELETE /cooked-meals/:id`,
+    `POST /cooked-meals/settle` (log past plans as eaten, with `settled_on` set)
 - [x] Tests: Hono's `app.request()` against the test database, with no server process
 
 **Done when:** the Friday scenario runs end to end with `curl` (or a `.http` file).
@@ -168,6 +169,10 @@ server-only dependencies.
      day it goes to Planned. Days in the past can't be planned (they show greyed out)
   8. **Recipe editor:** create or edit a recipe: ingredient lines with
      autocomplete, steps, times, servings, tags
+
+- On open and on returning to the foreground, the app calls
+  `POST /cooked-meals/settle` with its local today, so plans whose day has
+  passed count as eaten. "Made it" logs on the spot with an Undo · Edit toast.
 
 **Done when:** you use it to cook dinner on a real night.
 

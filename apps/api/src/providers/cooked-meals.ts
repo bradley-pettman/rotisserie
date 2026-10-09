@@ -13,6 +13,7 @@ const COOKED_MEAL_SELECT = `
     cm.headcount,
     cm.notes,
     cm.star_rating AS "starRating",
+    ${isoDate('cm.settled_on')} AS "settledOn",
     ${isoTimestamp('cm.created_at')} AS "createdAt",
     COALESCE(
       (
@@ -60,7 +61,8 @@ export async function upsertCookedMeal(
          meal_slot = EXCLUDED.meal_slot,
          headcount = EXCLUDED.headcount,
          notes = EXCLUDED.notes,
-         star_rating = EXCLUDED.star_rating`,
+         star_rating = EXCLUDED.star_rating,
+         settled_on = NULL`,
       [input.id, input.plannedMealId, input.cookedOn, input.mealSlot, input.headcount, input.notes, input.starRating]
     )
 
@@ -82,6 +84,46 @@ export async function upsertCookedMeal(
     const meal = await fetchCookedMeal(tx, input.id)
     if (meal === null) throw new Error(`Cooked meal ${input.id} missing after upsert`)
     return meal
+  })
+}
+
+export async function settlePlannedMealsBefore(before: string): Promise<CookedMealSchemas['CookedMeal'][]> {
+  return DB.withTransaction(async (tx) => {
+    const settled = await tx.query<{ id: string }>(
+      `WITH due AS (
+         SELECT pm.id, pm.planned_on, pm.meal_slot, pm.headcount
+         FROM planned_meals pm
+         WHERE pm.planned_on < $1::date
+           AND EXISTS (SELECT 1 FROM planned_meal_dishes d WHERE d.planned_meal_id = pm.id)
+           AND NOT EXISTS (SELECT 1 FROM cooked_meals cm WHERE cm.planned_meal_id = pm.id)
+           AND NOT EXISTS (
+             SELECT 1 FROM cooked_meals cm WHERE cm.cooked_on = pm.planned_on AND cm.meal_slot = pm.meal_slot
+           )
+       ),
+       inserted AS (
+         INSERT INTO cooked_meals (planned_meal_id, cooked_on, meal_slot, headcount, settled_on)
+         SELECT id, planned_on, meal_slot, headcount, $1::date FROM due
+         ON CONFLICT (planned_meal_id) DO NOTHING
+         RETURNING id, planned_meal_id
+       ),
+       dishes AS (
+         INSERT INTO cooked_meal_dishes (cooked_meal_id, recipe_id, label, notes, sort_order)
+         SELECT i.id, d.recipe_id, COALESCE(r.name, d.custom_text), d.notes, d.sort_order
+         FROM inserted i
+         JOIN planned_meal_dishes d ON d.planned_meal_id = i.planned_meal_id
+         LEFT JOIN recipes r ON r.id = d.recipe_id
+       )
+       SELECT id FROM inserted`,
+      [before]
+    )
+    if (settled.length === 0) return []
+
+    return tx.query<CookedMealSchemas['CookedMeal']>(
+      `${COOKED_MEAL_SELECT}
+       WHERE cm.id = ANY($1::uuid[])
+       ORDER BY cm.cooked_on, array_position(ARRAY['breakfast', 'lunch', 'dinner', 'snack']::text[], cm.meal_slot::text)`,
+      [settled.map((meal) => meal.id)]
+    )
   })
 }
 
