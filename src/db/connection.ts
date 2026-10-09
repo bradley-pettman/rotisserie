@@ -1,6 +1,6 @@
-import pg from "pg";
+import pg from 'pg'
 
-const { Pool } = pg;
+const { Pool } = pg
 
 /**
  * node-postgres hands NUMERIC/DECIMAL back as a STRING by default, because
@@ -25,15 +25,15 @@ const { Pool } = pg;
  * say) means revisiting this: either drop the override and cast per query, or
  * select that column as `col::text` so it keeps its exact string form.
  */
-pg.types.setTypeParser(pg.types.builtins.NUMERIC, (value) => Number(value));
+pg.types.setTypeParser(pg.types.builtins.NUMERIC, (value) => Number(value))
 
 /** Read a positive-integer knob from the environment, falling back when unset or junk. */
 function envInt(name: string, fallback: number): number {
-  const raw = process.env[name];
-  if (raw === undefined || raw.trim() === "") return fallback;
+  const raw = process.env[name]
+  if (raw === undefined || raw.trim() === '') return fallback
 
-  const value = Number(raw);
-  return Number.isInteger(value) && value > 0 ? value : fallback;
+  const value = Number(raw)
+  return Number.isInteger(value) && value > 0 ? value : fallback
 }
 
 /**
@@ -59,11 +59,11 @@ function envInt(name: string, fallback: number): number {
  */
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  max: envInt("PGPOOL_MAX", 10),
-  connectionTimeoutMillis: envInt("PGPOOL_CONNECTION_TIMEOUT_MS", 5_000),
-  idleTimeoutMillis: envInt("PGPOOL_IDLE_TIMEOUT_MS", 30_000),
-  statement_timeout: envInt("PGPOOL_STATEMENT_TIMEOUT_MS", 10_000),
-});
+  max: envInt('PGPOOL_MAX', 10),
+  connectionTimeoutMillis: envInt('PGPOOL_CONNECTION_TIMEOUT_MS', 5_000),
+  idleTimeoutMillis: envInt('PGPOOL_IDLE_TIMEOUT_MS', 30_000),
+  statement_timeout: envInt('PGPOOL_STATEMENT_TIMEOUT_MS', 10_000)
+})
 
 /**
  * REQUIRED, not optional logging: `Pool` is an EventEmitter, and Node throws an
@@ -78,57 +78,49 @@ const pool = new Pool({
  * There is nothing to do but log: the failed client is already being removed,
  * and the next `connect()` opens a fresh one.
  */
-pool.on("error", (error) => {
-  console.error("[db] idle client error", error);
-});
+pool.on('error', (error) => {
+  console.error('[db] idle client error', error)
+})
 
-export type QueryParam = string | number | boolean | null | Date | string[];
+export type QueryParam = string | number | boolean | null | Date | string[]
 
 export interface QueryFns {
-  query: <T>(text: string, params?: QueryParam[]) => Promise<T[]>;
-  queryOne: <T>(text: string, params?: QueryParam[]) => Promise<T | null>;
+  query: <T>(text: string, params?: QueryParam[]) => Promise<T[]>
+  queryOne: <T>(text: string, params?: QueryParam[]) => Promise<T | null>
 }
 
 export interface DB extends QueryFns {
-  withTransaction: <T>(fn: (tx: QueryFns) => Promise<T>) => Promise<T>;
+  withTransaction: <T>(fn: (tx: QueryFns) => Promise<T>) => Promise<T>
 }
 
-async function query<T>(
-  text: string,
-  params?: QueryParam[]
-): Promise<T[]> {
-  const result = await pool.query(text, params);
-  return result.rows as T[];
+async function query<T>(text: string, params?: QueryParam[]): Promise<T[]> {
+  const result = await pool.query(text, params)
+  return result.rows as T[]
 }
 
-async function queryOne<T>(
-  text: string,
-  params?: QueryParam[]
-): Promise<T | null> {
-  const rows = await query<T>(text, params);
-  return rows[0] ?? null;
+async function queryOne<T>(text: string, params?: QueryParam[]): Promise<T | null> {
+  const rows = await query<T>(text, params)
+  return rows[0] ?? null
 }
 
-async function withTransaction<T>(
-  fn: (tx: QueryFns) => Promise<T>
-): Promise<T> {
-  const client = await pool.connect();
+async function withTransaction<T>(fn: (tx: QueryFns) => Promise<T>): Promise<T> {
+  const client = await pool.connect()
   try {
-    await client.query("BEGIN");
+    await client.query('BEGIN')
 
     const txQuery = async <R>(text: string, params?: QueryParam[]): Promise<R[]> => {
-      const result = await client.query(text, params);
-      return result.rows as R[];
-    };
+      const result = await client.query(text, params)
+      return result.rows as R[]
+    }
     const txQueryOne = async <R>(text: string, params?: QueryParam[]): Promise<R | null> => {
-      const rows = await txQuery<R>(text, params);
-      return rows[0] ?? null;
-    };
+      const rows = await txQuery<R>(text, params)
+      return rows[0] ?? null
+    }
 
-    const result = await fn({ query: txQuery, queryOne: txQueryOne });
-    await client.query("COMMIT");
-    client.release();
-    return result;
+    const result = await fn({ query: txQuery, queryOne: txQueryOne })
+    await client.query('COMMIT')
+    client.release()
+    return result
   } catch (error) {
     // The ROLLBACK is best-effort and its own failure is swallowed ON PURPOSE.
     // The case where it fails is the case where the connection itself died --
@@ -141,15 +133,15 @@ async function withTransaction<T>(
     // aborted transaction, and handing that to the next caller would fail
     // their query for reasons they cannot see. Discarding it costs one
     // reconnect; reusing it costs a bug that only shows up under load.
-    let rolledBack = true;
+    let rolledBack = true
     try {
-      await client.query("ROLLBACK");
+      await client.query('ROLLBACK')
     } catch {
-      rolledBack = false;
+      rolledBack = false
     }
 
-    client.release(rolledBack ? undefined : true);
-    throw error;
+    client.release(rolledBack ? undefined : true)
+    throw error
   }
 }
 
@@ -171,13 +163,13 @@ async function withTransaction<T>(
  */
 export async function checkDatabase(): Promise<boolean> {
   try {
-    await pool.query("SELECT 1");
-    return true;
+    await pool.query('SELECT 1')
+    return true
   } catch {
-    return false;
+    return false
   }
 }
 
-export const DB: DB = { query, queryOne, withTransaction };
+export const DB: DB = { query, queryOne, withTransaction }
 
-export { pool };
+export { pool }

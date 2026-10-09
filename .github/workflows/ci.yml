@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   verify:
-    name: Typecheck and unit tests
+    name: Format, typecheck and unit tests
     runs-on: ubuntu-latest
 
     steps:
@@ -21,11 +21,14 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
-          node-version: "22"
+          node-version: '22'
           cache: npm
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Format
+        run: npm run format:check
 
       - name: Typecheck
         run: npm run typecheck
@@ -55,9 +58,9 @@ jobs:
 
     env:
       DATABASE_URL: postgres://postgres:postgres@localhost:5432/rotisserie_dev?sslmode=disable
-      DBMATE_VERSION: "2.36.0"
+      DBMATE_VERSION: '2.36.0'
       # sha256 of the v2.36.0 linux-amd64 release asset. Update both together.
-      DBMATE_SHA256: "47e284b3d8cbad1ba5f090495aa05afd1bbd5f35e2ed5577aad06da74ce780ce"
+      DBMATE_SHA256: '47e284b3d8cbad1ba5f090495aa05afd1bbd5f35e2ed5577aad06da74ce780ce'
 
     steps:
       - name: Checkout
@@ -66,7 +69,7 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
-          node-version: "22"
+          node-version: '22'
           cache: npm
 
       - name: Install dependencies

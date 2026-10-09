@@ -13,7 +13,7 @@ services:
       # the LAN, and on any cloud dev box or shared runner it is reachable from
       # the internet, with the credentials two lines above. The app, dbmate and
       # the test suite all connect from the host, so loopback is all they need.
-      - "127.0.0.1:5432:5432"
+      - '127.0.0.1:5432:5432'
     volumes:
       - pgdata:/var/lib/postgresql/data
 

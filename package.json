@@ -6,7 +6,9 @@
     "typecheck": "tsc",
     "test": "vitest run --passWithNoTests",
     "test:watch": "vitest",
-    "db:seed": "node db/seed.mjs"
+    "db:seed": "node db/seed.mjs",
+    "format": "oxfmt --write .",
+    "format:check": "oxfmt --check ."
   },
   "dependencies": {
     "pg": "^8.17.2",
@@ -15,6 +17,7 @@
   "devDependencies": {
     "@types/node": "^22",
     "@types/pg": "^8.16.0",
+    "oxfmt": "^0.54.0",
     "tsx": "^4.20.6",
     "typescript": "^5.9.2",
     "vitest": "^5.0.1"
