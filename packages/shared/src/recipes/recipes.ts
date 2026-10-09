@@ -29,9 +29,36 @@ const Recipe = RecipeRaw.extend({
   tags: TagSchemas.Tag.array()
 })
 
+const UpsertRecipeInput = z.object({
+  id: z.uuid(),
+  name: z.string().trim().min(1).max(255),
+  instructions: z.string(),
+  prepTimeMinutes: z.number().int().min(0).nullable(),
+  cookTimeMinutes: z.number().int().min(0).nullable(),
+  servings: z.number().int().positive().nullable(),
+  sourceUrl: z.url().nullable(),
+  notes: z.string().nullable(),
+  ingredients: z
+    .object({
+      name: z.string().trim().min(1).max(255),
+      quantity: z.number().positive().nullable(),
+      unit: z.string().trim().min(1).max(50).nullable(),
+      notes: z.string().nullable()
+    })
+    .array(),
+  tags: z.string().trim().min(1).max(100).array()
+})
+
+const RecipePage = z.object({
+  recipes: RecipeRaw.array(),
+  nextCursor: z.string().nullable()
+})
+
 export const RecipeSchemas = {
   RecipeRaw,
-  Recipe
+  Recipe,
+  UpsertRecipeInput,
+  RecipePage
 }
 
 export type RecipeSchemas = InferSchemas<typeof RecipeSchemas>

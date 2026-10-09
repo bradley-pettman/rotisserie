@@ -25,9 +25,39 @@ const CookedMeal = CookedMealRaw.extend({
     .array()
 })
 
+const CookedDishInput = z
+  .object({
+    recipeId: z.uuid().nullable(),
+    label: z.string().trim().min(1).max(255).optional(),
+    isLeftovers: z.boolean(),
+    notes: z.string().nullable()
+  })
+  .refine((dish) => dish.recipeId !== null || dish.label !== undefined, {
+    message: 'A dish needs a recipe or a label',
+    path: ['label']
+  })
+
+const CookedMealInput = z.object({
+  id: z.uuid(),
+  plannedMealId: z.uuid().nullable(),
+  cookedOn: z.iso.date(),
+  mealSlot: MealSlot,
+  headcount: z.number().int().positive().nullable(),
+  notes: z.string().nullable(),
+  dishes: CookedDishInput.array()
+})
+
+const CookedMealPage = z.object({
+  meals: CookedMeal.array(),
+  nextCursor: z.string().nullable()
+})
+
 export const CookedMealSchemas = {
   CookedMealRaw,
-  CookedMeal
+  CookedMeal,
+  CookedDishInput,
+  CookedMealInput,
+  CookedMealPage
 }
 
 export type CookedMealSchemas = InferSchemas<typeof CookedMealSchemas>

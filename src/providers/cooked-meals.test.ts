@@ -133,11 +133,11 @@ describe('listCookedMeals', () => {
 })
 
 describe('deleteCookedMeal', () => {
-  it('reports whether a meal was deleted', async () => {
+  it('returns the deleted id, then null on a repeat', async () => {
     const cooked = await upsertCookedMeal(cookedMealInput())
 
-    expect(await deleteCookedMeal(cooked.id)).toBe(true)
-    expect(await deleteCookedMeal(cooked.id)).toBe(false)
+    expect(await deleteCookedMeal(cooked.id)).toEqual({ id: cooked.id })
+    expect(await deleteCookedMeal(cooked.id)).toBeNull()
   })
 })
 

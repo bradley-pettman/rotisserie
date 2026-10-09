@@ -147,8 +147,8 @@ describe('deleting', () => {
       })
     )
 
-    expect(await deletePlannedMeal(plan.id)).toBe(true)
-    expect(await deletePlannedMeal(plan.id)).toBe(false)
+    expect(await deletePlannedMeal(plan.id)).toEqual({ id: plan.id })
+    expect(await deletePlannedMeal(plan.id)).toBeNull()
     expect(await getCookedMeal(cooked.id)).toMatchObject({ plannedMealId: null, dishes: [{ label: 'bagged salad' }] })
   })
 })

@@ -5,10 +5,10 @@ From an empty-but-sound database to a meal-planning app on your phone.
 The target system:
 
 ```
-┌──────────────────────┐    HTTPS · JSON    ┌──────────────────────┐    SQL    ┌────────────┐
-│  Expo app (iOS/And.) │ ─────────────────▶ │  Node API (Hono)     │ ────────▶ │ PostgreSQL │
-│  screens + API client│                    │  routes → Zod → SQL  │           │  (dbmate)  │
-└──────────────────────┘                    └──────────────────────┘           └────────────┘
+┌──────────────────────┐    HTTPS · JSON    ┌─────────────────────────────────┐    SQL    ┌────────────┐
+│  Expo app (iOS/And.) │ ─────────────────▶ │  Node API (Hono)                │ ────────▶ │ PostgreSQL │
+│  screens + API client│                    │  routes → use cases → providers │           │  (dbmate)  │
+└──────────────────────┘                    └─────────────────────────────────┘           └────────────┘
             ▲                                          ▲
             └────────── packages/shared: Zod schemas + TS types ──────────┘
 ```
@@ -19,7 +19,7 @@ The target system:
 |---|---|
 | Schema and migrations (`db/migrations`) | Done in Phase 0. Changes are discussed first. |
 | Zod schemas, TS types, SQL query functions, their tests | **Built by hand.** Claude explains and reviews, and doesn't write it. |
-| HTTP API, mobile app, deployment, builds | Claude can own it, with review. |
+| Use cases (`src/use-cases`), HTTP API, mobile app, deployment, builds | Claude can own it, with review. |
 
 The line sits at the query functions on purpose. Below it is where the domain
 rules live: canonical names, snapshots, transactions. Above it is mostly wiring.
@@ -46,59 +46,76 @@ dbmate drop && dbmate create && dbmate up && npm run db:seed
 The goal is to be able to drive the whole Friday scenario (plan sloppy joes,
 eat meatloaf) from TypeScript, with no HTTP involved.
 
-1. **Zod schemas and types**, one file per area under `src/`:
+1. **Zod schemas and types**, one folder per area under `packages/shared/src/`:
    - Recipe input: name, instructions, times, servings, ingredient lines
      (name, quantity, unit, notes) and tag names
    - Recipe output: the row plus resolved ingredient lines and tags
    - Planned meal plus dishes, and cooked meal plus dishes
    - Shared building blocks: `MealSlot`, a `YYYY-MM-DD` calendar-date string, UUIDs
-   - Derive types with `z.infer`, and keep input and output schemas separate
+   - Each area exports one `XSchemas` object (row, app shape, write inputs) and a
+     same-named type from `InferSchemas`, used as `RecipeSchemas['Recipe']`
 2. **Query functions**, raw SQL through `DB.query` / `queryOne` / `withTransaction`:
    - Writes are upserts by a client-generated id (`INSERT ... ON CONFLICT (id)
      DO UPDATE`), so a retried save never duplicates. Child rows (ingredient
      lines, tags, dishes) are replaced wholesale in the same transaction.
-   - `upsertRecipe(id, input)`: upsert the ingredient, unit and tag names
+   - `upsertRecipe(input)`: upsert the ingredient, unit and tag names
      (lowercase and trim first), then the recipe, then its lines and tags.
    - `getRecipe(id)` with lines and tags; `listRecipes({ q, limit, cursor })`
-   - `upsertPlannedMeal(id, input)`, `addPlannedDish`, `removePlannedDish`;
+   - `upsertPlannedMeal(input)`, `addPlannedDish`, `removePlannedDish`;
      `listPlannedMealsWithinDateRange(from, to)`, which resolves recipe names in one batched
      query, not one per dish
-   - `upsertCookedMeal(id, input)`: copy each recipe's current name into
+   - `upsertCookedMeal(input)`: copy each recipe's current name into
      `label` inside the same transaction; optionally link `planned_meal_id`
    - `lastMade(recipeIds[])`: `MAX(cooked_on)` excluding leftovers, batched
      with `= ANY($1::uuid[])`
 3. **Tests.** Unit tests for pure helpers (canonicalizing names, scaling).
    Integration tests for query functions against a real Postgres: a separate
-   `rotisserie_test` database, migrated once, each test in a transaction that
-   rolls back.
+   `rotisserie_test` database, recreated and migrated once per run, with every
+   table truncated and re-seeded before each test.
 
 **Things to get right here:**
 
 - DATE columns: select them with `to_char(col, 'YYYY-MM-DD')` and keep them as strings.
 - `COUNT(*)` comes back as a string. Cast with `::int`.
 - Unit synonyms ("tbsp", "T", "tablespoons") need folding onto one canonical name
-  before the upsert. The old app's `canonicalizeUnit` and `parse-ingredient.ts`
-  are in git history (see below).
+  before the upsert. `canonicalizeName` and `canonicalizeUnit` live in
+  `packages/shared/src/base/vocabulary.ts`; the old `parse-ingredient.ts` is in
+  git history (see below).
 
 **Done when:** a script (`npx tsx src/scripts/friday.ts`) plans the meal, logs what
 was actually eaten, and prints plan versus reality.
 
 ## Phase 2: HTTP API
 
-- Hono on Node (`@hono/node-server`), run with `tsx watch` in dev
-- Routes validate with the Phase 1 schemas and call the Phase 1 query functions,
-  with no SQL in route files
-- One error envelope: `{ error: { code, message, fields? } }`; 400 for
-  validation, 404 and 409 mapped from Postgres error codes (23505 unique,
-  23503 FK, 23514 check)
-- `GET /health` using `checkDatabase()`
-- Endpoints:
-  - `GET/POST /recipes`, `GET/PUT/DELETE /recipes/:id`
-  - `GET /units`, `GET /ingredients?q=` (autocomplete)
+Requests flow through three layers, each doing one job:
+
+```
+route (src/api/routes)        HTTP: validate params, query and body; pick the status code
+  → use case (src/use-cases)  one application action, e.g. GetRecipeById
+    → provider (src/providers) one data operation: SQL in, rows out
+```
+
+- [x] Hono on Node (`@hono/node-server`); `npm run dev` runs `tsx watch src/server.ts`
+- [x] **Use cases** are built with `defineUseCase({ input, output, implementation })`, a
+      `z.function` that validates its input and output. They're the home for
+      anything beyond fetching data: not-found decisions, ownership checks, and
+      later permissions, tenancy or a changelog writer. Routes never call
+      providers directly.
+- [x] Routes validate the request with `@hono/zod-validator` against the use
+      case's own `.input` schema, with no SQL in route files
+- [x] One error envelope: `{ error: { code, message, fields? } }`. 400 for an
+      invalid request or cursor, 404 for `NotFoundError`, 409 mapped from Postgres
+      (23502 not null, 23503 FK, 23505 unique, 23514 check), 500 for anything
+      else, including a use case breaking its own output contract
+- [x] `GET /health`: 200, or 503 when the database is unreachable
+- [x] Endpoints. Writes are `PUT` with the client-generated id in the path:
+  - `GET /recipes?q=&limit=&cursor=`, `GET/PUT/DELETE /recipes/:id`
+  - `GET /ingredients?q=` (autocomplete), `GET /units`, `GET /tags`
   - `GET /meals?from=&to=` (planned and cooked meals for a range, side by side)
-  - `POST /planned-meals`, `PATCH/DELETE /planned-meals/:id`, plus dish sub-routes
-  - `POST /cooked-meals`, `GET /cooked-meals?before=` (history, paged)
-- Tests: Hono's `app.request()` against the test database, with no server process
+  - `GET/PUT/DELETE /planned-meals/:id`, `POST /planned-meals/:id/dishes`,
+    `DELETE /planned-meals/:id/dishes/:dishId`
+  - `GET /cooked-meals?limit=&cursor=` (history, paged), `GET/PUT/DELETE /cooked-meals/:id`
+- [x] Tests: Hono's `app.request()` against the test database, with no server process
 
 **Done when:** the Friday scenario runs end to end with `curl` (or a `.http` file).
 
@@ -109,12 +126,14 @@ Do this before the first line of mobile code so the shared types exist from day 
 ```
 apps/api/          ← src/ moves here
 apps/mobile/       ← new Expo app
-packages/shared/   ← Zod schemas + types from Phase 1
+packages/shared/   ← already here: Zod schemas, types and vocabulary helpers
 db/                ← stays at the root
 ```
 
 npm workspaces. Expo's Metro bundler supports workspaces without extra configuration on current SDKs.
-Check that the `~/` path alias still resolves in both apps.
+`packages/shared` is already imported as `@rotisserie/shared/*` through a path
+alias; this phase makes it a real workspace package. Check that the `~/` alias
+still resolves in both apps.
 
 ## Phase 4: Mobile app v1, read and log
 
@@ -135,7 +154,7 @@ Check that the `~/` path alias still resolves in both apps.
 
 - Week view: planned meals and what you actually ate, side by side
 - Plan a meal: pick a slot, add dishes (recipe search or free text), set headcount
-- Move a meal (one `PATCH`), remove a dish
+- Move a meal (one `PUT`), remove a dish
 - Plan versus reality: replaced meals, skipped meals, unplanned meals
 
 ## Phase 6: Deploy and auth

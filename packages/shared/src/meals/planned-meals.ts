@@ -25,9 +25,32 @@ const PlannedMeal = PlannedMealRaw.extend({
     .array()
 })
 
+const PlannedDishInput = z
+  .object({
+    id: z.uuid(),
+    recipeId: z.uuid().nullable(),
+    customText: z.string().trim().min(1).nullable(),
+    notes: z.string().nullable()
+  })
+  .refine((dish) => dish.recipeId !== null || dish.customText !== null, {
+    message: 'A dish needs a recipe or custom text',
+    path: ['customText']
+  })
+
+const PlannedMealInput = z.object({
+  id: z.uuid(),
+  plannedOn: z.iso.date(),
+  mealSlot: MealSlot,
+  headcount: z.number().int().positive().nullable(),
+  notes: z.string().nullable(),
+  dishes: PlannedDishInput.array()
+})
+
 export const PlannedMealSchemas = {
   PlannedMealRaw,
-  PlannedMeal
+  PlannedMeal,
+  PlannedDishInput,
+  PlannedMealInput
 }
 
 export type PlannedMealSchemas = InferSchemas<typeof PlannedMealSchemas>

@@ -1,12 +1,15 @@
+import { zValidator } from '@hono/zod-validator'
 import { Hono } from 'hono'
+import { ListIngredients, ListTags, ListUnits } from '~/use-cases/vocabulary'
+import { rejectInvalid } from '../errors'
 
 export const vocabulary = new Hono()
-  .get('/ingredients', (c) => {
-    throw new Error('Not implemented')
+  .get('/ingredients', zValidator('query', ListIngredients.input, rejectInvalid), async (c) => {
+    return c.json(await ListIngredients(c.req.valid('query')))
   })
-  .get('/units', (c) => {
-    throw new Error('Not implemented')
+  .get('/units', async (c) => {
+    return c.json(await ListUnits({}))
   })
-  .get('/tags', (c) => {
-    throw new Error('Not implemented')
+  .get('/tags', async (c) => {
+    return c.json(await ListTags({}))
   })

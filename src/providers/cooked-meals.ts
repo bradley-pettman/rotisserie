@@ -1,29 +1,8 @@
-import type { CookedMealSchemas, MealSlot } from '@rotisserie/shared/meals'
+import type { CookedMealSchemas } from '@rotisserie/shared/meals'
 import { uniq } from 'lodash-es'
 import { DB, type QueryFns } from '~/db/connection'
+import { strict } from './errors'
 import { decodeCursor, encodeCursor, isoDate, isoTimestamp } from './sql'
-
-export type CookedDishInput = {
-  recipeId: string | null
-  label?: string
-  isLeftovers: boolean
-  notes: string | null
-}
-
-export type CookedMealInput = {
-  id: string
-  plannedMealId: string | null
-  cookedOn: string
-  mealSlot: MealSlot
-  headcount: number | null
-  notes: string | null
-  dishes: CookedDishInput[]
-}
-
-export type CookedMealPage = {
-  meals: CookedMealSchemas['CookedMeal'][]
-  nextCursor: string | null
-}
 
 const COOKED_MEAL_SELECT = `
   SELECT
@@ -58,7 +37,9 @@ async function fetchCookedMeal(db: QueryFns, id: string): Promise<CookedMealSche
   return db.queryOne<CookedMealSchemas['CookedMeal']>(`${COOKED_MEAL_SELECT} WHERE cm.id = $1`, [id])
 }
 
-export async function upsertCookedMeal(input: CookedMealInput): Promise<CookedMealSchemas['CookedMeal']> {
+export async function upsertCookedMeal(
+  input: CookedMealSchemas['CookedMealInput']
+): Promise<CookedMealSchemas['CookedMeal']> {
   return DB.withTransaction(async (tx) => {
     const recipeIdsNeedingLabels = uniq(
       input.dishes.flatMap((dish) => (dish.label === undefined && dish.recipeId !== null ? [dish.recipeId] : []))
@@ -106,6 +87,8 @@ export async function getCookedMeal(id: string): Promise<CookedMealSchemas['Cook
   return fetchCookedMeal(DB, id)
 }
 
+export const getCookedMealStrict = strict(getCookedMeal, 'Cooked meal')
+
 export async function listCookedMealsWithinDateRange(
   cookedFrom: string,
   cookedTo: string
@@ -118,7 +101,10 @@ export async function listCookedMealsWithinDateRange(
   )
 }
 
-export async function listCookedMeals(options: { cursor?: string; limit: number }): Promise<CookedMealPage> {
+export async function listCookedMeals(options: {
+  cursor?: string
+  limit: number
+}): Promise<CookedMealSchemas['CookedMealPage']> {
   const [cursorCookedOn = null, cursorId = null] = options.cursor === undefined ? [] : decodeCursor(options.cursor, 2)
   const rows = await DB.query<CookedMealSchemas['CookedMeal']>(
     `${COOKED_MEAL_SELECT}
@@ -134,10 +120,11 @@ export async function listCookedMeals(options: { cursor?: string; limit: number 
   return { meals, nextCursor }
 }
 
-export async function deleteCookedMeal(id: string): Promise<boolean> {
-  const rows = await DB.query<{ id: string }>(`DELETE FROM cooked_meals WHERE id = $1 RETURNING id`, [id])
-  return rows.length > 0
+export async function deleteCookedMeal(id: string): Promise<{ id: string } | null> {
+  return DB.queryOne<{ id: string }>(`DELETE FROM cooked_meals WHERE id = $1 RETURNING id`, [id])
 }
+
+export const deleteCookedMealStrict = strict(deleteCookedMeal, 'Cooked meal')
 
 export type LastMade = {
   recipeId: string

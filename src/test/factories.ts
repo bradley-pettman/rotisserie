@@ -1,7 +1,10 @@
 import { randomUUID } from 'node:crypto'
-import type { CookedMealInput } from '~/providers/cooked-meals'
-import type { PlannedMealInput } from '~/providers/planned-meals'
-import type { UpsertRecipeInput } from '~/providers/recipes'
+import type { CookedMealSchemas, PlannedMealSchemas } from '@rotisserie/shared/meals'
+import type { RecipeSchemas } from '@rotisserie/shared/recipes'
+
+type UpsertRecipeInput = RecipeSchemas['UpsertRecipeInput']
+type PlannedMealInput = PlannedMealSchemas['PlannedMealInput']
+type CookedMealInput = CookedMealSchemas['CookedMealInput']
 
 export function recipeInput(overrides: Partial<UpsertRecipeInput> = {}): UpsertRecipeInput {
   return {

@@ -1,31 +1,9 @@
 import type { RecipeSchemas } from '@rotisserie/shared/recipes'
 import { uniq } from 'lodash-es'
 import { DB, type QueryFns } from '~/db/connection'
+import { strict } from './errors'
 import { decodeCursor, encodeCursor, escapeLike, isoTimestamp } from './sql'
 import { upsertUnits, upsertIngredients, upsertTags } from './vocabulary'
-
-export type UpsertRecipeInput = {
-  id: string
-  name: string
-  instructions: string
-  prepTimeMinutes: number | null
-  cookTimeMinutes: number | null
-  servings: number | null
-  sourceUrl: string | null
-  notes: string | null
-  ingredients: {
-    name: string
-    quantity: number | null
-    unit: string | null
-    notes: string | null
-  }[]
-  tags: string[]
-}
-
-export type RecipePage = {
-  recipes: RecipeSchemas['RecipeRaw'][]
-  nextCursor: string | null
-}
 
 const RECIPE_SELECT = `
   SELECT
@@ -86,7 +64,13 @@ export async function getRecipe(id: string): Promise<RecipeSchemas['Recipe'] | n
   return fetchRecipe(DB, id)
 }
 
-export async function listRecipes(options: { q?: string; limit: number; cursor?: string }): Promise<RecipePage> {
+export const getRecipeStrict = strict(getRecipe, 'Recipe')
+
+export async function listRecipes(options: {
+  q?: string
+  limit: number
+  cursor?: string
+}): Promise<RecipeSchemas['RecipePage']> {
   const [cursorCreatedAt = null, cursorId = null] = options.cursor === undefined ? [] : decodeCursor(options.cursor, 2)
   const rows = await DB.query<RecipeSchemas['RecipeRaw']>(
     `SELECT
@@ -114,7 +98,7 @@ export async function listRecipes(options: { q?: string; limit: number; cursor?:
   return { recipes, nextCursor }
 }
 
-export async function upsertRecipe(input: UpsertRecipeInput): Promise<RecipeSchemas['Recipe']> {
+export async function upsertRecipe(input: RecipeSchemas['UpsertRecipeInput']): Promise<RecipeSchemas['Recipe']> {
   return DB.withTransaction(async (tx) => {
     const ingredientIds = await upsertIngredients(
       tx,
@@ -177,7 +161,8 @@ export async function upsertRecipe(input: UpsertRecipeInput): Promise<RecipeSche
   })
 }
 
-export async function deleteRecipe(id: string): Promise<boolean> {
-  const rows = await DB.query<{ id: string }>(`DELETE FROM recipes WHERE id = $1 RETURNING id`, [id])
-  return rows.length > 0
+export async function deleteRecipe(id: string): Promise<{ id: string } | null> {
+  return DB.queryOne<{ id: string }>(`DELETE FROM recipes WHERE id = $1 RETURNING id`, [id])
 }
+
+export const deleteRecipeStrict = strict(deleteRecipe, 'Recipe')

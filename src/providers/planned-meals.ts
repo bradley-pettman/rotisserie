@@ -1,22 +1,7 @@
-import type { MealSlot, PlannedMealSchemas } from '@rotisserie/shared/meals'
+import type { PlannedMealSchemas } from '@rotisserie/shared/meals'
 import { DB, type QueryFns } from '~/db/connection'
+import { strict } from './errors'
 import { isoDate, isoTimestamp } from './sql'
-
-export type PlannedDishInput = {
-  id: string
-  recipeId: string | null
-  customText: string | null
-  notes: string | null
-}
-
-export type PlannedMealInput = {
-  id: string
-  plannedOn: string
-  mealSlot: MealSlot
-  headcount: number | null
-  notes: string | null
-  dishes: PlannedDishInput[]
-}
 
 const PLANNED_MEAL_SELECT = `
   SELECT
@@ -84,7 +69,11 @@ export async function getPlannedMeal(id: string): Promise<PlannedMealSchemas['Pl
   return fetchPlannedMeal(DB, id)
 }
 
-export async function upsertPlannedMeal(input: PlannedMealInput): Promise<PlannedMealSchemas['PlannedMeal']> {
+export const getPlannedMealStrict = strict(getPlannedMeal, 'Planned meal')
+
+export async function upsertPlannedMeal(
+  input: PlannedMealSchemas['PlannedMealInput']
+): Promise<PlannedMealSchemas['PlannedMeal']> {
   return DB.withTransaction(async (tx) => {
     await tx.query(
       `INSERT INTO planned_meals (id, planned_on, meal_slot, headcount, notes)
@@ -117,14 +106,15 @@ export async function upsertPlannedMeal(input: PlannedMealInput): Promise<Planne
   })
 }
 
-export async function deletePlannedMeal(id: string): Promise<boolean> {
-  const rows = await DB.query<{ id: string }>(`DELETE FROM planned_meals WHERE id = $1 RETURNING id`, [id])
-  return rows.length > 0
+export async function deletePlannedMeal(id: string): Promise<{ id: string } | null> {
+  return DB.queryOne<{ id: string }>(`DELETE FROM planned_meals WHERE id = $1 RETURNING id`, [id])
 }
+
+export const deletePlannedMealStrict = strict(deletePlannedMeal, 'Planned meal')
 
 export async function addPlannedDish(
   plannedMealId: string,
-  dish: PlannedDishInput
+  dish: PlannedMealSchemas['PlannedDishInput']
 ): Promise<PlannedMealSchemas['PlannedMeal'] | null> {
   return DB.withTransaction(async (tx) => {
     const meal = await tx.queryOne<{ id: string }>(`SELECT id FROM planned_meals WHERE id = $1 FOR UPDATE`, [plannedMealId])
@@ -143,6 +133,8 @@ export async function addPlannedDish(
   })
 }
 
+export const addPlannedDishStrict = strict(addPlannedDish, 'Planned meal')
+
 export async function removePlannedDish(dishId: string): Promise<PlannedMealSchemas['PlannedMeal'] | null> {
   return DB.withTransaction(async (tx) => {
     const removed = await tx.queryOne<{ plannedMealId: string }>(
@@ -156,3 +148,5 @@ export async function removePlannedDish(dishId: string): Promise<PlannedMealSche
     return fetchPlannedMealOrThrow(tx, removed.plannedMealId)
   })
 }
+
+export const removePlannedDishStrict = strict(removePlannedDish, 'Dish')

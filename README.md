@@ -12,9 +12,9 @@
 
 A family meal planner and recipe book, being rebuilt as a mobile app.
 
-Right now this repo is the foundation: the PostgreSQL schema, its migrations
-and seeds, and a database connection module. The API and the Expo app come
-next. See [docs/ROADMAP.md](docs/ROADMAP.md).
+Right now this repo is the backend: the PostgreSQL schema, its migrations and
+seeds, the domain layer and a JSON API built on Hono. The Expo app comes next.
+See [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Getting started
 
@@ -26,6 +26,7 @@ cp .env.example .env
 docker-compose up -d     # PostgreSQL on localhost:5432
 dbmate up                # Create the tables
 npm run db:seed          # Load common units and ingredients
+npm run dev              # API on http://localhost:3000
 ```
 
 ## Scripts
@@ -33,7 +34,9 @@ npm run db:seed          # Load common units and ingredients
 ```bash
 npm run typecheck        # TypeScript check
 npm test                 # Tests (Vitest); needs Postgres running, recreates rotisserie_test
-npm run test:watch       # Unit tests in watch mode
+npm run test:watch       # Tests in watch mode
+npm run dev              # API with reload on save
+npm start                # API without reload
 npm run db:seed          # (Re)load db/seeds/*.sql
 ```
 

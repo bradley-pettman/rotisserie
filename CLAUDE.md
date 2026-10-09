@@ -4,9 +4,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Status
 
-A fresh start toward a mobile app. The database is in place. The domain layer
-is being written by hand, and the API and Expo app come after it. The plan is
-in `docs/ROADMAP.md`.
+A fresh start toward a mobile app. The database, the domain layer and the HTTP
+API are in place; the Expo app is next. The plan is in `docs/ROADMAP.md`.
 
 ## Ownership — read before writing code
 
@@ -30,6 +29,7 @@ dbmate up                # Run migrations
 dbmate rollback          # Undo the latest migration
 npm run db:seed          # Load units + ingredients (idempotent)
 
+npm run dev              # API on http://localhost:3000 (PORT to change), restarts on save
 npm run typecheck        # tsc
 npm test                 # Vitest; needs Postgres running, recreates rotisserie_test each run
 npx tsx <file.ts>        # Run a TypeScript file directly
@@ -42,11 +42,26 @@ db/migrations/      SQL migrations (dbmate)
 db/seeds/           Units and ingredient vocabulary
 db/seed.mjs         Applies the seeds
 src/db/connection.ts  pg pool, DB.query / queryOne / withTransaction, checkDatabase
+src/providers/      SQL query functions, one file per area (sql.ts: generic SQL helpers; errors.ts: NotFoundError and strict)
+src/use-cases/      One file per use case, built with defineUseCase
+src/api/            Hono app, error envelope, routes/ (one file per resource)
+src/server.ts       Starts the API
+src/test/           Vitest global setup, per-test reset, factories, API request helper
+packages/shared/    Zod schemas, types and pure domain helpers, one folder per area
 docs/ROADMAP.md     Phases from here to an app on a phone
 docs/SPEC.md        Product spec (features, not implementation)
 ```
 
-Path alias: `~/` maps to `src/`.
+Path aliases: `~/` maps to `src/`, `@rotisserie/shared/*` to `packages/shared/src/*`.
+
+## Layers
+
+`route → use case → provider`. Routes handle HTTP only: validate the request
+against the use case's `.input` schema, call one use case, and choose the
+status. Use cases (`defineUseCase`, a `z.function` validating input and output)
+hold application decisions such as not-found, ownership and future
+permissions or changelog writes. Providers do one data operation each. Routes
+never import providers.
 
 ## Data model
 

@@ -117,11 +117,11 @@ describe('listRecipes', () => {
 })
 
 describe('deleteRecipe', () => {
-  it('reports whether a recipe was deleted', async () => {
+  it('returns the deleted id, then null on a repeat', async () => {
     const recipe = await upsertRecipe(recipeInput())
 
-    expect(await deleteRecipe(recipe.id)).toBe(true)
-    expect(await deleteRecipe(recipe.id)).toBe(false)
+    expect(await deleteRecipe(recipe.id)).toEqual({ id: recipe.id })
+    expect(await deleteRecipe(recipe.id)).toBeNull()
     expect(await getRecipe(recipe.id)).toBeNull()
   })
 
