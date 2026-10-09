@@ -106,7 +106,7 @@ All three under apps/api/src/.
       else, including a use case breaking its own output contract
 - [x] `GET /health`: 200, or 503 when the database is unreachable
 - [x] Endpoints. Writes are `PUT` with the client-generated id in the path:
-  - `GET /recipes?q=&limit=&cursor=`, `GET/PUT/DELETE /recipes/:id`
+  - `GET /recipes?q=&tag=&sort=&limit=&cursor=` (`q` matches names and ingredients; `sort` is `recentlyMade`, `longestAgo`, `name` or `rating`), `GET/PUT/DELETE /recipes/:id`
   - `GET /ingredients?q=` (autocomplete), `GET /units`, `GET /tags`
   - `GET /meals?from=&to=` (planned and cooked meals for a range, side by side)
   - `GET /planned-meals/unscheduled` (the Planned pool), `GET/PUT/DELETE /planned-meals/:id`, `POST /planned-meals/:id/dishes`,
@@ -152,7 +152,9 @@ server-only dependencies.
 - Screens:
   1. **Meals (home):** a week strip over a scroll of days that opens on today,
      plus the **Planned** tray: meals planned without a day. Today with nothing
-     scheduled offers the Planned meals to pick from
+     scheduled offers the Planned meals to pick from. Meals have no name: a
+     one-line row shows the first dish (by `sort_order`) as the headline and
+     the rest after it, truncated ("**Chili** · cornbread, bag salad mix")
   2. **Planned meal:** its dishes and headcount, with "Made it" and "Made something else"
   3. **Recipes:** searchable list
   4. **Recipe:** ingredients scaled to a headcount, the instructions, the

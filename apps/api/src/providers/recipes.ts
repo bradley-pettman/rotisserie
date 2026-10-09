@@ -1,8 +1,9 @@
+import { canonicalizeName } from '@rotisserie/shared/base'
 import type { RecipeSchemas } from '@rotisserie/shared/recipes'
-import { uniq } from 'lodash-es'
+import { omit, uniq } from 'lodash-es'
 import { DB, type QueryFns } from '~/db/connection'
 import { strict } from './errors'
-import { decodeCursor, encodeCursor, escapeLike, isoTimestamp } from './sql'
+import { decodeCursor, encodeCursor, escapeLike, InvalidCursorError, isoDate, isoTimestamp } from './sql'
 import { upsertUnits, upsertIngredients, upsertTags } from './vocabulary'
 
 const RECIPE_SELECT = `
@@ -66,13 +67,45 @@ export async function getRecipe(id: string): Promise<RecipeSchemas['Recipe'] | n
 
 export const getRecipeStrict = strict(getRecipe, 'Recipe')
 
+const RECIPE_SORTS: Record<
+  RecipeSchemas['RecipeSort'],
+  { key: string; keyText: string; type: string; direction: 'ASC' | 'DESC' }
+> = {
+  recentlyMade: {
+    key: `COALESCE(s.last_made_on, DATE '1970-01-01')`,
+    keyText: isoDate(`COALESCE(s.last_made_on, DATE '1970-01-01')`),
+    type: 'date',
+    direction: 'DESC'
+  },
+  longestAgo: {
+    key: `COALESCE(s.last_made_on, DATE '9999-12-31')`,
+    keyText: isoDate(`COALESCE(s.last_made_on, DATE '9999-12-31')`),
+    type: 'date',
+    direction: 'ASC'
+  },
+  name: { key: 'lower(r.name)', keyText: 'lower(r.name)', type: 'text', direction: 'ASC' },
+  rating: {
+    key: 'COALESCE(s.average_rating, 0)',
+    keyText: 'COALESCE(s.average_rating, 0)::text',
+    type: 'numeric',
+    direction: 'DESC'
+  }
+}
+
 export async function listRecipes(options: {
   q?: string
+  tag?: string
+  sort: RecipeSchemas['RecipeSort']
   limit: number
   cursor?: string
-}): Promise<RecipeSchemas['RecipePage']> {
-  const [cursorCreatedAt = null, cursorId = null] = options.cursor === undefined ? [] : decodeCursor(options.cursor, 2)
-  const rows = await DB.query<RecipeSchemas['RecipeRaw']>(
+}): Promise<RecipeSchemas['RecipeWithStatsPage']> {
+  const sort = RECIPE_SORTS[options.sort]
+  const [cursorSort = null, cursorKey = null, cursorId = null] =
+    options.cursor === undefined ? [] : decodeCursor(options.cursor, 3)
+  if (cursorSort !== null && cursorSort !== options.sort) throw new InvalidCursorError()
+  const tag = canonicalizeName(options.tag ?? '')
+
+  const rows = await DB.query<RecipeSchemas['RecipeWithStatsPage']['recipes'][number] & { sortKey: string }>(
     `SELECT
        r.id,
        r.name,
@@ -83,19 +116,47 @@ export async function listRecipes(options: {
        r.source_url AS "sourceUrl",
        r.notes,
        ${isoTimestamp('r.created_at')} AS "createdAt",
-       ${isoTimestamp('r.updated_at')} AS "updatedAt"
+       ${isoTimestamp('r.updated_at')} AS "updatedAt",
+       json_build_object(
+         'averageRating', ROUND(s.average_rating, 1),
+         'ratingCount', s.rating_count,
+         'timesMade', s.times_made,
+         'lastMadeOn', ${isoDate('s.last_made_on')}
+       ) AS stats,
+       ${sort.keyText} AS "sortKey"
      FROM recipes r
-     WHERE r.name ILIKE '%' || $1 || '%'
-       AND ($2::timestamptz IS NULL OR (r.created_at, r.id) < ($2::timestamptz, $3::uuid))
-     ORDER BY r.created_at DESC, r.id DESC
-     LIMIT $4`,
-    [escapeLike(options.q?.trim() ?? ''), cursorCreatedAt, cursorId, options.limit + 1]
+     JOIN recipe_stats s ON s.recipe_id = r.id
+     WHERE (
+         r.name ILIKE '%' || $1 || '%'
+         OR EXISTS (
+           SELECT 1
+           FROM recipe_ingredients ri
+           JOIN ingredients i ON i.id = ri.ingredient_id
+           WHERE ri.recipe_id = r.id AND i.name ILIKE '%' || $1 || '%'
+         )
+       )
+       AND (
+         $2::text = ''
+         OR EXISTS (
+           SELECT 1
+           FROM recipe_tags rt
+           JOIN tags t ON t.id = rt.tag_id
+           WHERE rt.recipe_id = r.id AND t.name = $2
+         )
+       )
+       AND (
+         $3::text IS NULL
+         OR (${sort.key}, r.id) ${sort.direction === 'ASC' ? '>' : '<'} ($3::${sort.type}, $4::uuid)
+       )
+     ORDER BY ${sort.key} ${sort.direction}, r.id ${sort.direction}
+     LIMIT $5`,
+    [escapeLike(options.q?.trim() ?? ''), tag, cursorKey, cursorId, options.limit + 1]
   )
 
-  const recipes = rows.slice(0, options.limit)
-  const last = recipes.at(-1)
-  const nextCursor = rows.length > options.limit && last ? encodeCursor([last.createdAt, last.id]) : null
-  return { recipes, nextCursor }
+  const page = rows.slice(0, options.limit)
+  const last = page.at(-1)
+  const nextCursor = rows.length > options.limit && last ? encodeCursor([options.sort, last.sortKey, last.id]) : null
+  return { recipes: page.map((row) => omit(row, 'sortKey')), nextCursor }
 }
 
 export async function upsertRecipe(input: RecipeSchemas['UpsertRecipeInput']): Promise<RecipeSchemas['Recipe']> {

@@ -178,19 +178,13 @@ export async function listRecipeStats(recipeIds: string[]): Promise<RecipeStatsR
 
   return DB.query<RecipeStatsRow>(
     `SELECT
-       ids.id AS "recipeId",
-       ROUND(AVG(made.star_rating), 1) AS "averageRating",
-       COUNT(made.star_rating)::int AS "ratingCount",
-       COUNT(made.id)::int AS "timesMade",
-       ${isoDate('MAX(made.cooked_on)')} AS "lastMadeOn"
-     FROM unnest($1::uuid[]) AS ids(id)
-     LEFT JOIN (
-       SELECT DISTINCT d.recipe_id, cm.id, cm.star_rating, cm.cooked_on
-       FROM cooked_meal_dishes d
-       JOIN cooked_meals cm ON cm.id = d.cooked_meal_id
-       WHERE d.recipe_id = ANY($1::uuid[]) AND NOT d.is_leftovers
-     ) made ON made.recipe_id = ids.id
-     GROUP BY ids.id`,
+       s.recipe_id AS "recipeId",
+       ROUND(s.average_rating, 1) AS "averageRating",
+       s.rating_count AS "ratingCount",
+       s.times_made AS "timesMade",
+       ${isoDate('s.last_made_on')} AS "lastMadeOn"
+     FROM recipe_stats s
+     WHERE s.recipe_id = ANY($1::uuid[])`,
     [uniq(recipeIds)]
   )
 }

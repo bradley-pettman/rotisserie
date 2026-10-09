@@ -27,7 +27,7 @@ describe('GET /recipes', () => {
     expect(second.body).toMatchObject({ recipes: [{}], nextCursor: null })
   })
 
-  it('includes stats on each recipe', async () => {
+  it('includes stats on each recipe, most recently made first by default', async () => {
     const made = await putRecipe({ name: 'Turkey Meatloaf' })
     await putRecipe({ name: 'Lasagne' })
     await putCookedMeal(made.body.id, '2026-10-05', 5)
@@ -36,8 +36,8 @@ describe('GET /recipes', () => {
     const page = RecipeSchemas.RecipeWithStatsPage.parse(response.body)
 
     expect(page.recipes.map(({ name, stats }) => ({ name, stats }))).toEqual([
-      { name: 'Lasagne', stats: { averageRating: null, ratingCount: 0, timesMade: 0, lastMadeOn: null } },
-      { name: 'Turkey Meatloaf', stats: { averageRating: 5, ratingCount: 1, timesMade: 1, lastMadeOn: '2026-10-05' } }
+      { name: 'Turkey Meatloaf', stats: { averageRating: 5, ratingCount: 1, timesMade: 1, lastMadeOn: '2026-10-05' } },
+      { name: 'Lasagne', stats: { averageRating: null, ratingCount: 0, timesMade: 0, lastMadeOn: null } }
     ])
   })
 
@@ -48,6 +48,41 @@ describe('GET /recipes', () => {
     const response = await send('GET', '/recipes?q=meat')
 
     expect(response.body.recipes.map((recipe: { name: string }) => recipe.name)).toEqual(['Turkey Meatloaf'])
+  })
+
+  it('searches, filters by tag and sorts by name together', async () => {
+    await putRecipe({ name: 'Turkey Tacos', tags: ['weeknight'] })
+    await putRecipe({
+      name: 'Sloppy Joes',
+      ingredients: [{ name: 'ground turkey', quantity: 1, unit: 'lb', notes: null }],
+      tags: ['Weeknight']
+    })
+    await putRecipe({ name: 'Roast Turkey', tags: ['holiday'] })
+    await putRecipe({ name: 'Pancakes', ingredients: [], tags: ['weeknight'] })
+
+    const response = await send('GET', '/recipes?sort=name&tag=Weeknight&q=turkey')
+
+    expect(response.status).toBe(200)
+    expect(RecipeSchemas.RecipeWithStatsPage.parse(response.body).recipes.map((recipe) => recipe.name)).toEqual([
+      'Sloppy Joes',
+      'Turkey Tacos'
+    ])
+  })
+
+  it('returns 400 for an unknown sort', async () => {
+    expect(await send('GET', '/recipes?sort=newest')).toMatchObject({
+      status: 400,
+      body: { error: { code: 'validation', fields: { sort: [expect.any(String)] } } }
+    })
+  })
+
+  it('returns 400 for a cursor from another sort', async () => {
+    await putRecipe({ name: 'First' })
+    await putRecipe({ name: 'Second' })
+
+    const first = await send('GET', '/recipes?sort=name&limit=1')
+
+    expect((await send('GET', `/recipes?sort=rating&limit=1&cursor=${first.body.nextCursor}`)).status).toBe(400)
   })
 
   it('returns 400 for a malformed cursor or limit', async () => {
