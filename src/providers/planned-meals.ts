@@ -1,6 +1,7 @@
 import type { MealSlot, PlannedMealSchemas } from '@rotisserie/shared/meals'
 
 export type PlannedDishInput = {
+  id: string
   recipeId: string | null
   customText: string | null
   notes: string | null
@@ -14,7 +15,10 @@ export type PlannedMealInput = {
   dishes: PlannedDishInput[]
 }
 
-export async function getPlannedMeals(from: string, to: string): Promise<PlannedMealSchemas['PlannedMeal'][]> {
+export async function listPlannedMealsWithinDateRange(
+  plannedFrom: string,
+  plannedTo: string
+): Promise<PlannedMealSchemas['PlannedMeal'][]> {
   throw new Error('Not implemented: getPlannedMeals')
 }
 
@@ -22,15 +26,8 @@ export async function getPlannedMeal(id: string): Promise<PlannedMealSchemas['Pl
   throw new Error('Not implemented: getPlannedMeal')
 }
 
-export async function planMeal(input: PlannedMealInput): Promise<PlannedMealSchemas['PlannedMeal']> {
-  throw new Error('Not implemented: planMeal')
-}
-
-export async function updatePlannedMeal(
-  id: string,
-  patch: Partial<Omit<PlannedMealInput, 'dishes'>>
-): Promise<PlannedMealSchemas['PlannedMeal'] | null> {
-  throw new Error('Not implemented: updatePlannedMeal')
+export async function upsertPlannedMeal(input: PlannedMealInput): Promise<PlannedMealSchemas['PlannedMeal']> {
+  throw new Error('Not implemented: upsertPlannedMeal')
 }
 
 export async function deletePlannedMeal(id: string): Promise<boolean> {

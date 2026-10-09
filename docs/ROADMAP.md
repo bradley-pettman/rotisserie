@@ -54,14 +54,17 @@ eat meatloaf) from TypeScript, with no HTTP involved.
    - Shared building blocks: `MealSlot`, a `YYYY-MM-DD` calendar-date string, UUIDs
    - Derive types with `z.infer`, and keep input and output schemas separate
 2. **Query functions**, raw SQL through `DB.query` / `queryOne` / `withTransaction`:
-   - `createRecipe` / `updateRecipe`, in one transaction each: upsert the
-     ingredient, unit and tag names (lowercase and trim first), then write the
-     lines. Replace the ingredient lines wholesale on update.
-   - `getRecipe(id)` with lines and tags; `searchRecipes(q, limit, cursor)`
-   - `planMeal`, `moveMeal`, `addDish`, `removeDish`; `getWeek(from, to)`,
-     which resolves recipe names in one batched query, not one per dish
-   - `logCookedMeal`: copy each recipe's current name into `label` inside the
-     same transaction; optionally link `planned_meal_id`
+   - Writes are upserts by a client-generated id (`INSERT ... ON CONFLICT (id)
+     DO UPDATE`), so a retried save never duplicates. Child rows (ingredient
+     lines, tags, dishes) are replaced wholesale in the same transaction.
+   - `upsertRecipe(id, input)`: upsert the ingredient, unit and tag names
+     (lowercase and trim first), then the recipe, then its lines and tags.
+   - `getRecipe(id)` with lines and tags; `listRecipes({ q, limit, cursor })`
+   - `upsertPlannedMeal(id, input)`, `addPlannedDish`, `removePlannedDish`;
+     `listPlannedMealsWithinDateRange(from, to)`, which resolves recipe names in one batched
+     query, not one per dish
+   - `upsertCookedMeal(id, input)`: copy each recipe's current name into
+     `label` inside the same transaction; optionally link `planned_meal_id`
    - `lastMade(recipeIds[])`: `MAX(cooked_on)` excluding leftovers, batched
      with `= ANY($1::uuid[])`
 3. **Tests.** Unit tests for pure helpers (canonicalizing names, scaling).

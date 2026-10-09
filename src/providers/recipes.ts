@@ -1,6 +1,7 @@
 import type { RecipeSchemas } from '@rotisserie/shared/recipes'
 
-export type RecipeInput = {
+export type UpsertRecipeInput = {
+  id: string
   name: string
   instructions: string
   prepTimeMinutes: number | null
@@ -26,16 +27,12 @@ export async function getRecipe(id: string): Promise<RecipeSchemas['Recipe'] | n
   throw new Error('Not implemented: getRecipe')
 }
 
-export async function searchRecipes(options: { q?: string; limit: number; cursor?: string }): Promise<RecipePage> {
-  throw new Error('Not implemented: searchRecipes')
+export async function listRecipes(options: { q?: string; limit: number; cursor?: string }): Promise<RecipePage> {
+  throw new Error('Not implemented: listRecipes')
 }
 
-export async function createRecipe(input: RecipeInput): Promise<RecipeSchemas['Recipe']> {
-  throw new Error('Not implemented: createRecipe')
-}
-
-export async function updateRecipe(id: string, input: RecipeInput): Promise<RecipeSchemas['Recipe'] | null> {
-  throw new Error('Not implemented: updateRecipe')
+export async function upsertRecipe(input: UpsertRecipeInput): Promise<RecipeSchemas['Recipe']> {
+  throw new Error('Not implemented: upsertRecipe')
 }
 
 export async function deleteRecipe(id: string): Promise<boolean> {

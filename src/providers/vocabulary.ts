@@ -1,8 +1,8 @@
 import type { IngredientSchemas, TagSchemas, UnitSchemas } from '@rotisserie/shared/base'
 import type { QueryFns } from '~/db/connection'
 
-export async function searchIngredients(q: string, limit: number): Promise<IngredientSchemas['Ingredient'][]> {
-  throw new Error('Not implemented: searchIngredients')
+export async function listIngredients(options: { q?: string; limit: number }): Promise<IngredientSchemas['Ingredient'][]> {
+  throw new Error('Not implemented: listIngredients')
 }
 
 export async function listUnits(): Promise<UnitSchemas['Unit'][]> {

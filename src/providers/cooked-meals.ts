@@ -8,6 +8,7 @@ export type CookedDishInput = {
 }
 
 export type CookedMealInput = {
+  id: string
   plannedMealId: string | null
   cookedOn: string
   mealSlot: MealSlot
@@ -18,30 +19,26 @@ export type CookedMealInput = {
 
 export type CookedMealPage = {
   meals: CookedMealSchemas['CookedMeal'][]
-  nextBefore: string | null
+  nextCursor: string | null
 }
 
-export async function logCookedMeal(input: CookedMealInput): Promise<CookedMealSchemas['CookedMeal']> {
-  throw new Error('Not implemented: logCookedMeal')
+export async function upsertCookedMeal(input: CookedMealInput): Promise<CookedMealSchemas['CookedMeal']> {
+  throw new Error('Not implemented: upsertCookedMeal')
 }
 
 export async function getCookedMeal(id: string): Promise<CookedMealSchemas['CookedMeal'] | null> {
   throw new Error('Not implemented: getCookedMeal')
 }
 
-export async function getCookedMeals(from: string, to: string): Promise<CookedMealSchemas['CookedMeal'][]> {
-  throw new Error('Not implemented: getCookedMeals')
+export async function listCookedMealsWithinDateRange(
+  cookedFrom: string,
+  cookedTo: string
+): Promise<CookedMealSchemas['CookedMeal'][]> {
+  throw new Error('Not implemented: listCookedMealsWithinDateRange')
 }
 
-export async function listCookedMeals(options: { before?: string; limit: number }): Promise<CookedMealPage> {
+export async function listCookedMeals(options: { cursor?: string; limit: number }): Promise<CookedMealPage> {
   throw new Error('Not implemented: listCookedMeals')
-}
-
-export async function updateCookedMeal(
-  id: string,
-  patch: Partial<CookedMealInput>
-): Promise<CookedMealSchemas['CookedMeal'] | null> {
-  throw new Error('Not implemented: updateCookedMeal')
 }
 
 export async function deleteCookedMeal(id: string): Promise<boolean> {
