@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { Pressable, ScrollView, View } from 'react-native'
 import { useDeletePlannedMeal, useMealsInRange, usePlannedMeal, useUpsertPlannedMeal } from '~/api/queries'
 import { BottomBar } from '~/components/BottomBar'
+import { useDismiss } from '~/components/ModalHeader'
 import { ListLink, Stepper } from '~/components/controls'
 import { DayPicker } from '~/components/DayPicker'
 import { HeaderButton, ScreenHeader } from '~/components/ScreenHeader'
@@ -27,6 +28,7 @@ function whenLabel(plannedOn: string | null): string {
 export default function PlannedMealScreen() {
   const colors = useColors()
   const router = useRouter()
+  const dismiss = useDismiss()
   const toast = useToast()
   const { id } = useLocalSearchParams<{ id: string }>()
   const meal = usePlannedMeal(id)
@@ -178,7 +180,7 @@ export default function PlannedMealScreen() {
               remove.mutate(data.id, {
                 onSuccess: () => {
                   toast({ message: 'Meal deleted' })
-                  router.back()
+                  dismiss()
                 },
                 onError: (error) => toast({ message: error.message })
               })
@@ -188,7 +190,7 @@ export default function PlannedMealScreen() {
       </ScrollView>
 
       <BottomBar>
-        <Button label="Made it" busy={madeIt.isPending} onPress={() => madeIt.run(data, now, () => router.back())} />
+        <Button label="Made it" busy={madeIt.isPending} onPress={() => madeIt.run(data, now, () => dismiss())} />
         <Button
           label="Made something else"
           kind="secondary"
