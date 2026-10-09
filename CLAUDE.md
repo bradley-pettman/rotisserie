@@ -5,7 +5,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Status
 
 A fresh start toward a mobile app. The database, the domain layer and the HTTP
-API are in place; the Expo app is next. The plan is in `docs/ROADMAP.md`.
+API are in place; the Expo app (Phase 4) is in progress in `apps/mobile`. The
+plan is in `docs/ROADMAP.md`.
 
 ## Ownership — read before writing code
 
@@ -34,7 +35,13 @@ npm test                 # Vitest in every workspace; the API's needs Postgres a
 npm test -w @rotisserie/api      # One workspace (also @rotisserie/shared)
 npm install <pkg> -w @rotisserie/api   # Add a dependency to one workspace
 npx tsx <file.ts>        # Run a TypeScript file directly
+
+npm start -w @rotisserie/mobile          # Expo dev server; open it in Expo Go on the phone
+npx expo install <pkg>                   # From apps/mobile: adds an SDK-compatible version
 ```
+
+The app reads `EXPO_PUBLIC_API_URL` from `apps/mobile/.env.local` (copy
+`apps/mobile/.env.example`). On a phone, use the laptop's LAN IP, not localhost.
 
 ## Structure
 
@@ -53,6 +60,12 @@ apps/api/             @rotisserie/api
   src/api/            Hono app, error envelope, routes/ (one file per resource)
   src/server.ts       Starts the API
   src/test/           Vitest global setup, per-test reset, factories, API request helper
+apps/mobile/          @rotisserie/mobile: Expo SDK 57, Expo Router
+  src/app/            Routes: (tabs) for Meals and Recipes; create, plan, log, recipe-editor are modals
+  src/api/            fetch client (parses responses with the shared schemas) and TanStack Query hooks
+  src/components/     UI building blocks; colors come from useColors()
+  src/lib/            Pure helpers (dates, meals, quantities, recipes); quantities has Vitest tests
+  src/theme/          Golden hour tokens: light and dark palettes, Figtree type scale
 packages/shared/      @rotisserie/shared: Zod schemas, types and pure domain helpers, one folder per area
 docs/ROADMAP.md       Phases from here to an app on a phone
 docs/SPEC.md          Product spec (features, not implementation)
