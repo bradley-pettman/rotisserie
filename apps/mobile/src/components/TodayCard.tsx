@@ -1,6 +1,9 @@
 import { useRouter } from 'expo-router'
 import { Pressable, View } from 'react-native'
-import { useDeleteCookedMeal, useUpsertCookedMeal, type PlannedMeal } from '~/api/queries'
+import { CookedMealSchemas } from '@rotisserie/shared/meals'
+import { useMutation } from '@tanstack/react-query'
+import { api } from '~/api/client'
+import { useDeleteCookedMeal, useInvalidateMeals, type CookedMealInput, type PlannedMeal } from '~/api/queries'
 import { cookedFromPlan, slotLabel } from '~/lib/meals'
 import { radius, useColors } from '~/theme'
 import { Icon } from './Icon'
@@ -91,23 +94,26 @@ export function TodayCard({ meal, now }: { meal: PlannedMeal; now: string }) {
 export function useMadeIt() {
   const router = useRouter()
   const toast = useToast()
-  const upsert = useUpsertCookedMeal()
+  const invalidate = useInvalidateMeals()
   const remove = useDeleteCookedMeal()
+  const upsert = useMutation({
+    mutationFn: ({ id, ...body }: CookedMealInput) => api.put(CookedMealSchemas.CookedMeal, `/cooked-meals/${id}`, body),
+    onSuccess: (cooked) => {
+      toast({
+        message: `${slotLabel(cooked.mealSlot)} logged`,
+        actions: [
+          { label: 'Undo', onPress: () => remove.mutate(cooked.id) },
+          { label: 'Edit', onPress: () => router.push({ pathname: '/log', params: { cookedMealId: cooked.id } }) }
+        ]
+      })
+      return invalidate()
+    },
+    onError: (error) => toast({ message: error.message })
+  })
   return {
     isPending: upsert.isPending,
-    run(meal: PlannedMeal, cookedOn: string) {
-      const input = cookedFromPlan(meal, cookedOn)
-      upsert.mutate(input, {
-        onSuccess: (cooked) =>
-          toast({
-            message: `${slotLabel(cooked.mealSlot)} logged`,
-            actions: [
-              { label: 'Undo', onPress: () => remove.mutate(cooked.id) },
-              { label: 'Edit', onPress: () => router.push({ pathname: '/log', params: { cookedMealId: cooked.id } }) }
-            ]
-          }),
-        onError: (error) => toast({ message: error.message })
-      })
+    run(meal: PlannedMeal, cookedOn: string, onDone?: () => void) {
+      upsert.mutate(cookedFromPlan(meal, cookedOn), { onSuccess: onDone })
     }
   }
 }

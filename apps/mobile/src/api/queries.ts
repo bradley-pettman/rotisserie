@@ -83,7 +83,7 @@ export function useTags() {
   })
 }
 
-function useInvalidateMeals() {
+export function useInvalidateMeals() {
   const queryClient = useQueryClient()
   return () =>
     Promise.all([
