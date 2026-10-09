@@ -1,0 +1,41 @@
+{
+  "expo": {
+    "name": "Rotisserie",
+    "slug": "rotisserie",
+    "scheme": "rotisserie",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.bradleypettman.rotisserie"
+    },
+    "android": {
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "bundler": "metro",
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-status-bar",
+      "expo-font",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 200,
+          "backgroundColor": "#FBF8F2",
+          "dark": {
+            "backgroundColor": "#1A1612"
+          }
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
