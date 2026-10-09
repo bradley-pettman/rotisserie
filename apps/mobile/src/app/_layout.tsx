@@ -63,6 +63,7 @@ function AppStack() {
           />
           <Stack.Screen name="plan" options={{ presentation: 'modal' }} />
           <Stack.Screen name="log" options={{ presentation: 'modal' }} />
+          <Stack.Screen name="recipe-editor" options={{ presentation: 'modal' }} />
         </Stack>
       </ToastProvider>
     </ThemeProvider>

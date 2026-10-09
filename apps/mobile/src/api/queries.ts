@@ -1,5 +1,5 @@
 import { CookedMealSchemas, PlannedMealSchemas } from '@rotisserie/shared/meals'
-import { TagSchemas } from '@rotisserie/shared/base'
+import { IngredientSchemas, TagSchemas, UnitSchemas } from '@rotisserie/shared/base'
 import { RecipeSchemas } from '@rotisserie/shared/recipes'
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import z from 'zod'
@@ -26,7 +26,9 @@ export const keys = {
   recipes: ['recipes'] as const,
   recipeList: (q: string) => ['recipes', 'list', q] as const,
   recipe: (id: string) => ['recipes', id] as const,
-  tags: ['tags'] as const
+  tags: ['tags'] as const,
+  units: ['units'] as const,
+  ingredients: (q: string) => ['ingredients', q] as const
 }
 
 export function useMealsInRange(from: string, to: string) {
@@ -73,6 +75,36 @@ export function useRecipeSearch(q: string) {
     queryKey: keys.recipeList(q),
     queryFn: () => api.get(RecipeSchemas.RecipeWithStatsPage, '/recipes', { q: q || undefined, limit: 100 }),
     placeholderData: keepPreviousData
+  })
+}
+
+export function useUnits() {
+  return useQuery({
+    queryKey: keys.units,
+    queryFn: () => api.get(UnitSchemas.Unit.array(), '/units'),
+    staleTime: Infinity
+  })
+}
+
+export function useIngredientSearch(q: string) {
+  return useQuery({
+    queryKey: keys.ingredients(q),
+    queryFn: () => api.get(IngredientSchemas.Ingredient.array(), '/ingredients', { q, limit: 6 }),
+    enabled: q.length >= 2,
+    placeholderData: keepPreviousData
+  })
+}
+
+export function useDeleteRecipe() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => api.delete(`/recipes/${id}`),
+    onSuccess: () =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: keys.recipes }),
+        queryClient.invalidateQueries({ queryKey: keys.meals }),
+        queryClient.invalidateQueries({ queryKey: ['planned'] })
+      ])
   })
 }
 

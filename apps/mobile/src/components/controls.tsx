@@ -1,4 +1,12 @@
-import { Pressable, TextInput, View, type StyleProp, type TextInputProps, type ViewStyle } from 'react-native'
+import {
+  Pressable,
+  TextInput,
+  View,
+  type StyleProp,
+  type TextInputProps,
+  type TextStyle,
+  type ViewStyle
+} from 'react-native'
 import { radius, type as typeScale, useColors } from '~/theme'
 import { Icon } from './Icon'
 import { Text } from './ui'
@@ -117,7 +125,12 @@ export function Stars({ value, onChange }: { value: number | null; onChange: (va
   )
 }
 
-export function Field({ label, style, ...props }: TextInputProps & { label?: string; style?: StyleProp<ViewStyle> }) {
+export function Field({
+  label,
+  style,
+  inputStyle,
+  ...props
+}: TextInputProps & { label?: string; style?: StyleProp<ViewStyle>; inputStyle?: StyleProp<TextStyle> }) {
   const colors = useColors()
   return (
     <View style={[{ gap: 6 }, style]}>
@@ -142,7 +155,8 @@ export function Field({ label, style, ...props }: TextInputProps & { label?: str
             borderColor: colors.line,
             color: colors.ink,
             textAlignVertical: props.multiline ? 'top' : 'center'
-          }
+          },
+          inputStyle
         ]}
       />
     </View>
