@@ -107,7 +107,10 @@ describe('listPlannedMealsWithinDateRange', () => {
 describe('listUnscheduledPlannedMeals', () => {
   it('returns meals with no date that have not been cooked, oldest first', async () => {
     const spaghetti = await upsertPlannedMeal(
-      plannedMealInput({ plannedOn: null, dishes: [{ id: randomUUID(), recipeId: null, customText: 'spaghetti', notes: null }] })
+      plannedMealInput({
+        plannedOn: null,
+        dishes: [{ id: randomUUID(), recipeId: null, customText: 'spaghetti', notes: null }]
+      })
     )
     const tacos = await upsertPlannedMeal(
       plannedMealInput({ plannedOn: null, dishes: [{ id: randomUUID(), recipeId: null, customText: 'tacos', notes: null }] })
