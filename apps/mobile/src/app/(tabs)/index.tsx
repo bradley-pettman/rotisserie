@@ -68,10 +68,25 @@ export default function MealsScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
       <View style={{ paddingTop: insets.top + 14, borderBottomWidth: 1, borderBottomColor: colors.line }}>
-        <View style={{ paddingHorizontal: 20, paddingBottom: 10 }}>
-          <Text variant="title" accessibilityRole="header">
+        <View style={{ flexDirection: 'row', alignItems: 'center', paddingLeft: 20, paddingRight: 10, paddingBottom: 10 }}>
+          <Text variant="title" accessibilityRole="header" style={{ flex: 1 }}>
             Meals
           </Text>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Household"
+            onPress={() => router.push('/household')}
+            style={({ pressed }) => ({
+              width: 44,
+              height: 44,
+              borderRadius: 22,
+              alignItems: 'center',
+              justifyContent: 'center',
+              opacity: pressed ? 0.6 : 1
+            })}
+          >
+            <Icon name="home" size={24} color={colors.ink} strokeWidth={2} />
+          </Pressable>
         </View>
 
         <View style={{ flexDirection: 'row', gap: 4, paddingHorizontal: 14, paddingBottom: 12 }}>

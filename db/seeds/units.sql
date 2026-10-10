@@ -2,7 +2,8 @@
 -- Use INSERT ... ON CONFLICT DO NOTHING for idempotency
 
 -- Volume
-INSERT INTO units (name, abbreviation, category) VALUES
+INSERT INTO units (name, abbreviation, category, is_standard)
+SELECT name, abbreviation, category, TRUE FROM (VALUES
   ('cup', 'cup', 'volume'),
   ('tablespoon', 'tbsp', 'volume'),
   ('teaspoon', 'tsp', 'volume'),
@@ -12,18 +13,22 @@ INSERT INTO units (name, abbreviation, category) VALUES
   ('pint', 'pt', 'volume'),
   ('quart', 'qt', 'volume'),
   ('gallon', 'gal', 'volume')
-ON CONFLICT (name) DO NOTHING;
+) AS seed(name, abbreviation, category)
+ON CONFLICT (name) DO UPDATE SET is_standard = TRUE;
 
 -- Weight
-INSERT INTO units (name, abbreviation, category) VALUES
+INSERT INTO units (name, abbreviation, category, is_standard)
+SELECT name, abbreviation, category, TRUE FROM (VALUES
   ('ounce', 'oz', 'weight'),
   ('pound', 'lb', 'weight'),
   ('gram', 'g', 'weight'),
   ('kilogram', 'kg', 'weight')
-ON CONFLICT (name) DO NOTHING;
+) AS seed(name, abbreviation, category)
+ON CONFLICT (name) DO UPDATE SET is_standard = TRUE;
 
 -- Count
-INSERT INTO units (name, abbreviation, category) VALUES
+INSERT INTO units (name, abbreviation, category, is_standard)
+SELECT name, abbreviation, category, TRUE FROM (VALUES
   ('piece', 'pc', 'count'),
   ('whole', NULL, 'count'),
   ('slice', NULL, 'count'),
@@ -36,10 +41,12 @@ INSERT INTO units (name, abbreviation, category) VALUES
   ('head', NULL, 'count'),
   ('stalk', NULL, 'count'),
   ('leaf', NULL, 'count')
-ON CONFLICT (name) DO NOTHING;
+) AS seed(name, abbreviation, category)
+ON CONFLICT (name) DO UPDATE SET is_standard = TRUE;
 
 -- Other/Container
-INSERT INTO units (name, abbreviation, category) VALUES
+INSERT INTO units (name, abbreviation, category, is_standard)
+SELECT name, abbreviation, category, TRUE FROM (VALUES
   ('can', NULL, 'other'),
   ('package', 'pkg', 'other'),
   ('jar', NULL, 'other'),
@@ -48,4 +55,5 @@ INSERT INTO units (name, abbreviation, category) VALUES
   ('box', NULL, 'other'),
   ('stick', NULL, 'other'),
   ('cube', NULL, 'other')
-ON CONFLICT (name) DO NOTHING;
+) AS seed(name, abbreviation, category)
+ON CONFLICT (name) DO UPDATE SET is_standard = TRUE;
