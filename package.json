@@ -16,8 +16,13 @@
     "format:check": "oxfmt --check ."
   },
   "devDependencies": {
-    "oxfmt": "^0.54.0",
+    "oxfmt": "^0.75.0",
     "pg": "^8.17.2",
     "typescript": "^5.9.2"
+  },
+  "overrides": {
+    "@expo/cli": {
+      "zod": "^4.6.7"
+    }
   }
 }
