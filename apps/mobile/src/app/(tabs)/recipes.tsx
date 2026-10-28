@@ -109,7 +109,9 @@ export default function RecipesScreen() {
             if (recipes.hasNextPage && !recipes.isFetchingNextPage) recipes.fetchNextPage()
           }}
           ListFooterComponent={
-            recipes.isFetchingNextPage ? <ActivityIndicator color={colors.ink2} style={{ paddingVertical: 16 }} /> : null
+            recipes.isFetchingNextPage ? (
+              <ActivityIndicator color={colors.ink2} style={{ paddingVertical: 16 }} />
+            ) : undefined
           }
           ListEmptyComponent={
             <Text tone="ink2" style={{ paddingVertical: 24, textAlign: 'center' }}>

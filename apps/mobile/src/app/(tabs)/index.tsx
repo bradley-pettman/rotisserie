@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router'
 import { useMemo, useRef, useState } from 'react'
-import { Pressable, RefreshControl, ScrollView, View } from 'react-native'
+import { Pressable, RefreshControl, ScrollView, type ScrollViewInstance, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useMealsInRange, useUnscheduledPlannedMeals, useUpsertPlannedMeal, type PlannedMeal } from '~/api/queries'
 import { EmptyMarker, Icon, MadeMarker, PlannedMarker } from '~/components/Icon'
@@ -34,7 +34,7 @@ export default function MealsScreen() {
   const unscheduled = useUnscheduledPlannedMeals()
   const [trayOpen, setTrayOpen] = useState(false)
   const [pickingFor, setPickingFor] = useState<string | null>(null)
-  const scroll = useRef<ScrollView>(null)
+  const scroll = useRef<ScrollViewInstance>(null)
   const offsets = useRef<Record<string, number>>({})
   const scrolledToToday = useRef(false)
 
@@ -181,7 +181,9 @@ export default function MealsScreen() {
         refreshControl={
           <RefreshControl
             refreshing={meals.isRefetching}
-            onRefresh={() => Promise.all([meals.refetch(), unscheduled.refetch()])}
+            onRefresh={async () => {
+              await Promise.all([meals.refetch(), unscheduled.refetch()])
+            }}
             tintColor={colors.ink2}
           />
         }

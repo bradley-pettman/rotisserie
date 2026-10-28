@@ -12,7 +12,7 @@ export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{ headerShown: false, sceneStyle: { backgroundColor: colors.bg } }}
-      tabBar={({ state, descriptors, navigation, insets }) => {
+      tabBar={({ state, descriptors, emitter, navigateToTab, insets }) => {
         const tabs = state.routes.map((route, index) => {
           const focused = state.index === index
           const label = descriptors[route.key]?.options.title ?? route.name
@@ -23,8 +23,8 @@ export default function TabLayout() {
               accessibilityRole="tab"
               accessibilityState={{ selected: focused }}
               onPress={() => {
-                const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true })
-                if (!focused && !event.defaultPrevented) navigation.navigate(route.name)
+                const event = emitter.emit({ type: 'tabPress', target: route.key, canPreventDefault: true })
+                if (!focused && !event.defaultPrevented) navigateToTab(route.key)
               }}
               style={{ width: 72, minHeight: 48, alignItems: 'center', justifyContent: 'center', gap: 2 }}
             >
