@@ -1,5 +1,19 @@
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] as const
+const MONTH_NAMES = [
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December'
+] as const
 
 function pad(value: number): string {
   return String(value).padStart(2, '0')
@@ -33,6 +47,27 @@ export function daysBetween(from: string, to: string): string[] {
 export function startOfWeek(iso: string): string {
   const offset = (fromIsoDate(iso).getDay() + 6) % 7
   return addDays(iso, -offset)
+}
+
+export function startOfMonth(iso: string): string {
+  return `${iso.slice(0, 8)}01`
+}
+
+export function addMonths(iso: string, months: number): string {
+  const date = fromIsoDate(startOfMonth(iso))
+  date.setMonth(date.getMonth() + months)
+  return toIsoDate(date)
+}
+
+export function monthLabel(iso: string): string {
+  const date = fromIsoDate(iso)
+  return `${MONTH_NAMES[date.getMonth()]} ${date.getFullYear()}`
+}
+
+export function monthGrid(iso: string): string[] {
+  const first = startOfMonth(iso)
+  const last = addDays(addMonths(first, 1), -1)
+  return daysBetween(startOfWeek(first), addDays(startOfWeek(last), 6))
 }
 
 export function weekdayShort(iso: string): string {

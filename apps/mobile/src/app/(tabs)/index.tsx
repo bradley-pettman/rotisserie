@@ -3,25 +3,27 @@ import { useMemo, useRef, useState } from 'react'
 import { Pressable, RefreshControl, ScrollView, type ScrollViewInstance, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useMealsInRange, useUnscheduledPlannedMeals, useUpsertPlannedMeal, type PlannedMeal } from '~/api/queries'
-import { EmptyMarker, Icon, MadeMarker, PlannedMarker } from '~/components/Icon'
+import { Segmented } from '~/components/controls'
+import { EntryRow } from '~/components/EntryRow'
+import { EmptyMarker, Icon, PlannedMarker } from '~/components/Icon'
 import { MealRow } from '~/components/MealRow'
+import { MealsCalendar } from '~/components/MealsCalendar'
 import { Sheet } from '~/components/Sheet'
 import { TodayCard } from '~/components/TodayCard'
 import { useToast } from '~/components/Toast'
 import { ErrorState, Loading, SectionHeading, Text } from '~/components/ui'
 import { addDays, dayLabel, dayOfMonth, daysBetween, relativeDayLabel, startOfWeek, today, weekdayShort } from '~/lib/dates'
-import {
-  cookedDishName,
-  entriesForDay,
-  plannedDishName,
-  slotLabel,
-  summarize,
-  toPlannedInput,
-  type DayEntry
-} from '~/lib/meals'
+import { entriesForDay, plannedDishName, slotLabel, summarize, toPlannedInput, type DayEntry } from '~/lib/meals'
 import { useColors } from '~/theme'
 
 const DAYS_AHEAD = 13
+
+type MealsView = 'timeline' | 'calendar'
+
+const VIEW_OPTIONS: { value: MealsView; label: string }[] = [
+  { value: 'timeline', label: 'Timeline' },
+  { value: 'calendar', label: 'Calendar' }
+]
 
 export default function MealsScreen() {
   const colors = useColors()
@@ -34,6 +36,7 @@ export default function MealsScreen() {
   const unscheduled = useUnscheduledPlannedMeals()
   const [trayOpen, setTrayOpen] = useState(false)
   const [pickingFor, setPickingFor] = useState<string | null>(null)
+  const [view, setView] = useState<MealsView>('timeline')
   const scroll = useRef<ScrollViewInstance>(null)
   const offsets = useRef<Record<string, number>>({})
   const scrolledToToday = useRef(false)
@@ -72,6 +75,17 @@ export default function MealsScreen() {
           <Text variant="title" accessibilityRole="header" style={{ flex: 1 }}>
             Meals
           </Text>
+          <View style={{ width: 184, marginRight: 4 }}>
+            <Segmented
+              label="View"
+              value={view}
+              onChange={(next) => {
+                if (next === 'timeline') scrolledToToday.current = false
+                setView(next)
+              }}
+              options={VIEW_OPTIONS}
+            />
+          </View>
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Household"
@@ -89,122 +103,130 @@ export default function MealsScreen() {
           </Pressable>
         </View>
 
-        <View style={{ flexDirection: 'row', gap: 4, paddingHorizontal: 14, paddingBottom: 12 }}>
-          {strip.map(({ day, eaten, planned }) => {
-            const isToday = day === now
-            const past = day < now
-            const textColor = isToday ? colors.onGold : past ? colors.ink2 : colors.ink
-            const state = eaten ? 'eaten' : planned ? 'planned' : 'nothing yet'
-            return (
-              <Pressable
-                key={day}
-                accessibilityRole="button"
-                accessibilityLabel={`${dayLabel(day)}${isToday ? ', today' : ''}, ${state}`}
-                onPress={() => scrollToDay(day)}
-                style={{
-                  flex: 1,
-                  height: 62,
-                  borderRadius: 14,
-                  backgroundColor: isToday ? colors.gold : 'transparent',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 3
-                }}
-              >
-                <Text variant="tiny" style={{ color: textColor }}>
-                  {weekdayShort(day).toUpperCase()}
-                </Text>
-                <Text variant="bodyStrong" style={{ color: textColor, fontSize: 17 }}>
-                  {dayOfMonth(day)}
-                </Text>
-                <View
-                  style={{
-                    width: 6,
-                    height: 6,
-                    borderRadius: 3,
-                    backgroundColor: eaten ? (isToday ? colors.onGold : colors.ink3) : 'transparent',
-                    borderWidth: !eaten && planned ? 1.5 : 0,
-                    borderColor: isToday ? colors.onGold : colors.ring
-                  }}
-                />
-              </Pressable>
-            )
-          })}
-        </View>
-
-        <View style={{ paddingHorizontal: 12, paddingBottom: 6 }}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityState={{ expanded: trayOpen }}
-            onPress={() => setTrayOpen((open) => !open)}
-            style={{ minHeight: 48, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', gap: 12 }}
-          >
-            <Icon name="tray" size={22} color={colors.accent} strokeWidth={2} />
-            <Text variant="bodyStrong" style={{ flex: 1 }}>
-              Planned
-            </Text>
-            <Text tone="ink2">{pool.length}</Text>
-            <Icon name={trayOpen ? 'chevronDown' : 'chevronRight'} size={16} color={colors.ink2} strokeWidth={2.5} />
-          </Pressable>
-          {trayOpen ? (
-            <ScrollView
-              style={{ maxHeight: 240 }}
-              contentContainerStyle={{ paddingLeft: 44, paddingRight: 10, paddingBottom: 6 }}
-            >
-              {pool.length === 0 ? (
-                <Text tone="ink2" style={{ paddingVertical: 10 }}>
-                  Nothing waiting for a day.
-                </Text>
-              ) : (
-                pool.map((meal) => {
-                  const { lead, rest } = summarize(meal.dishes.map(plannedDishName))
-                  return (
-                    <MealRow
-                      key={meal.id}
-                      marker={<PlannedMarker color={colors.ring} size={18} />}
-                      lead={lead}
-                      rest={rest}
-                      meta={slotLabel(meal.mealSlot)}
-                      onPress={() => router.push(`/planned/${meal.id}`)}
+        {view === 'timeline' ? (
+          <>
+            <View style={{ flexDirection: 'row', gap: 4, paddingHorizontal: 14, paddingBottom: 12 }}>
+              {strip.map(({ day, eaten, planned }) => {
+                const isToday = day === now
+                const past = day < now
+                const textColor = isToday ? colors.onGold : past ? colors.ink2 : colors.ink
+                const state = eaten ? 'eaten' : planned ? 'planned' : 'nothing yet'
+                return (
+                  <Pressable
+                    key={day}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${dayLabel(day)}${isToday ? ', today' : ''}, ${state}`}
+                    onPress={() => scrollToDay(day)}
+                    style={{
+                      flex: 1,
+                      height: 62,
+                      borderRadius: 14,
+                      backgroundColor: isToday ? colors.gold : 'transparent',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 3
+                    }}
+                  >
+                    <Text variant="tiny" style={{ color: textColor }}>
+                      {weekdayShort(day).toUpperCase()}
+                    </Text>
+                    <Text variant="bodyStrong" style={{ color: textColor, fontSize: 17 }}>
+                      {dayOfMonth(day)}
+                    </Text>
+                    <View
+                      style={{
+                        width: 6,
+                        height: 6,
+                        borderRadius: 3,
+                        backgroundColor: eaten ? (isToday ? colors.onGold : colors.ink3) : 'transparent',
+                        borderWidth: !eaten && planned ? 1.5 : 0,
+                        borderColor: isToday ? colors.onGold : colors.ring
+                      }}
                     />
-                  )
-                })
-              )}
-            </ScrollView>
-          ) : null}
-        </View>
+                  </Pressable>
+                )
+              })}
+            </View>
+
+            <View style={{ paddingHorizontal: 12, paddingBottom: 6 }}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityState={{ expanded: trayOpen }}
+                onPress={() => setTrayOpen((open) => !open)}
+                style={{ minHeight: 48, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', gap: 12 }}
+              >
+                <Icon name="tray" size={22} color={colors.accent} strokeWidth={2} />
+                <Text variant="bodyStrong" style={{ flex: 1 }}>
+                  Planned
+                </Text>
+                <Text tone="ink2">{pool.length}</Text>
+                <Icon name={trayOpen ? 'chevronDown' : 'chevronRight'} size={16} color={colors.ink2} strokeWidth={2.5} />
+              </Pressable>
+              {trayOpen ? (
+                <ScrollView
+                  style={{ maxHeight: 240 }}
+                  contentContainerStyle={{ paddingLeft: 44, paddingRight: 10, paddingBottom: 6 }}
+                >
+                  {pool.length === 0 ? (
+                    <Text tone="ink2" style={{ paddingVertical: 10 }}>
+                      Nothing waiting for a day.
+                    </Text>
+                  ) : (
+                    pool.map((meal) => {
+                      const { lead, rest } = summarize(meal.dishes.map(plannedDishName))
+                      return (
+                        <MealRow
+                          key={meal.id}
+                          marker={<PlannedMarker color={colors.ring} size={18} />}
+                          lead={lead}
+                          rest={rest}
+                          meta={slotLabel(meal.mealSlot)}
+                          onPress={() => router.push(`/planned/${meal.id}`)}
+                        />
+                      )
+                    })
+                  )}
+                </ScrollView>
+              ) : null}
+            </View>
+          </>
+        ) : null}
       </View>
 
-      <ScrollView
-        ref={scroll}
-        contentContainerStyle={{ paddingTop: 12, paddingBottom: 40 }}
-        refreshControl={
-          <RefreshControl
-            refreshing={meals.isRefetching}
-            onRefresh={async () => {
-              await Promise.all([meals.refetch(), unscheduled.refetch()])
-            }}
-            tintColor={colors.ink2}
-          />
-        }
-      >
-        <View style={{ gap: 22, paddingHorizontal: 20 }}>
-          {days.map(({ day, entries }) => (
-            <View
-              key={day}
-              onLayout={(event) => {
-                offsets.current[day] = event.nativeEvent.layout.y
-                if (day === now && !scrolledToToday.current) {
-                  scrolledToToday.current = true
-                  requestAnimationFrame(() => scrollToDay(now, false))
-                }
+      {view === 'calendar' ? (
+        <MealsCalendar now={now} />
+      ) : (
+        <ScrollView
+          ref={scroll}
+          contentContainerStyle={{ paddingTop: 12, paddingBottom: 40 }}
+          refreshControl={
+            <RefreshControl
+              refreshing={meals.isRefetching}
+              onRefresh={async () => {
+                await Promise.all([meals.refetch(), unscheduled.refetch()])
               }}
-            >
-              <DaySection day={day} now={now} entries={entries} poolSize={pool.length} onPick={() => setPickingFor(day)} />
-            </View>
-          ))}
-        </View>
-      </ScrollView>
+              tintColor={colors.ink2}
+            />
+          }
+        >
+          <View style={{ gap: 22, paddingHorizontal: 20 }}>
+            {days.map(({ day, entries }) => (
+              <View
+                key={day}
+                onLayout={(event) => {
+                  offsets.current[day] = event.nativeEvent.layout.y
+                  if (day === now && !scrolledToToday.current) {
+                    scrolledToToday.current = true
+                    requestAnimationFrame(() => scrollToDay(now, false))
+                  }
+                }}
+              >
+                <DaySection day={day} now={now} entries={entries} poolSize={pool.length} onPick={() => setPickingFor(day)} />
+              </View>
+            ))}
+          </View>
+        </ScrollView>
+      )}
 
       <PlannedPicker day={pickingFor} pool={pool} onClose={() => setPickingFor(null)} />
     </View>
@@ -265,36 +287,6 @@ function DaySection({
         ) : null}
       </View>
     </View>
-  )
-}
-
-function EntryRow({ entry }: { entry: DayEntry }) {
-  const colors = useColors()
-  const router = useRouter()
-  if (entry.kind === 'cooked') {
-    const { lead, rest } = summarize(entry.meal.dishes.map(cookedDishName))
-    return (
-      <MealRow
-        marker={<MadeMarker fill={colors.gold} check={colors.onGold} />}
-        lead={lead}
-        rest={rest}
-        meta={slotLabel(entry.slot)}
-        muted
-        accessibilityLabel={`${slotLabel(entry.slot)}, made: ${lead}${rest ? `, ${rest}` : ''}`}
-        onPress={() => router.push({ pathname: '/log', params: { cookedMealId: entry.meal.id } })}
-      />
-    )
-  }
-  const { lead, rest } = summarize(entry.meal.dishes.map(plannedDishName))
-  return (
-    <MealRow
-      marker={<PlannedMarker color={colors.ring} />}
-      lead={lead}
-      rest={rest}
-      meta={slotLabel(entry.slot)}
-      accessibilityLabel={`${slotLabel(entry.slot)}, planned: ${lead}${rest ? `, ${rest}` : ''}`}
-      onPress={() => router.push(`/planned/${entry.meal.id}`)}
-    />
   )
 }
 
