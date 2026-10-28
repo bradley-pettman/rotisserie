@@ -22,14 +22,30 @@ export function summarize(names: string[]): { lead: string; rest: string } {
 }
 
 export type DayEntry =
-  | { kind: 'cooked'; slot: MealSlot; meal: CookedMeal }
+  | { kind: 'cooked'; slot: MealSlot; meal: CookedMeal; instead: PlannedMeal | null }
   | { kind: 'planned'; slot: MealSlot; meal: PlannedMeal }
+
+function sameDish(eaten: CookedMeal['dishes'][number], planned: PlannedMeal['dishes'][number]): boolean {
+  if (eaten.recipeId !== null && planned.recipe) return eaten.recipeId === planned.recipe.id
+  return eaten.label.trim().toLowerCase() === plannedDishName(planned).trim().toLowerCase()
+}
+
+export function replacedPlan(meal: CookedMeal, planned: PlannedMeal[]): PlannedMeal | null {
+  const plan = planned.find((candidate) => candidate.id === meal.plannedMealId)
+  if (!plan || plan.dishes.length === 0) return null
+  return meal.dishes.some((dish) => plan.dishes.some((other) => sameDish(dish, other))) ? null : plan
+}
 
 export function entriesForDay(day: string, planned: PlannedMeal[], cooked: CookedMeal[]): DayEntry[] {
   const cookedToday = cooked.filter((meal) => meal.cookedOn === day)
   const fulfilled = new Set(cooked.map((meal) => meal.plannedMealId).filter((id) => id !== null))
   const entries: DayEntry[] = [
-    ...cookedToday.map((meal) => ({ kind: 'cooked' as const, slot: meal.mealSlot, meal })),
+    ...cookedToday.map((meal) => ({
+      kind: 'cooked' as const,
+      slot: meal.mealSlot,
+      meal,
+      instead: replacedPlan(meal, planned)
+    })),
     ...planned
       .filter((meal) => meal.plannedOn === day && !fulfilled.has(meal.id))
       .map((meal) => ({ kind: 'planned' as const, slot: meal.mealSlot, meal }))

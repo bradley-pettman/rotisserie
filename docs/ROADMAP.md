@@ -198,15 +198,18 @@ cheapest before there is real data.
 Left for later: password change and reset (reset needs email), rate limits on
 sign-in and joining, and deleting an account.
 
-## Phase 5: Planning on the phone
+## Phase 5: Planning on the phone ✅
 
-- Calendar view, toggled from the Meals timeline, for looking ahead ("what are
-  we having next Thursday?"): a month grid, with the selected day's meals and
-  its Pick from Planned choices below
-- Plan a meal from an empty day in the calendar
-- Move a meal (one `PUT`), remove a dish
-- Cooked meal detail: rating and notes
-- Plan versus reality: replaced meals, skipped meals, unplanned meals
+- [x] Calendar view, toggled from the Meals timeline, for looking ahead ("what are
+      we having next Thursday?"): a month grid, with the selected day's meals and
+      its Pick from Planned choices below
+- [x] Plan a meal from an empty day in the calendar
+- [x] Move a meal (one `PUT`), remove a dish
+- [x] Cooked meal detail: rating and notes, in the log editor
+- [x] Plan versus reality: meals logged by settle ask "Did you make it?" (made
+      it, made something else, or didn't make it, which puts the plan back in
+      Planned), and a meal that shares no dish with its plan says what it
+      replaced. Unplanned meals need nothing extra.
 
 ## Phase 6: Deploy and auth
 
