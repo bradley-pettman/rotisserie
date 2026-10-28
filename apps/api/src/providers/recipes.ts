@@ -57,12 +57,12 @@ const RECIPE_SELECT = `
     ) AS tags
   FROM recipes r`
 
-async function fetchRecipe(db: QueryFns, id: string): Promise<RecipeSchemas['Recipe'] | null> {
-  return db.queryOne<RecipeSchemas['Recipe']>(`${RECIPE_SELECT} WHERE r.id = $1`, [id])
+async function fetchRecipe(db: QueryFns, householdId: string, id: string): Promise<RecipeSchemas['Recipe'] | null> {
+  return db.queryOne<RecipeSchemas['Recipe']>(`${RECIPE_SELECT} WHERE r.household_id = $1 AND r.id = $2`, [householdId, id])
 }
 
-export async function getRecipe(id: string): Promise<RecipeSchemas['Recipe'] | null> {
-  return fetchRecipe(DB, id)
+export async function getRecipe(householdId: string, id: string): Promise<RecipeSchemas['Recipe'] | null> {
+  return fetchRecipe(DB, householdId, id)
 }
 
 export const getRecipeStrict = strict(getRecipe, 'Recipe')
@@ -92,13 +92,16 @@ const RECIPE_SORTS: Record<
   }
 }
 
-export async function listRecipes(options: {
-  q?: string
-  tag?: string
-  sort: RecipeSchemas['RecipeSort']
-  limit: number
-  cursor?: string
-}): Promise<RecipeSchemas['RecipeWithStatsPage']> {
+export async function listRecipes(
+  householdId: string,
+  options: {
+    q?: string
+    tag?: string
+    sort: RecipeSchemas['RecipeSort']
+    limit: number
+    cursor?: string
+  }
+): Promise<RecipeSchemas['RecipeWithStatsPage']> {
   const sort = RECIPE_SORTS[options.sort]
   const [cursorSort = null, cursorKey = null, cursorId = null] =
     options.cursor === undefined ? [] : decodeCursor(options.cursor, 3)
@@ -126,7 +129,8 @@ export async function listRecipes(options: {
        ${sort.keyText} AS "sortKey"
      FROM recipes r
      JOIN recipe_stats s ON s.recipe_id = r.id
-     WHERE (
+     WHERE r.household_id = $6
+       AND (
          r.name ILIKE '%' || $1 || '%'
          OR EXISTS (
            SELECT 1
@@ -150,7 +154,7 @@ export async function listRecipes(options: {
        )
      ORDER BY ${sort.key} ${sort.direction}, r.id ${sort.direction}
      LIMIT $5`,
-    [escapeLike(options.q?.trim() ?? ''), tag, cursorKey, cursorId, options.limit + 1]
+    [escapeLike(options.q?.trim() ?? ''), tag, cursorKey, cursorId, options.limit + 1, householdId]
   )
 
   const page = rows.slice(0, options.limit)
@@ -159,21 +163,14 @@ export async function listRecipes(options: {
   return { recipes: page.map((row) => omit(row, 'sortKey')), nextCursor }
 }
 
-export async function upsertRecipe(input: RecipeSchemas['UpsertRecipeInput']): Promise<RecipeSchemas['Recipe']> {
+export async function upsertRecipe(
+  householdId: string,
+  input: RecipeSchemas['UpsertRecipeInput']
+): Promise<RecipeSchemas['Recipe'] | null> {
   return DB.withTransaction(async (tx) => {
-    const ingredientIds = await upsertIngredients(
-      tx,
-      input.ingredients.map((line) => line.name)
-    )
-    const unitIds = await upsertUnits(
-      tx,
-      input.ingredients.flatMap((line) => (line.unit === null ? [] : [line.unit]))
-    )
-    const tagIds = await upsertTags(tx, input.tags)
-
-    await tx.query(
-      `INSERT INTO recipes (id, name, instructions, prep_time_minutes, cook_time_minutes, servings, source_url, notes)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+    const saved = await tx.queryOne<{ id: string }>(
+      `INSERT INTO recipes (id, household_id, name, instructions, prep_time_minutes, cook_time_minutes, servings, source_url, notes)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
        ON CONFLICT (id) DO UPDATE SET
          name = EXCLUDED.name,
          instructions = EXCLUDED.instructions,
@@ -182,9 +179,12 @@ export async function upsertRecipe(input: RecipeSchemas['UpsertRecipeInput']): P
          servings = EXCLUDED.servings,
          source_url = EXCLUDED.source_url,
          notes = EXCLUDED.notes,
-         updated_at = NOW()`,
+         updated_at = NOW()
+       WHERE recipes.household_id = EXCLUDED.household_id
+       RETURNING id`,
       [
         input.id,
+        householdId,
         input.name,
         input.instructions,
         input.prepTimeMinutes,
@@ -194,6 +194,17 @@ export async function upsertRecipe(input: RecipeSchemas['UpsertRecipeInput']): P
         input.notes
       ]
     )
+    if (saved === null) return null
+
+    const ingredientIds = await upsertIngredients(
+      tx,
+      input.ingredients.map((line) => line.name)
+    )
+    const unitIds = await upsertUnits(
+      tx,
+      input.ingredients.flatMap((line) => (line.unit === null ? [] : [line.unit]))
+    )
+    const tagIds = await upsertTags(tx, householdId, input.tags)
 
     const lines = input.ingredients.map((line, index) => ({
       ingredient_id: ingredientIds.find((ingredient) => ingredient.name === line.name)?.id ?? null,
@@ -211,19 +222,25 @@ export async function upsertRecipe(input: RecipeSchemas['UpsertRecipeInput']): P
     )
 
     await tx.query(`DELETE FROM recipe_tags WHERE recipe_id = $1`, [input.id])
-    await tx.query(`INSERT INTO recipe_tags (recipe_id, tag_id) SELECT $1, unnest($2::uuid[])`, [
+    await tx.query(`INSERT INTO recipe_tags (household_id, recipe_id, tag_id) SELECT $1, $2, unnest($3::uuid[])`, [
+      householdId,
       input.id,
       uniq(tagIds.map((tag) => tag.id))
     ])
 
-    const recipe = await fetchRecipe(tx, input.id)
+    const recipe = await fetchRecipe(tx, householdId, input.id)
     if (recipe === null) throw new Error(`Recipe ${input.id} missing after upsert`)
     return recipe
   })
 }
 
-export async function deleteRecipe(id: string): Promise<{ id: string } | null> {
-  return DB.queryOne<{ id: string }>(`DELETE FROM recipes WHERE id = $1 RETURNING id`, [id])
+export const upsertRecipeStrict = strict(upsertRecipe, 'Recipe')
+
+export async function deleteRecipe(householdId: string, id: string): Promise<{ id: string } | null> {
+  return DB.queryOne<{ id: string }>(`DELETE FROM recipes WHERE household_id = $1 AND id = $2 RETURNING id`, [
+    householdId,
+    id
+  ])
 }
 
 export const deleteRecipeStrict = strict(deleteRecipe, 'Recipe')

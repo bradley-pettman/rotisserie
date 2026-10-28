@@ -6,8 +6,16 @@ import pg from 'pg'
 import type z from 'zod'
 import { InvalidCursorError } from '~/providers/sql'
 import { NotFoundError } from '~/providers/errors'
+import { ConflictError, ForbiddenError, NoHouseholdError, UnauthenticatedError } from '~/use-cases/errors'
 
-export type ErrorCode = 'validation' | 'not_found' | 'conflict' | 'internal'
+export type ErrorCode =
+  | 'validation'
+  | 'unauthenticated'
+  | 'no_household'
+  | 'forbidden'
+  | 'not_found'
+  | 'conflict'
+  | 'internal'
 
 export type ErrorBody = {
   error: {
@@ -51,8 +59,21 @@ export function handleError(error: Error, c: Context): Response {
   if (error instanceof HTTPException) {
     return errorResponse(c, error.status, { code: 'validation', message: error.message })
   }
+  if (error instanceof UnauthenticatedError) {
+    c.header('WWW-Authenticate', 'Bearer')
+    return errorResponse(c, 401, { code: 'unauthenticated', message: error.message })
+  }
+  if (error instanceof NoHouseholdError) {
+    return errorResponse(c, 403, { code: 'no_household', message: error.message })
+  }
+  if (error instanceof ForbiddenError) {
+    return errorResponse(c, 403, { code: 'forbidden', message: error.message })
+  }
   if (error instanceof NotFoundError) {
     return errorResponse(c, 404, { code: 'not_found', message: error.message })
+  }
+  if (error instanceof ConflictError) {
+    return errorResponse(c, 409, { code: 'conflict', message: error.message })
   }
   if (error instanceof pg.DatabaseError && CONFLICT_CODES.includes(error.code ?? '')) {
     return errorResponse(c, 409, { code: 'conflict', message: error.detail ?? error.message })

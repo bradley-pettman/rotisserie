@@ -2,7 +2,8 @@
 -- Use INSERT ... ON CONFLICT DO NOTHING for idempotency
 
 -- Produce
-INSERT INTO ingredients (name) VALUES
+INSERT INTO ingredients (name, is_standard)
+SELECT name, TRUE FROM (VALUES
   ('onion'),
   ('garlic'),
   ('tomato'),
@@ -36,10 +37,12 @@ INSERT INTO ingredients (name) VALUES
   ('basil (fresh)'),
   ('mint'),
   ('dill')
-ON CONFLICT (name) DO NOTHING;
+) AS seed(name)
+ON CONFLICT (name) DO UPDATE SET is_standard = TRUE;
 
 -- Proteins
-INSERT INTO ingredients (name) VALUES
+INSERT INTO ingredients (name, is_standard)
+SELECT name, TRUE FROM (VALUES
   ('chicken breast'),
   ('chicken thigh'),
   ('ground beef'),
@@ -67,10 +70,12 @@ INSERT INTO ingredients (name) VALUES
   ('ham'),
   ('tempeh'),
   ('seitan')
-ON CONFLICT (name) DO NOTHING;
+) AS seed(name)
+ON CONFLICT (name) DO UPDATE SET is_standard = TRUE;
 
 -- Dairy & Eggs
-INSERT INTO ingredients (name) VALUES
+INSERT INTO ingredients (name, is_standard)
+SELECT name, TRUE FROM (VALUES
   ('butter'),
   ('milk'),
   ('heavy cream'),
@@ -94,10 +99,12 @@ INSERT INTO ingredients (name) VALUES
   ('mascarpone'),
   ('brie'),
   ('gruyère cheese')
-ON CONFLICT (name) DO NOTHING;
+) AS seed(name)
+ON CONFLICT (name) DO UPDATE SET is_standard = TRUE;
 
 -- Pantry Staples
-INSERT INTO ingredients (name) VALUES
+INSERT INTO ingredients (name, is_standard)
+SELECT name, TRUE FROM (VALUES
   ('olive oil'),
   ('vegetable oil'),
   ('flour'),
@@ -159,10 +166,12 @@ INSERT INTO ingredients (name) VALUES
   ('coconut oil'),
   ('canola oil'),
   ('peanut oil')
-ON CONFLICT (name) DO NOTHING;
+) AS seed(name)
+ON CONFLICT (name) DO UPDATE SET is_standard = TRUE;
 
 -- Spices & Seasonings
-INSERT INTO ingredients (name) VALUES
+INSERT INTO ingredients (name, is_standard)
+SELECT name, TRUE FROM (VALUES
   ('paprika'),
   ('cumin'),
   ('oregano'),
@@ -198,10 +207,12 @@ INSERT INTO ingredients (name) VALUES
   ('za''atar'),
   ('sumac'),
   ('five spice powder')
-ON CONFLICT (name) DO NOTHING;
+) AS seed(name)
+ON CONFLICT (name) DO UPDATE SET is_standard = TRUE;
 
 -- Nuts & Seeds
-INSERT INTO ingredients (name) VALUES
+INSERT INTO ingredients (name, is_standard)
+SELECT name, TRUE FROM (VALUES
   ('almonds'),
   ('walnuts'),
   ('pecans'),
@@ -216,10 +227,12 @@ INSERT INTO ingredients (name) VALUES
   ('chia seeds'),
   ('flax seeds'),
   ('macadamia nuts')
-ON CONFLICT (name) DO NOTHING;
+) AS seed(name)
+ON CONFLICT (name) DO UPDATE SET is_standard = TRUE;
 
 -- Fruits
-INSERT INTO ingredients (name) VALUES
+INSERT INTO ingredients (name, is_standard)
+SELECT name, TRUE FROM (VALUES
   ('apple'),
   ('banana'),
   ('orange'),
@@ -245,4 +258,5 @@ INSERT INTO ingredients (name) VALUES
   ('fig'),
   ('plum'),
   ('grapefruit')
-ON CONFLICT (name) DO NOTHING;
+) AS seed(name)
+ON CONFLICT (name) DO UPDATE SET is_standard = TRUE;

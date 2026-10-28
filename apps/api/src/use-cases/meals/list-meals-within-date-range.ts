@@ -2,9 +2,11 @@ import { CookedMealSchemas, PlannedMealSchemas } from '@rotisserie/shared/meals'
 import z from 'zod'
 import { listCookedMealsWithinDateRange } from '~/providers/cooked-meals'
 import { listPlannedMealsWithinDateRange } from '~/providers/planned-meals'
+import { MemberActor } from '../actors'
 import { defineUseCase } from '../define-use-case'
 
 export const ListMealsWithinDateRange = defineUseCase({
+  actor: MemberActor,
   input: z
     .object({
       from: z.iso.date(),
@@ -15,10 +17,10 @@ export const ListMealsWithinDateRange = defineUseCase({
     planned: PlannedMealSchemas.PlannedMeal.array(),
     cooked: CookedMealSchemas.CookedMeal.array()
   }),
-  implementation: async ({ from, to }) => {
+  implementation: async ({ from, to }, { householdId }) => {
     const [planned, cooked] = await Promise.all([
-      listPlannedMealsWithinDateRange(from, to),
-      listCookedMealsWithinDateRange(from, to)
+      listPlannedMealsWithinDateRange(householdId, from, to),
+      listCookedMealsWithinDateRange(householdId, from, to)
     ])
     return { planned, cooked }
   }

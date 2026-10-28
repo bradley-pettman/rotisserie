@@ -177,6 +177,27 @@ server-only dependencies.
 
 **Done when:** you use it to cook dinner on a real night.
 
+## Accounts and households ✅
+
+Done ahead of deploy, because a `household_id` touches every table and is
+cheapest before there is real data.
+
+- [x] Email and password accounts: scrypt hashes, opaque session tokens stored
+      as SHA-256, 90-day sessions that slide forward on use
+- [x] Households: one per person, `owner` and `member` roles, single-use invite
+      codes that last 7 days. Recipes, tags, plans and history belong to a
+      household; composite foreign keys stop references across households
+- [x] Ingredients and units stay one shared dictionary; each household only
+      sees the standard entries and the ones its recipes use
+- [x] App: sign in, sign up, start or join a household, and a Household screen
+      (members, invites, roles, leave, sign out)
+- [x] Existing data moves into a household called "Home" during the migration;
+      `npm run invite -w @rotisserie/api` prints a code to join it, and whoever
+      joins first becomes its owner
+
+Left for later: password change and reset (reset needs email), rate limits on
+sign-in and joining, and deleting an account.
+
 ## Phase 5: Planning on the phone
 
 - Calendar view, toggled from the Meals timeline, for looking ahead ("what are
@@ -228,9 +249,11 @@ Total about $15 a month, less while the new-account credits last.
   keys), runs `cdk deploy`, then invokes the migration Lambda.
 - **Backups:** RDS automated backups with 7-day retention; a point-in-time
   restore to a new instance tested once.
-- **Auth**, in increasing order of effort:
-  1. One long random API token, stored on the phone with `expo-secure-store`
-  2. Real accounts, once more than one person needs their own login
+- **Auth** is already in the API (accounts and households, above). Deploying
+  it needs throttling on `/auth/sign-in` and `/household/join` (API Gateway
+  route throttling is enough to start). Password reset needs email, and the
+  VPC Lambda has no outbound network, so it waits for a NAT (or fck-nat on a
+  `t4g.nano`, about $3 a month) or another way to send mail.
 - HTTPS only (API Gateway provides it); a custom domain is optional
 
 Things to avoid: a NAT gateway, RDS Proxy, Secrets Manager (SSM Parameter Store
@@ -261,15 +284,12 @@ restore has been tested.
 
 ## Open decisions
 
-Settle the first one before Phase 6, because it changes every table.
-
-1. **One user or a household?** Sharing means a `households` table and a
-   `household_id` on recipes, planned meals and cooked meals, and every query
-   scoped by it. Adding it later is a migration on every table plus a backfill.
+1. ~~**One user or a household?**~~ Decided: households. See Accounts and
+   households above.
 2. **"Cooked" or "eaten"?** If takeout belongs in history, `cooked_meals` is
    slightly misnamed. Renaming before there's data is cheap; renaming later isn't.
-3. **One meal per slot?** `planned_meals_one_per_slot` says yes. Drop it if you
-   want separate kids' and adults' dinners.
+3. **One meal per slot?** `planned_meals_one_per_slot` says yes, per household.
+   Drop it if you want separate kids' and adults' dinners.
 
 ## The old app
 

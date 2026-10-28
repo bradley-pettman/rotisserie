@@ -1,9 +1,11 @@
 import { RecipeSchemas } from '@rotisserie/shared/recipes'
 import z from 'zod'
 import { listRecipes } from '~/providers/recipes'
+import { MemberActor } from '../actors'
 import { defineUseCase } from '../define-use-case'
 
 export const ListRecipes = defineUseCase({
+  actor: MemberActor,
   input: z.object({
     q: z.string().optional(),
     tag: z.string().trim().optional(),
@@ -12,5 +14,5 @@ export const ListRecipes = defineUseCase({
     cursor: z.string().optional()
   }),
   output: RecipeSchemas.RecipeWithStatsPage,
-  implementation: async (input) => listRecipes(input)
+  implementation: async (input, { householdId }) => listRecipes(householdId, input)
 })
