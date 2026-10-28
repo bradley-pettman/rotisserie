@@ -212,54 +212,206 @@ sign-in and joining, and deleting an account.
 
 Needed once the app has to work away from home Wi-Fi. AWS on purpose, as a
 learning exercise: Fly.io with Neon would be cheaper (about $0–5 a month) and
-simpler.
+simpler. Decided in detail in October 2026; the headings below are the plan.
 
 ```
-Expo app ──HTTPS──▶ API Gateway (HTTP API) ──▶ Lambda (Hono) ──VPC──▶ RDS Postgres
-                                                     │                    ▲
-                                                     └── IAM auth token ──┘
+Expo app ──HTTPS──▶ API Gateway (HTTP API) ──▶ API Lambda (Hono) ──VPC──▶ RDS Postgres
+            api.<domain>                              │                      ▲
+                                                      └── IAM auth token ────┤
+GitHub Actions ──OIDC──▶ cdk deploy ──▶ Migrator Lambda (dbmate + seeds) ──────┘
 ```
 
 | Piece | Choice | ~Monthly |
 |---|---|---|
+| Account | A new account for this app only, `us-east-2`, root MFA, IAM Identity Center sign-in, a Budget alarm at $25 | $0 |
+| Domain | Registered in Route 53; `api.<domain>` on the HTTP API with an ACM certificate | $0.50, plus ~$15 a year |
 | API | API Gateway **HTTP API** (v2), not REST API | pennies |
-| Compute | Lambda, arm64, Node, `handle(app)` from `hono/aws-lambda` | ~$0 |
-| Database | RDS Postgres `db.t4g.micro`, single-AZ, 20 GB gp3, private subnet, no public IP | ~$14 (~$8–10 reserved for a year) |
-| Credentials | RDS IAM authentication (`@aws-sdk/rds-signer`) | $0 |
-| Logs | CloudWatch Logs, 1–2 week retention | pennies |
+| Compute | Lambda, arm64, Node 22, `handle(app)` from `hono/aws-lambda` | ~$0 |
+| Database | RDS Postgres 16 `db.t4g.micro`, single-AZ, 20 GB gp3 autoscaling to 50, isolated subnet, no public IP | ~$14 (~$8–10 reserved for a year) |
+| Credentials | RDS IAM authentication (`@aws-sdk/rds-signer`); the master password sits in Secrets Manager and is read once | $0.40 |
+| Logs and alarms | CloudWatch Logs with 2-week retention; six alarms to one SNS email | ~$1 |
 | Infrastructure | AWS CDK in TypeScript, as `apps/infra` | $0 |
 
-Total about $15 a month, less while the new-account credits last.
+Total about $16 a month, less while the new-account credits last.
 
-- **Infrastructure as code:** one CDK stack in `apps/infra` for the VPC, RDS,
-  Lambda and HTTP API. Nothing is created by clicking in the console.
-- **Networking:** the Lambda runs in the VPC's private subnets so it can reach
-  RDS. No NAT gateway (~$32 a month): the API only talks to Postgres, and
-  anything else it needs is resolved at deploy time and passed in as
-  environment variables, so no VPC endpoints either.
-- **Database access:** the Lambda's role signs a short-lived IAM token as the
-  Postgres password. Signing is local, so it needs no network call and there
-  is no stored password.
-- **Connections:** the `pg` pool is created outside the handler with `max: 1`
-  so warm invocations reuse it. No RDS Proxy (~$22 a month) at this scale.
-- **Migrations:** a small migration Lambda in the same VPC runs dbmate's
-  migrations and is invoked as a deploy step, since the database isn't
-  reachable from a laptop or CI.
-- **Deploys:** GitHub Actions authenticates to AWS with OIDC (no long-lived
-  keys), runs `cdk deploy`, then invokes the migration Lambda.
-- **Backups:** RDS automated backups with 7-day retention; a point-in-time
-  restore to a new instance tested once.
-- **Auth** is already in the API (accounts and households, above). Deploying
-  it needs throttling on `/auth/sign-in` and `/household/join` (API Gateway
-  route throttling is enough to start). Password reset needs email, and the
-  VPC Lambda has no outbound network, so it waits for a NAT (or fck-nat on a
-  `t4g.nano`, about $3 a month) or another way to send mail.
-- HTTPS only (API Gateway provides it); a custom domain is optional
+### Infrastructure as code
 
-Things to avoid: a NAT gateway, RDS Proxy, Secrets Manager (SSM Parameter Store
-or IAM auth instead), a public IP on the database, Aurora DSQL (no foreign
-keys, and the schema depends on them), and Aurora Serverless v2 scaled to zero
-(its ~15s resume would hit almost every time the app is opened).
+Two stacks in `apps/infra`, both built from recipes (below). Nothing is
+created by clicking in the console, except registering the domain, which
+CloudFormation can't do.
+
+- **`Rotisserie-bootstrap`:** the GitHub OIDC provider and deploy role, and
+  the budget. Deployed once from the laptop, because it creates the role CI
+  needs before CI can deploy anything.
+- **`Rotisserie-prod`:** everything else. Deployed only by CI. It takes a
+  stage name for resource names, so a staging stack is one more line, not a
+  refactor. Its name and the database construct's id are permanent: renaming
+  either replaces the instance.
+
+The region and account are pinned in the stack (`us-east-2`, account id from
+`CDK_DEFAULT_ACCOUNT`), so a laptop with a different default can't deploy
+somewhere surprising. `cdk.context.json` is committed so the hosted-zone
+lookup never needs credentials on a PR.
+
+### The recipes library
+
+`apps/infra/src/recipes/` is a hand-rolled, copy-and-own construct library in
+the style of `@maestro-js/aws-cdk-recipes` and SST: each recipe is one
+opinionated construct that builds several resources behind a short props
+interface. It is plain source with no package and no CLI, and its props
+never mention Rotisserie, so it could become a package if a second project
+wants it.
+
+| Recipe | Wraps |
+|---|---|
+| `Vpc` | Two AZs (RDS needs two even for single-AZ), isolated subnets only, no NAT. `publicSubnets: true` is for the day a bastion arrives |
+| `PostgresDatabase` | RDS instance with IAM auth, gp3, encryption, backups, deletion protection; `grantConnect(grantee, dbUser)` adds `rds-db:connect` and the security-group rule together |
+| `LambdaFunction` | esbuild-bundled `NodejsFunction`, ESM, arm64, its own log group with retention, optional VPC placement |
+| `HttpApi` | HTTP API with a Lambda integration, custom domain, certificate, Route 53 alias and per-route throttling |
+| `DbmateMigrations` | A `LambdaFunction` carrying dbmate, `db/migrations` and `db/seeds`, wrapped in a CDK Trigger |
+| `GitHubOidcRole` | The OIDC provider and a deploy role trusted by one repo and branch |
+| `Budget` | A monthly AWS Budgets limit with email alerts |
+
+Conventions every recipe follows:
+
+1. One file, one class, props declared beside it in a `declare namespace`.
+   Shared helpers go in `recipes/helpers/` only once two recipes need them.
+2. Plain CDK types in (`ec2.IVpc`, `route53.IHostedZone`) and out: every
+   underlying resource is a public field (`.instance`, `.function`, `.api`),
+   and the stack wires recipes together in ordinary CDK. Recipes don't import
+   each other, except `DbmateMigrations` building on `LambdaFunction`.
+3. A `transform` hook per child resource, `(props) => props`, for anything
+   not exposed as a prop. It runs before construction, which is the only time
+   most settings can change.
+4. Defaults are the safe, cheap choice: encrypted, private, arm64, 2-week log
+   retention, stateful resources on `RemovalPolicy.SNAPSHOT` or `RETAIN` with
+   deletion protection. A prop opts out, never in, and there's no
+   `dev`/`prod` mode.
+5. CDK value types (`Duration`, `Size`), not strings to parse.
+6. No hard-coded physical names, so two stacks can't collide. The custom
+   domain is the one exception.
+7. No `permissions` prop: the stack uses grant methods, which keep the IAM
+   policy and the security-group rule together.
+8. No code comments, as everywhere in this repo.
+
+Tests are CDK `assertions` in Vitest, run by the root `npm test`: one file
+per recipe asserting the defaults in convention 4, plus one test that
+`Rotisserie-prod` synthesizes. Bundling is skipped under test
+(`aws:cdk:bundling-stacks: []`).
+
+### Networking and database access
+
+- The Lambdas run in the VPC's isolated subnets, which have no route to the
+  internet in either direction. No NAT gateway (~$32 a month), no VPC
+  endpoints: anything a Lambda needs is resolved at deploy time and passed in
+  as environment variables.
+- Security groups refer to each other, not to addresses: RDS accepts 5432
+  from the API and Migrator groups and nothing else.
+- Both Lambdas sign in as one Postgres role, `app`, with a short-lived IAM
+  token as the password. Signing is local, so it needs no network call.
+  `connection.ts` gets one extra branch: when `DATABASE_URL` is unset it
+  reads the `PG*` variables, sets `password` to a signer function (`pg`
+  calls it on every new connection, which is what makes a 15-minute token
+  work in a Lambda that lives for hours) and verifies TLS against the RDS CA
+  bundle committed at `apps/api/certs/`. Local dev, CI and the tests don't
+  change.
+- Who creates `app`: a `DbBootstrap` trigger that runs once on creation. It
+  is the only thing that ever reads the master password, which RDS generates
+  into Secrets Manager because that is the one secret store CloudFormation
+  can inject into a Lambda's environment inside a VPC with no network. This
+  is the one exception to "avoid Secrets Manager" below; the runtime path
+  stays IAM.
+- The `pg` pool is created outside the handler with `PGPOOL_MAX=1` so warm
+  invocations reuse it. No RDS Proxy (~$22 a month) at this scale.
+
+### Migrations
+
+`DbmateMigrations` runs as a CDK Trigger *during* `cdk deploy`, ordered
+before the API Lambda's update, so new code never sees the old schema (old
+code briefly sees the new one, so migrations add and a later deploy
+removes). A failed migration fails the deploy. The bundle holds a pinned
+dbmate linux-arm64 binary downloaded and checksummed at synth, plus
+`db/migrations` and `db/seeds`; adding a migration file changes the bundle,
+which is what reruns the trigger. The handler builds `DATABASE_URL` with a
+fresh token, runs `dbmate up`, then applies the seeds.
+
+There is no way into the database from a laptop or CI, on purpose:
+
+- Your recipe book goes in through the API: `load-recipes` moves from
+  providers to `PUT /recipes/:id`, signed in as you. Writes are upserts, so
+  it is safe to rerun.
+- `invite` is not needed in prod: the first sign-up starts a household.
+- The restore drill goes through the app (below).
+- A bastion (a `t4g.nano` in a public subnet, reached through SSM Session
+  Manager with no inbound ports, stopped by default at ~$0.65 a month) is
+  one recipe and a few stack lines away, and waits until the first time prod
+  needs `psql` by hand.
+
+### Deploys
+
+- A `deploy` job in `ci.yml` with `needs` on the existing jobs, on pushes to
+  `main` only, under `concurrency: deploy-prod`. PRs run `cdk synth` as the
+  infra's typecheck.
+- GitHub authenticates with OIDC (no long-lived keys). The role is trusted
+  by `repo:<owner>/rotisserie:ref:refs/heads/main` alone and may only assume
+  the `cdk-*` roles that `cdk bootstrap` creates.
+- By hand, once: `cdk bootstrap`, `Rotisserie-bootstrap`, and the first
+  `Rotisserie-prod` deploy (certificate validation and RDS creation take
+  10–20 minutes). After that, prod deploys only through CI.
+
+### Front door
+
+- One `$default` route to the Lambda, so Hono owns routing, plus explicit
+  routes for `POST /auth/sign-in`, `POST /auth/sign-up` and
+  `POST /household/join` so they can carry their own throttle: 2 requests a
+  second, burst 5. The stage default is 50 a second, burst 100, which bounds
+  the bill if the URL leaks.
+- API Gateway throttles are global per route, not per client. That stops a
+  runaway script; per-account lockout stays in "Left for later" above.
+- JSON access logs (request id, route, status, latency, integration latency
+  for spotting cold starts), 2-week retention. No CORS: a native app sends
+  no `Origin`. `GET /health` stays public.
+- HTTPS only; API Gateway provides it.
+
+### Operations
+
+- **Alarms,** six lines in the stack, one SNS email: API Lambda errors, HTTP
+  API 5xx, Lambda throttles, RDS free storage under 2 GB, RDS CPU over 80%
+  for 15 minutes, and the budget. A failed migration shows up as a red
+  deploy. No X-Ray, dashboards or Lambda Insights.
+- **Backups:** RDS automated backups with 7-day retention, maintenance and
+  backup windows in the small hours. The restore drill: restore the latest
+  snapshot to a new instance, point the API at it with one env var through
+  `cdk deploy`, open the app, delete the restored instance. Written down as
+  a runbook in `apps/infra/README.md` after the first run.
+- **Cold starts:** with light use most app opens hit a cold Lambda, and the
+  first screen fires two or three requests at once. Expect roughly 0.5–1s
+  after a quiet stretch, then fast. Measure before doing anything about it.
+
+### Build order
+
+Each step deploys on its own.
+
+1. Account setup, by hand: account, MFA, Identity Center, domain,
+   `cdk bootstrap` in `us-east-2`.
+2. `apps/infra` skeleton, `GitHubOidcRole`, `Budget`, the CI jobs. An empty
+   `Rotisserie-prod` through CI proves the pipeline before anything
+   expensive exists.
+3. `Vpc`, `PostgresDatabase`, `DbBootstrap`. The role `app` exists.
+4. `LambdaFunction`, `DbmateMigrations`. The schema exists in prod.
+5. API changes (`lambda.ts`, the IAM branch, the CA bundle, `load-recipes`
+   through the API), then `HttpApi` with the domain.
+6. Alarms, recipe tests, the restore drill, the runbook.
+
+Auth is already in the API (accounts and households, above). Password reset
+needs email, and the VPC Lambda has no outbound network, so it waits for a
+NAT (or fck-nat on a `t4g.nano`, about $3 a month) or another way to send
+mail.
+
+Things to avoid: a NAT gateway, RDS Proxy, Secrets Manager for anything but
+the master password, a public IP on the database, Aurora DSQL (no foreign
+keys, and the schema depends on them), and Aurora Serverless v2 scaled to
+zero (its ~15s resume would hit almost every time the app is opened).
 
 **Done when:** the phone talks to the deployed API over cellular data, and a
 restore has been tested.
@@ -294,6 +446,16 @@ restore has been tested.
    dinners with their own headcounts). Dropping it later needs no data
    migration, and the work would be in the app: the day picker, the Meals
    rows and Pick from Planned.
+4. ~~**Lambda, or a long-running server?**~~ Decided: Lambda. The API is
+   request/response only, Hono's handler is a four-line entry file, and
+   Fargate would add ~$7 plus an ALB. Cold starts are the price; measure
+   before paying anything to remove them.
+5. ~~**A bastion for the database?**~~ Decided: not yet. Every laptop task
+   (seeds, loading recipes, the restore drill) has a path that doesn't need
+   one; the bastion is for the first time prod needs `psql` by hand.
+6. ~~**One Postgres role or two?**~~ Decided: one, `app`, for the API and
+   the Migrator. Two (a schema owner and a DML-only role) would cost default
+   privilege grants for a risk a household app doesn't carry.
 
 ## The old app
 
