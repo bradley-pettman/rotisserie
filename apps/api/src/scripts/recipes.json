@@ -1,0 +1,1483 @@
+[
+  {
+    "id": "a2e093e4-608b-436f-8727-1e39885fc120",
+    "name": "Mushroom Chicken",
+    "sourceUrl": "https://diethood.com/baked-chicken-mushrooms/",
+    "prepTimeMinutes": 10,
+    "cookTimeMinutes": 25,
+    "servings": 4,
+    "notes": null,
+    "ingredients": [
+      {
+        "name": "butter",
+        "quantity": 1,
+        "unit": "tablespoon",
+        "notes": "divided"
+      },
+      {
+        "name": "olive oil",
+        "quantity": 2,
+        "unit": "tablespoon",
+        "notes": "divided"
+      },
+      {
+        "name": "button mushroom",
+        "quantity": 8,
+        "unit": "ounce",
+        "notes": "sliced"
+      },
+      {
+        "name": "yellow onion",
+        "quantity": 1,
+        "unit": null,
+        "notes": "large, thinly sliced"
+      },
+      {
+        "name": "garlic",
+        "quantity": 3,
+        "unit": "clove",
+        "notes": "minced"
+      },
+      {
+        "name": "chicken breast",
+        "quantity": 1,
+        "unit": "pound",
+        "notes": "4 small boneless skinless breasts, pounded to 1/4 inch"
+      },
+      {
+        "name": "garlic powder",
+        "quantity": 0.5,
+        "unit": "teaspoon",
+        "notes": null
+      },
+      {
+        "name": "smoked paprika",
+        "quantity": 0.5,
+        "unit": "teaspoon",
+        "notes": "or sweet paprika"
+      },
+      {
+        "name": "italian seasoning",
+        "quantity": 1,
+        "unit": "teaspoon",
+        "notes": null
+      },
+      {
+        "name": "shredded mozzarella cheese",
+        "quantity": 4,
+        "unit": "ounce",
+        "notes": "part-skim"
+      },
+      {
+        "name": "low-sodium chicken broth",
+        "quantity": 0.5,
+        "unit": "cup",
+        "notes": null
+      },
+      {
+        "name": "salt",
+        "quantity": null,
+        "unit": null,
+        "notes": "to taste"
+      },
+      {
+        "name": "black pepper",
+        "quantity": null,
+        "unit": null,
+        "notes": "to taste"
+      },
+      {
+        "name": "fresh parsley",
+        "quantity": null,
+        "unit": null,
+        "notes": "chopped, for garnish"
+      }
+    ],
+    "instructions": "Heat the oven to 375°F and grease a 9x13-inch baking dish.\nMelt half the butter with half the oil in a large skillet over medium-high heat. Cook the mushrooms and onion with salt and pepper for 5 minutes, then stir in the garlic for 20 seconds.\nSpread half the mushroom mixture in the baking dish and keep the rest aside.\nSeason the chicken with salt, pepper, garlic powder, paprika and Italian seasoning. Brown it in the rest of the butter and oil, about 2 minutes per side, and lay it over the mushrooms.\nPour the broth into the skillet, scrape up the browned bits and boil 4-5 minutes to reduce.\nCover the chicken with the remaining mushrooms, then the mozzarella, and pour the reduced broth over.\nBake uncovered about 15 minutes, until the chicken is cooked through. Garnish with parsley.",
+    "tags": ["main", "chicken"]
+  },
+  {
+    "id": "1db5b268-5771-49cb-ad7b-e2d8298e412f",
+    "name": "Filipino Picadillo",
+    "sourceUrl": "https://shareably.net/55-filipino-dishes-that-are-beyond-delicious-and-worth-feasting-on/6",
+    "prepTimeMinutes": null,
+    "cookTimeMinutes": null,
+    "servings": null,
+    "notes": "Served over rice with a fried egg, hot sauce and fried plantains (no plantain recipe given). Canned diced tomatoes (15 oz, with liquid) can replace the fresh ones.",
+    "ingredients": [
+      {
+        "name": "white rice",
+        "quantity": 2,
+        "unit": "cup",
+        "notes": "uncooked"
+      },
+      {
+        "name": "extra virgin olive oil",
+        "quantity": 3,
+        "unit": "tablespoon",
+        "notes": "divided"
+      },
+      {
+        "name": "yellow potato",
+        "quantity": 2.5,
+        "unit": "cup",
+        "notes": "diced, about 1 lb"
+      },
+      {
+        "name": "carrot",
+        "quantity": 2,
+        "unit": "cup",
+        "notes": "diced 1/2 inch"
+      },
+      {
+        "name": "onion",
+        "quantity": 1.5,
+        "unit": "cup",
+        "notes": "diced"
+      },
+      {
+        "name": "garlic",
+        "quantity": 1,
+        "unit": "tablespoon",
+        "notes": "fresh, minced"
+      },
+      {
+        "name": "ground beef",
+        "quantity": 1,
+        "unit": "pound",
+        "notes": "80/20"
+      },
+      {
+        "name": "ground pork",
+        "quantity": 0.5,
+        "unit": "pound",
+        "notes": null
+      },
+      {
+        "name": "tomato paste",
+        "quantity": 1,
+        "unit": "tablespoon",
+        "notes": null
+      },
+      {
+        "name": "plum tomato",
+        "quantity": 0.5,
+        "unit": "pound",
+        "notes": "diced; San Marzano works"
+      },
+      {
+        "name": "kosher salt",
+        "quantity": 0.5,
+        "unit": "teaspoon",
+        "notes": null
+      },
+      {
+        "name": "black pepper",
+        "quantity": 0.25,
+        "unit": "teaspoon",
+        "notes": null
+      },
+      {
+        "name": "raisins",
+        "quantity": 0.5,
+        "unit": "cup",
+        "notes": null
+      },
+      {
+        "name": "fish sauce",
+        "quantity": 1,
+        "unit": "tablespoon",
+        "notes": null
+      },
+      {
+        "name": "soy sauce",
+        "quantity": 3,
+        "unit": "tablespoon",
+        "notes": null
+      },
+      {
+        "name": "chili garlic paste",
+        "quantity": 1,
+        "unit": "teaspoon",
+        "notes": null
+      },
+      {
+        "name": "water",
+        "quantity": 1,
+        "unit": "cup",
+        "notes": null
+      },
+      {
+        "name": "frozen peas",
+        "quantity": 1,
+        "unit": "cup",
+        "notes": "thawed"
+      },
+      {
+        "name": "egg",
+        "quantity": null,
+        "unit": null,
+        "notes": "1 fried egg per serving, for topping"
+      }
+    ],
+    "instructions": "Start the rice, using twice as much water as rice.\nFry the potatoes and carrots in 2 tablespoons of the oil for about 15 minutes, until just shy of tender. Remove them and leave the oil in the pan.\nSauté the onion in the remaining tablespoon of oil for about 3 minutes, then add the garlic for about 1 minute.\nAdd the beef and pork and brown for about 8 minutes.\nPush the meat aside and cook the tomato paste for about 1 minute.\nStir in the tomatoes, salt, pepper, raisins, fish sauce, soy sauce, chili garlic paste, water and the fried potatoes and carrots.\nSimmer over medium heat until most of the liquid has cooked off.\nStir in the peas and take off the heat.\nFry the eggs sunny side up or over easy and serve over rice with the picadillo.",
+    "tags": ["main", "beef", "pork"]
+  },
+  {
+    "id": "4e587263-0a54-44fa-aedb-d66c3b053c05",
+    "name": "White Chicken Enchiladas",
+    "sourceUrl": "https://www.gonnawantseconds.com/white-chicken-enchiladas/",
+    "prepTimeMinutes": 10,
+    "cookTimeMinutes": 30,
+    "servings": 4,
+    "notes": "Rolled enchiladas can be assembled and refrigerated up to 24 hours with the sauce kept separate; add the sauce just before baking. Use full-fat sour cream so the sauce doesn't turn runny. Leftovers keep 3-4 days.",
+    "ingredients": [
+      {
+        "name": "small flour tortilla",
+        "quantity": 8,
+        "unit": null,
+        "notes": "8-10"
+      },
+      {
+        "name": "cooked chicken",
+        "quantity": 3,
+        "unit": "cup",
+        "notes": "shredded or chopped"
+      },
+      {
+        "name": "shredded monterey jack cheese",
+        "quantity": 3,
+        "unit": "cup",
+        "notes": "divided"
+      },
+      {
+        "name": "unsalted butter",
+        "quantity": 3,
+        "unit": "tablespoon",
+        "notes": null
+      },
+      {
+        "name": "flour",
+        "quantity": 3,
+        "unit": "tablespoon",
+        "notes": null
+      },
+      {
+        "name": "chicken broth",
+        "quantity": 2,
+        "unit": "cup",
+        "notes": null
+      },
+      {
+        "name": "sour cream",
+        "quantity": 1,
+        "unit": "cup",
+        "notes": "full-fat"
+      },
+      {
+        "name": "diced green chilies",
+        "quantity": 1,
+        "unit": "can",
+        "notes": "4 oz, mild"
+      },
+      {
+        "name": "green onion",
+        "quantity": 2,
+        "unit": "tablespoon",
+        "notes": "sliced, 2-3 tablespoons"
+      }
+    ],
+    "instructions": "Heat the oven to 350°F and grease a 9x13-inch baking dish.\nMix the chicken with 1 cup of the cheese, fill each tortilla, roll up and set seam side down in the dish.\nMelt the butter in a skillet, whisk in the flour and cook 1 minute.\nOff the heat, whisk in the broth, then return to the heat and cook until thickened and bubbly.\nLet the sauce cool 3-5 minutes so the sour cream won't curdle, then stir in the sour cream and green chilies until smooth.\nPour the sauce over the enchiladas and top with the remaining cheese.\nBake 20-25 minutes until bubbly and heated through, then broil briefly until the top is golden.\nTop with sliced green onions and serve.",
+    "tags": ["main", "chicken", "mexican", "casserole"]
+  },
+  {
+    "id": "67017108-8a9a-49c5-b25b-b1247efed4f6",
+    "name": "Pizza Crescents",
+    "sourceUrl": "https://www.pillsbury.com/recipes/pepperoni-pizza-crescent-rolls/051c5e19-4557-44d0-892b-c5ddb72e4637",
+    "prepTimeMinutes": 15,
+    "cookTimeMinutes": 15,
+    "servings": 8,
+    "notes": "Cook time is not listed separately on the page; baking takes 12-15 minutes. Rolls can be shaped up to 2 hours ahead and refrigerated. Leftovers keep 2 days refrigerated.",
+    "ingredients": [
+      {
+        "name": "refrigerated crescent roll dough",
+        "quantity": 1,
+        "unit": "can",
+        "notes": "8 oz, 8 count"
+      },
+      {
+        "name": "pepperoni",
+        "quantity": 24,
+        "unit": "slice",
+        "notes": "about 5 oz"
+      },
+      {
+        "name": "shredded mozzarella cheese",
+        "quantity": 0.5,
+        "unit": "cup",
+        "notes": "2 oz"
+      },
+      {
+        "name": "marinara sauce",
+        "quantity": 1,
+        "unit": "cup",
+        "notes": "heated, for dipping; pizza sauce also works"
+      }
+    ],
+    "instructions": "Heat the oven to 375°F.\nSeparate the dough into 8 triangles and pat each out slightly.\nLay 3 slightly overlapping pepperoni slices in the center of each triangle.\nSprinkle about 1 tablespoon of mozzarella on each.\nRoll each triangle up from the short side toward the opposite point and set point side down on an ungreased baking sheet.\nBake 12-15 minutes until golden brown.\nServe warm with heated marinara or pizza sauce for dipping.",
+    "tags": ["main", "italian", "quick"]
+  },
+  {
+    "id": "dac76dfe-4d10-4978-b30a-6b1d0e5cb4f8",
+    "name": "Italian Turkey Meatloaf & Smashed Potatoes",
+    "sourceUrl": "https://reciperunner.com/italian-turkey-meatloaf-with-parmesan-rosemary-smashed-potatoes/",
+    "prepTimeMinutes": 20,
+    "cookTimeMinutes": 60,
+    "servings": 4,
+    "notes": "Boil and prep the potatoes while the meatloaf bakes, and raise the oven to 400°F for the last few minutes so the potatoes can go in as soon as the meatloaf comes out.",
+    "ingredients": [
+      {
+        "name": "lean ground turkey",
+        "quantity": 1,
+        "unit": "pound",
+        "notes": "meatloaf"
+      },
+      {
+        "name": "marinara sauce",
+        "quantity": 1,
+        "unit": "cup",
+        "notes": "divided; half in the meatloaf, half on top"
+      },
+      {
+        "name": "panko",
+        "quantity": 0.25,
+        "unit": "cup",
+        "notes": "gluten-free if needed"
+      },
+      {
+        "name": "shredded parmesan cheese",
+        "quantity": 0.33,
+        "unit": "cup",
+        "notes": "for the meatloaf"
+      },
+      {
+        "name": "yellow onion",
+        "quantity": 0.5,
+        "unit": null,
+        "notes": "finely chopped"
+      },
+      {
+        "name": "flat-leaf parsley",
+        "quantity": 0.25,
+        "unit": "cup",
+        "notes": "chopped"
+      },
+      {
+        "name": "garlic powder",
+        "quantity": 0.75,
+        "unit": "teaspoon",
+        "notes": null
+      },
+      {
+        "name": "italian seasoning",
+        "quantity": 0.5,
+        "unit": "teaspoon",
+        "notes": null
+      },
+      {
+        "name": "dried basil",
+        "quantity": 0.5,
+        "unit": "teaspoon",
+        "notes": null
+      },
+      {
+        "name": "red pepper flakes",
+        "quantity": 0.25,
+        "unit": "teaspoon",
+        "notes": "optional"
+      },
+      {
+        "name": "kosher salt",
+        "quantity": 0.5,
+        "unit": "teaspoon",
+        "notes": "for the meatloaf, plus more for potato water and seasoning"
+      },
+      {
+        "name": "black pepper",
+        "quantity": null,
+        "unit": null,
+        "notes": "to taste"
+      },
+      {
+        "name": "egg",
+        "quantity": 1,
+        "unit": null,
+        "notes": null
+      },
+      {
+        "name": "balsamic vinegar",
+        "quantity": 1,
+        "unit": "tablespoon",
+        "notes": null
+      },
+      {
+        "name": "worcestershire sauce",
+        "quantity": 1,
+        "unit": "teaspoon",
+        "notes": null
+      },
+      {
+        "name": "fingerling potato",
+        "quantity": 12,
+        "unit": null,
+        "notes": "or baby potatoes, scrubbed"
+      },
+      {
+        "name": "olive oil",
+        "quantity": null,
+        "unit": null,
+        "notes": "for drizzling potatoes, to taste"
+      },
+      {
+        "name": "shredded parmesan cheese",
+        "quantity": 0.25,
+        "unit": "cup",
+        "notes": "for the potatoes"
+      },
+      {
+        "name": "fresh rosemary",
+        "quantity": 2,
+        "unit": "teaspoon",
+        "notes": "chopped"
+      }
+    ],
+    "instructions": "Heat the oven to 350°F and line a baking sheet with parchment.\nMix 1/2 cup of the marinara with the panko, Parmesan, onion, parsley, seasonings, egg, balsamic and Worcestershire, then gently work in the turkey by hand.\nShape into an 8x4-inch loaf on the sheet and spread the remaining 1/2 cup marinara on top.\nBake on the middle rack 45-50 minutes until a thermometer reads 160°F. Add extra Parmesan in the last 10 minutes if you like, then rest 10 minutes before slicing.\nMeanwhile, cover the potatoes with salted water, bring to a boil, then simmer 15-18 minutes until fork-tender.\nRaise the oven to 400°F, line a sheet with parchment and drain the potatoes onto it.\nSmash each potato to about 1/2 inch thick, drizzle with olive oil, season with salt, pepper and rosemary.\nBake about 20 minutes, sprinkle with Parmesan and bake 2-3 minutes more until melted. Serve hot.",
+    "tags": ["main", "turkey", "italian"]
+  },
+  {
+    "id": "705c6300-74b0-4c8e-bfd2-c2e821c689c5",
+    "name": "Teriyaki Chicken Salad",
+    "sourceUrl": "https://www.yellowblissroad.com/teriyaki-chicken-salad-red-robin-copycat/",
+    "prepTimeMinutes": 30,
+    "cookTimeMinutes": 25,
+    "servings": 4,
+    "notes": "A copycat of Red Robin's salad. The chicken needs at least 30 minutes in the marinade.",
+    "ingredients": [
+      {
+        "name": "chicken tender",
+        "quantity": 6,
+        "unit": null,
+        "notes": "or 2 large breasts"
+      },
+      {
+        "name": "teriyaki sauce",
+        "quantity": 1,
+        "unit": "cup",
+        "notes": null
+      },
+      {
+        "name": "romaine lettuce",
+        "quantity": 8,
+        "unit": "cup",
+        "notes": "chopped"
+      },
+      {
+        "name": "carrot",
+        "quantity": 1,
+        "unit": null,
+        "notes": "large, shredded"
+      },
+      {
+        "name": "red cabbage",
+        "quantity": 0.5,
+        "unit": "cup",
+        "notes": "shredded"
+      },
+      {
+        "name": "edamame",
+        "quantity": 0.5,
+        "unit": "cup",
+        "notes": null
+      },
+      {
+        "name": "mandarin oranges",
+        "quantity": 1,
+        "unit": "can",
+        "notes": "15 oz, drained"
+      },
+      {
+        "name": "sliced almonds",
+        "quantity": 0.25,
+        "unit": "cup",
+        "notes": "toasted"
+      },
+      {
+        "name": "sesame seeds",
+        "quantity": 1,
+        "unit": "tablespoon",
+        "notes": "toasted"
+      },
+      {
+        "name": "mayonnaise",
+        "quantity": 0.67,
+        "unit": "cup",
+        "notes": "dressing"
+      },
+      {
+        "name": "sugar",
+        "quantity": 3,
+        "unit": "teaspoon",
+        "notes": "dressing"
+      },
+      {
+        "name": "honey",
+        "quantity": 1.5,
+        "unit": "tablespoon",
+        "notes": "dressing"
+      },
+      {
+        "name": "yellow mustard",
+        "quantity": 1,
+        "unit": "tablespoon",
+        "notes": "dressing"
+      },
+      {
+        "name": "dijon mustard",
+        "quantity": 1.5,
+        "unit": "tablespoon",
+        "notes": "dressing"
+      },
+      {
+        "name": "apple cider vinegar",
+        "quantity": 1,
+        "unit": "tablespoon",
+        "notes": "dressing"
+      },
+      {
+        "name": "olive oil",
+        "quantity": 2,
+        "unit": "tablespoon",
+        "notes": "dressing"
+      }
+    ],
+    "instructions": "Marinate the chicken in the teriyaki sauce in a sealed bag for at least 30 minutes.\nHeat the oven to 400°F. Bake the chicken in a foil-lined dish for 10-20 minutes, depending on thickness, then let it cool and slice.\nWhile the oven heats, toast the almonds and sesame seeds on a sheet pan for 5-7 minutes.\nShake or whisk the mayonnaise, sugar, honey, both mustards, vinegar and oil into a dressing and chill it.\nToss the lettuce, carrot, cabbage and edamame with half the dressing.\nTop with the chicken, mandarin oranges, almonds and sesame seeds, and serve the rest of the dressing on the side.",
+    "tags": ["main", "chicken", "salad", "asian"]
+  },
+  {
+    "id": "40f378b6-2375-4643-8a1c-c67aba8fbd30",
+    "name": "Beef Stroganoff",
+    "sourceUrl": "https://www.gimmesomeoven.com/easy-beef-stroganoff-recipe/",
+    "prepTimeMinutes": 5,
+    "cookTimeMinutes": 25,
+    "servings": 4,
+    "notes": null,
+    "ingredients": [
+      {
+        "name": "wide egg noodles",
+        "quantity": 1,
+        "unit": "pound",
+        "notes": "uncooked"
+      },
+      {
+        "name": "butter",
+        "quantity": 0.25,
+        "unit": "cup",
+        "notes": "divided"
+      },
+      {
+        "name": "flank steak",
+        "quantity": 1.5,
+        "unit": "pound",
+        "notes": "thinly sliced"
+      },
+      {
+        "name": "white onion",
+        "quantity": 1,
+        "unit": null,
+        "notes": "small, thinly sliced"
+      },
+      {
+        "name": "sliced mushrooms",
+        "quantity": 1,
+        "unit": "pound",
+        "notes": "button and baby bella"
+      },
+      {
+        "name": "garlic",
+        "quantity": 4,
+        "unit": "clove",
+        "notes": "minced"
+      },
+      {
+        "name": "dry white wine",
+        "quantity": 0.5,
+        "unit": "cup",
+        "notes": null
+      },
+      {
+        "name": "beef stock",
+        "quantity": 1.5,
+        "unit": "cup",
+        "notes": null
+      },
+      {
+        "name": "worcestershire sauce",
+        "quantity": 1,
+        "unit": "tablespoon",
+        "notes": null
+      },
+      {
+        "name": "flour",
+        "quantity": 3,
+        "unit": "tablespoon",
+        "notes": "all-purpose"
+      },
+      {
+        "name": "plain greek yogurt",
+        "quantity": 0.5,
+        "unit": "cup",
+        "notes": "or light sour cream"
+      },
+      {
+        "name": "salt",
+        "quantity": null,
+        "unit": null,
+        "notes": "to taste"
+      },
+      {
+        "name": "black pepper",
+        "quantity": null,
+        "unit": null,
+        "notes": "to taste"
+      },
+      {
+        "name": "fresh parsley",
+        "quantity": null,
+        "unit": null,
+        "notes": "chopped, optional"
+      }
+    ],
+    "instructions": "Bring a big pot of well-salted water to a boil, cook the noodles al dente while the sauce comes together, and drain.\nMelt 2 tablespoons of the butter in a large sauté pan over medium-high heat. Season the steak with salt and pepper and sear it in a single layer for about 3 minutes, then flip and brown 2-3 minutes more. Work in batches if needed and set the steak aside.\nMelt the remaining butter in the pan and cook the onion for 3 minutes. Add the mushrooms and cook 5-7 minutes until soft, then the garlic for 1 minute.\nPour in the wine, scrape up the browned bits and let it reduce for 3 minutes.\nWhisk the stock, Worcestershire and flour until smooth, add to the pan and simmer 5 minutes, stirring now and then.\nStir in the yogurt and the steak, season to taste, and serve over the noodles with parsley.",
+    "tags": ["main", "beef", "pasta"]
+  },
+  {
+    "id": "c7b2bade-584c-4177-9e55-9ec23b41e0fe",
+    "name": "Summer Minestrone with Turkey Meatballs",
+    "sourceUrl": "https://damndelicious.net/2018/06/18/summer-minestrone-with-turkey-meatballs/",
+    "prepTimeMinutes": 20,
+    "cookTimeMinutes": 20,
+    "servings": 6,
+    "notes": null,
+    "ingredients": [
+      {
+        "name": "ground turkey breast",
+        "quantity": 1,
+        "unit": "pound",
+        "notes": "meatballs"
+      },
+      {
+        "name": "panko",
+        "quantity": 0.33,
+        "unit": "cup",
+        "notes": "meatballs"
+      },
+      {
+        "name": "grated parmesan cheese",
+        "quantity": 0.25,
+        "unit": "cup",
+        "notes": "meatballs"
+      },
+      {
+        "name": "garlic",
+        "quantity": 2,
+        "unit": "clove",
+        "notes": "minced, meatballs"
+      },
+      {
+        "name": "dried basil",
+        "quantity": 1,
+        "unit": "teaspoon",
+        "notes": "meatballs"
+      },
+      {
+        "name": "red pepper flakes",
+        "quantity": 0.25,
+        "unit": "teaspoon",
+        "notes": "optional, meatballs"
+      },
+      {
+        "name": "olive oil",
+        "quantity": 2,
+        "unit": "tablespoon",
+        "notes": "divided"
+      },
+      {
+        "name": "garlic",
+        "quantity": 2,
+        "unit": "clove",
+        "notes": "minced, soup"
+      },
+      {
+        "name": "sweet onion",
+        "quantity": 1,
+        "unit": null,
+        "notes": "diced"
+      },
+      {
+        "name": "carrot",
+        "quantity": 2,
+        "unit": null,
+        "notes": "peeled and diced"
+      },
+      {
+        "name": "celery",
+        "quantity": 1,
+        "unit": "stalk",
+        "notes": "diced"
+      },
+      {
+        "name": "dried thyme",
+        "quantity": 0.5,
+        "unit": "teaspoon",
+        "notes": null
+      },
+      {
+        "name": "chicken stock",
+        "quantity": 8,
+        "unit": "cup",
+        "notes": null
+      },
+      {
+        "name": "bay leaf",
+        "quantity": 2,
+        "unit": null,
+        "notes": null
+      },
+      {
+        "name": "ditalini pasta",
+        "quantity": 0.75,
+        "unit": "cup",
+        "notes": null
+      },
+      {
+        "name": "zucchini",
+        "quantity": 2,
+        "unit": null,
+        "notes": "medium, halved and sliced"
+      },
+      {
+        "name": "baby spinach",
+        "quantity": 3,
+        "unit": "cup",
+        "notes": null
+      },
+      {
+        "name": "lemon juice",
+        "quantity": 3,
+        "unit": "tablespoon",
+        "notes": "fresh"
+      },
+      {
+        "name": "fresh parsley",
+        "quantity": 2,
+        "unit": "tablespoon",
+        "notes": "chopped"
+      },
+      {
+        "name": "kosher salt",
+        "quantity": null,
+        "unit": null,
+        "notes": "to taste"
+      },
+      {
+        "name": "black pepper",
+        "quantity": null,
+        "unit": null,
+        "notes": "to taste"
+      }
+    ],
+    "instructions": "Mix the turkey, panko, Parmesan, 2 cloves of the garlic, basil and red pepper flakes with salt and pepper, and roll into about 30 meatballs, 3/4 inch across.\nBrown the meatballs in batches in 1 tablespoon of the oil in a large pot over medium heat, 2-3 minutes, then set them aside.\nAdd the rest of the oil and cook the remaining garlic with the onion, carrots and celery until tender, 3-4 minutes. Stir in the thyme for a minute.\nAdd the stock and bay leaves and bring to a boil.\nAdd the pasta and meatballs and simmer 10-12 minutes, until the pasta is tender and the meatballs are cooked through.\nStir in the zucchini and spinach until the spinach wilts, about 2 minutes.\nFinish with the lemon juice and parsley, season to taste and serve right away.",
+    "tags": ["main", "soup", "turkey", "italian"]
+  },
+  {
+    "id": "01ea2049-8ad9-4a9f-b907-f0114c670703",
+    "name": "Honey Sriracha Salmon Bowls",
+    "sourceUrl": "https://eatwithclarity.com/honey-sriracha-salmon-bowls/",
+    "prepTimeMinutes": 10,
+    "cookTimeMinutes": 10,
+    "servings": 4,
+    "notes": "Air fryer option: 400°F for 7-9 minutes, then thicken the leftover marinade on the stove with 1/2 teaspoon cornstarch and toss the salmon in it.",
+    "ingredients": [
+      {
+        "name": "salmon fillet",
+        "quantity": 4,
+        "unit": null,
+        "notes": "4-6 oz each"
+      },
+      {
+        "name": "low-sodium soy sauce",
+        "quantity": 3,
+        "unit": "tablespoon",
+        "notes": "or tamari"
+      },
+      {
+        "name": "honey",
+        "quantity": 2,
+        "unit": "tablespoon",
+        "notes": null
+      },
+      {
+        "name": "sriracha",
+        "quantity": 2,
+        "unit": "tablespoon",
+        "notes": null
+      },
+      {
+        "name": "garlic",
+        "quantity": 2,
+        "unit": "teaspoon",
+        "notes": "minced"
+      },
+      {
+        "name": "water",
+        "quantity": 3,
+        "unit": "tablespoon",
+        "notes": null
+      },
+      {
+        "name": "cooked white rice",
+        "quantity": 2,
+        "unit": "cup",
+        "notes": null
+      },
+      {
+        "name": "avocado",
+        "quantity": 1,
+        "unit": null,
+        "notes": "sliced"
+      },
+      {
+        "name": "cucumber",
+        "quantity": 1,
+        "unit": null,
+        "notes": "sliced"
+      },
+      {
+        "name": "edamame",
+        "quantity": 1,
+        "unit": "cup",
+        "notes": "cooked"
+      },
+      {
+        "name": "sriracha mayo",
+        "quantity": 0.5,
+        "unit": "cup",
+        "notes": null
+      },
+      {
+        "name": "sesame seeds",
+        "quantity": null,
+        "unit": null,
+        "notes": "for topping"
+      },
+      {
+        "name": "red pepper flakes",
+        "quantity": null,
+        "unit": null,
+        "notes": "for topping"
+      }
+    ],
+    "instructions": "Skin the salmon if you like and cut it into 1-inch cubes.\nWhisk the soy sauce, honey, sriracha, garlic and water, and marinate the salmon in it for 20 minutes to an hour.\nSear the salmon in an oiled skillet over medium-high heat, 2-3 minutes per side, keeping the marinade aside.\nPour in the reserved marinade and cook until it thickens into a glaze.\nBuild bowls of rice, salmon, avocado, cucumber and edamame, and top with sriracha mayo, red pepper flakes and sesame seeds.",
+    "tags": ["main", "seafood", "bowl", "asian"]
+  },
+  {
+    "id": "fa0c04c3-7acf-4ff6-b317-9556253bc3ca",
+    "name": "Veggie Fried Rice",
+    "sourceUrl": "https://stylishcravings.com/easy-to-make-veggie-fried-rice/",
+    "prepTimeMinutes": null,
+    "cookTimeMinutes": null,
+    "servings": null,
+    "notes": "About 15 minutes total. Microwavable rice and a frozen mixed vegetable bag keep it fast. Good with shrimp, chicken, beef or a fried egg.",
+    "ingredients": [
+      {
+        "name": "brown rice",
+        "quantity": 2,
+        "unit": "cup",
+        "notes": "microwavable works"
+      },
+      {
+        "name": "low-sodium soy sauce",
+        "quantity": 1,
+        "unit": "tablespoon",
+        "notes": null
+      },
+      {
+        "name": "garlic powder",
+        "quantity": 1,
+        "unit": "tablespoon",
+        "notes": null
+      },
+      {
+        "name": "ginger",
+        "quantity": 0.5,
+        "unit": "tablespoon",
+        "notes": null
+      },
+      {
+        "name": "mixed vegetables",
+        "quantity": 1,
+        "unit": "cup",
+        "notes": "frozen bag"
+      },
+      {
+        "name": "sesame oil",
+        "quantity": 1,
+        "unit": "tablespoon",
+        "notes": null
+      },
+      {
+        "name": "scallion",
+        "quantity": 2,
+        "unit": null,
+        "notes": "sliced, for topping"
+      },
+      {
+        "name": "red pepper flakes",
+        "quantity": 1,
+        "unit": "tablespoon",
+        "notes": "optional, or hot sauce"
+      }
+    ],
+    "instructions": "Cook the rice and the mixed vegetables according to their package directions.\nHeat the sesame oil in a skillet over medium heat.\nAdd the vegetables and rice and stir to combine.\nStir in the garlic powder, ginger and soy sauce.\nCook for a few minutes, until heated through and lightly crisped.\nTop with sliced scallions and serve.",
+    "tags": ["main", "vegetarian", "asian", "quick"]
+  },
+  {
+    "id": "8fe3082c-b0fe-4ffc-b84d-7a21a45cc24a",
+    "name": "Restaurant-Style Fried Rice",
+    "sourceUrl": "https://www.faithfullyglutenfree.com/fried-rice-restaurant-style/",
+    "prepTimeMinutes": 30,
+    "cookTimeMinutes": 10,
+    "servings": 8,
+    "notes": "Day-old rice works well; cook the rice and frozen vegetables per package directions first.",
+    "ingredients": [
+      {
+        "name": "white rice",
+        "quantity": 2,
+        "unit": "cup",
+        "notes": "uncooked, cooked per package directions"
+      },
+      {
+        "name": "vegetable oil",
+        "quantity": 2,
+        "unit": "tablespoon",
+        "notes": null
+      },
+      {
+        "name": "onion",
+        "quantity": 1,
+        "unit": null,
+        "notes": "small, diced"
+      },
+      {
+        "name": "frozen mixed vegetables",
+        "quantity": 2,
+        "unit": "cup",
+        "notes": "cooked per package directions"
+      },
+      {
+        "name": "egg",
+        "quantity": 2,
+        "unit": null,
+        "notes": "large"
+      },
+      {
+        "name": "gluten-free soy sauce",
+        "quantity": 2,
+        "unit": "tablespoon",
+        "notes": "2-3 tablespoons, to taste"
+      },
+      {
+        "name": "sesame oil",
+        "quantity": null,
+        "unit": null,
+        "notes": "to taste, optional"
+      },
+      {
+        "name": "green onion",
+        "quantity": null,
+        "unit": null,
+        "notes": "green tops, for garnish"
+      }
+    ],
+    "instructions": "Cook the rice and the frozen vegetables separately according to their package directions.\nHeat a wok or large skillet over medium-high heat and add the oil.\nCook the diced onion in the hot oil until tender, 2-3 minutes.\nStir in the cooked rice and heat through, a few minutes longer if it was made ahead.\nAdd the cooked vegetables and stir for a few more minutes.\nPush everything to the sides, crack the eggs into the middle and scramble quickly, then mix them into the rice.\nSeason with the soy sauce, toss until evenly coated, and drizzle with sesame oil if using.\nTop with the onion greens and serve.",
+    "tags": ["main", "asian", "vegetarian"]
+  },
+  {
+    "id": "3f7fd9a1-5bd8-42b7-9700-c65581f8b3f1",
+    "name": "Toasted Ravioli",
+    "sourceUrl": "http://veggingattheshore.com/2017/03/easy-weeknight-toasted-ravioli/",
+    "prepTimeMinutes": null,
+    "cookTimeMinutes": 15,
+    "servings": null,
+    "notes": "Baked rather than fried; the post says it is ready in under half an hour.",
+    "ingredients": [
+      {
+        "name": "ravioli",
+        "quantity": 1,
+        "unit": "package",
+        "notes": "store-bought"
+      },
+      {
+        "name": "egg",
+        "quantity": 2,
+        "unit": null,
+        "notes": "lightly beaten"
+      },
+      {
+        "name": "seasoned breadcrumbs",
+        "quantity": 2,
+        "unit": "cup",
+        "notes": null
+      },
+      {
+        "name": "marinara sauce",
+        "quantity": null,
+        "unit": null,
+        "notes": "jarred, for serving"
+      }
+    ],
+    "instructions": "Heat the oven to 375°F and line a baking sheet with parchment.\nDip each ravioli in the beaten egg, then press into the breadcrumbs to coat.\nArrange the breaded ravioli on the baking sheet.\nBake about 15 minutes, until crisp on the outside.\nServe warm with marinara for dipping.",
+    "tags": ["main", "italian", "quick"]
+  },
+  {
+    "id": "a997e40d-817b-46c8-b580-4e14d92e3896",
+    "name": "Instant Pot Mac and Cheese",
+    "sourceUrl": "https://www.spendwithpennies.com/instant-pot-mac-and-cheese/",
+    "prepTimeMinutes": 10,
+    "cookTimeMinutes": 6,
+    "servings": 8,
+    "notes": "Takes about 10 minutes for the pot to come to pressure. Do not drain the pasta liquid.",
+    "ingredients": [
+      {
+        "name": "elbow macaroni",
+        "quantity": 10,
+        "unit": "ounce",
+        "notes": "about 2.5 cups"
+      },
+      {
+        "name": "water",
+        "quantity": 3,
+        "unit": "cup",
+        "notes": null
+      },
+      {
+        "name": "butter",
+        "quantity": 1,
+        "unit": "tablespoon",
+        "notes": null
+      },
+      {
+        "name": "dry mustard powder",
+        "quantity": 1,
+        "unit": "teaspoon",
+        "notes": null
+      },
+      {
+        "name": "onion powder",
+        "quantity": 0.5,
+        "unit": "teaspoon",
+        "notes": null
+      },
+      {
+        "name": "seasoned salt",
+        "quantity": 0.25,
+        "unit": "teaspoon",
+        "notes": "or to taste"
+      },
+      {
+        "name": "black pepper",
+        "quantity": 0.25,
+        "unit": "teaspoon",
+        "notes": null
+      },
+      {
+        "name": "cream cheese",
+        "quantity": 3,
+        "unit": "ounce",
+        "notes": "about 1/3 cup"
+      },
+      {
+        "name": "milk",
+        "quantity": 0.75,
+        "unit": "cup",
+        "notes": "divided"
+      },
+      {
+        "name": "shredded sharp cheddar cheese",
+        "quantity": 2.5,
+        "unit": "cup",
+        "notes": "about 10 ounces"
+      },
+      {
+        "name": "shredded parmesan cheese",
+        "quantity": 2,
+        "unit": "tablespoon",
+        "notes": null
+      }
+    ],
+    "instructions": "Put the dry macaroni, water, butter, mustard powder, onion powder, seasoned salt and pepper in the Instant Pot.\nLock the lid, set the valve to sealing, and cook on high pressure for 6 minutes.\nQuick release the pressure when done and leave the liquid in the pot.\nStir in the cream cheese until melted, then blend in 1/4 cup of the milk.\nAdd the cheddar and parmesan and stir until melted.\nThin with more of the remaining milk as needed for a creamy sauce; you may not need all of it.\nServe right away.",
+    "tags": ["main", "pasta", "instant pot", "vegetarian"]
+  },
+  {
+    "id": "e919e03e-8520-4ab4-a30b-8fc6f290e8a6",
+    "name": "Parmesan Crusted Chicken",
+    "sourceUrl": "https://dinnerthendessert.com/parmesan-crusted-chicken/",
+    "prepTimeMinutes": 10,
+    "cookTimeMinutes": 35,
+    "servings": 4,
+    "notes": "With regular breadcrumbs or the granulated Parmesan in a shaker, dip the chicken in a beaten egg first so the crust sticks.",
+    "ingredients": [
+      {
+        "name": "chicken breast",
+        "quantity": 4,
+        "unit": null,
+        "notes": "6 oz each"
+      },
+      {
+        "name": "kosher salt",
+        "quantity": 0.5,
+        "unit": "teaspoon",
+        "notes": null
+      },
+      {
+        "name": "black pepper",
+        "quantity": 0.5,
+        "unit": "teaspoon",
+        "notes": "coarse ground"
+      },
+      {
+        "name": "olive oil",
+        "quantity": 0.25,
+        "unit": "cup",
+        "notes": null
+      },
+      {
+        "name": "shredded parmesan cheese",
+        "quantity": 1,
+        "unit": "cup",
+        "notes": "shredded, not granulated"
+      },
+      {
+        "name": "panko",
+        "quantity": 1,
+        "unit": "cup",
+        "notes": null
+      }
+    ],
+    "instructions": "Heat the oven to 350°F.\nRub the chicken all over with the oil, salt and pepper.\nMix the Parmesan and panko in a bowl and press each breast into it until well coated.\nBake in a baking pan for 30-35 minutes, flipping gently with a spatula halfway through.",
+    "tags": ["main", "chicken"]
+  },
+  {
+    "id": "7b09254d-9bed-466b-a3c1-ad95aecfa346",
+    "name": "Corn & Zucchini Chowder",
+    "sourceUrl": "https://lifemadesimplebakes.com/summer-corn-and-zucchini-chowder-5/",
+    "prepTimeMinutes": 20,
+    "cookTimeMinutes": 30,
+    "servings": 6,
+    "notes": "Keeps 3 days in the fridge; freezes up to 2 months but the dairy may change texture.",
+    "ingredients": [
+      {
+        "name": "bacon",
+        "quantity": 4,
+        "unit": "slice",
+        "notes": "chopped"
+      },
+      {
+        "name": "yellow onion",
+        "quantity": 0.5,
+        "unit": null,
+        "notes": "large, diced"
+      },
+      {
+        "name": "celery",
+        "quantity": 2,
+        "unit": "stalk",
+        "notes": "finely diced"
+      },
+      {
+        "name": "corn",
+        "quantity": 5,
+        "unit": null,
+        "notes": "ears, kernels cut from the cob"
+      },
+      {
+        "name": "garlic",
+        "quantity": 4,
+        "unit": "clove",
+        "notes": "minced"
+      },
+      {
+        "name": "low-sodium chicken broth",
+        "quantity": 5,
+        "unit": "cup",
+        "notes": null
+      },
+      {
+        "name": "russet potato",
+        "quantity": 2,
+        "unit": null,
+        "notes": "peeled, cut into 1/4-inch cubes"
+      },
+      {
+        "name": "kosher salt",
+        "quantity": 1.25,
+        "unit": "teaspoon",
+        "notes": null
+      },
+      {
+        "name": "black pepper",
+        "quantity": 0.5,
+        "unit": "teaspoon",
+        "notes": "ground"
+      },
+      {
+        "name": "paprika",
+        "quantity": 0.5,
+        "unit": "teaspoon",
+        "notes": null
+      },
+      {
+        "name": "dried parsley",
+        "quantity": 0.5,
+        "unit": "teaspoon",
+        "notes": null
+      },
+      {
+        "name": "dried thyme",
+        "quantity": 0.25,
+        "unit": "teaspoon",
+        "notes": null
+      },
+      {
+        "name": "cayenne pepper",
+        "quantity": 0.13,
+        "unit": "teaspoon",
+        "notes": "1/8 tsp"
+      },
+      {
+        "name": "zucchini",
+        "quantity": 1,
+        "unit": null,
+        "notes": "large, quartered lengthwise and sliced"
+      },
+      {
+        "name": "yellow squash",
+        "quantity": 1,
+        "unit": null,
+        "notes": "large, quartered lengthwise and sliced"
+      },
+      {
+        "name": "half-and-half",
+        "quantity": 2,
+        "unit": "cup",
+        "notes": "or whole milk"
+      }
+    ],
+    "instructions": "Cook the chopped bacon in a large Dutch oven over medium heat until crisp, about 5 minutes.\nAdd the onion and celery and cook 3 minutes, then add the corn and cook 4 minutes more. Stir in the garlic for about 1 minute until fragrant.\nPour in the broth, raise the heat to medium-high and bring to a simmer.\nAdd the potatoes, salt, pepper, paprika, parsley, thyme and cayenne. Lower to medium and cook 10 minutes.\nAdd the zucchini and yellow squash and cook 10 to 12 minutes more, until the potatoes are fork-tender and the squash is cooked through.\nBlend 2 cups of the chowder until smooth, 1 to 2 minutes, then return it to the pot.\nStir in the half-and-half, take off the heat and let it rest 10 minutes before serving.",
+    "tags": ["main", "soup", "one pot"]
+  },
+  {
+    "id": "8468f3d7-628c-4394-811c-65aad76e7166",
+    "name": "Air Fryer Honey BBQ Chicken Tenders",
+    "sourceUrl": "https://chickenairfryerrecipes.com/air-fryer-honey-bbq-chicken-tenders/",
+    "prepTimeMinutes": 5,
+    "cookTimeMinutes": 16,
+    "servings": 1,
+    "notes": "Recipe card yields 1 serving (4 tenders); scale up for more. The card lists onion powder and black pepper at 1/4 with no unit; teaspoon assumed. Chicken is done at 165F internal. Oven option: 400F for about 20 minutes, brushing with sauce at the end.",
+    "ingredients": [
+      {
+        "name": "chicken tender",
+        "quantity": 4,
+        "unit": null,
+        "notes": null
+      },
+      {
+        "name": "egg",
+        "quantity": 1,
+        "unit": null,
+        "notes": null
+      },
+      {
+        "name": "bread crumbs",
+        "quantity": 0.5,
+        "unit": "cup",
+        "notes": "panko works"
+      },
+      {
+        "name": "garlic powder",
+        "quantity": 0.5,
+        "unit": "teaspoon",
+        "notes": null
+      },
+      {
+        "name": "salt",
+        "quantity": 0.5,
+        "unit": "teaspoon",
+        "notes": null
+      },
+      {
+        "name": "onion powder",
+        "quantity": 0.25,
+        "unit": "teaspoon",
+        "notes": "unit not on card, assumed"
+      },
+      {
+        "name": "black pepper",
+        "quantity": 0.25,
+        "unit": "teaspoon",
+        "notes": "unit not on card, assumed"
+      },
+      {
+        "name": "bbq sauce",
+        "quantity": 0.5,
+        "unit": "cup",
+        "notes": null
+      },
+      {
+        "name": "ketchup",
+        "quantity": 2,
+        "unit": "tablespoon",
+        "notes": null
+      },
+      {
+        "name": "honey",
+        "quantity": 2,
+        "unit": "tablespoon",
+        "notes": null
+      }
+    ],
+    "instructions": "Stir the bread crumbs, garlic powder, salt, onion powder and pepper together in one bowl. Whisk the egg until fluffy in a second bowl.\nDip each tender in the egg, then press it into the crumb mixture to coat fully.\nArrange the tenders in the air fryer basket and cook at 390F for 14 minutes, flipping halfway.\nMeanwhile, mix the BBQ sauce, ketchup and honey.\nBrush sauce over the tops and air fry 1 minute, then flip, brush the other side and cook 1 minute more.\nCheck that the internal temperature reads 165F, and serve.",
+    "tags": ["main", "chicken", "air fryer"]
+  },
+  {
+    "id": "fed42cd4-8df4-4246-b4f6-a2f19d7e7304",
+    "name": "Sloppy Joes",
+    "sourceUrl": "https://www.thechunkychef.com/best-homemade-sloppy-joes/",
+    "prepTimeMinutes": 5,
+    "cookTimeMinutes": 20,
+    "servings": 6,
+    "notes": "The meat mixture freezes for up to 4 months; thaw it overnight in the fridge and reheat.",
+    "ingredients": [
+      {
+        "name": "butter",
+        "quantity": 1,
+        "unit": "tablespoon",
+        "notes": null
+      },
+      {
+        "name": "olive oil",
+        "quantity": 1,
+        "unit": "teaspoon",
+        "notes": null
+      },
+      {
+        "name": "ground beef",
+        "quantity": 1,
+        "unit": "pound",
+        "notes": null
+      },
+      {
+        "name": "green bell pepper",
+        "quantity": 0.33,
+        "unit": null,
+        "notes": "minced"
+      },
+      {
+        "name": "yellow onion",
+        "quantity": 0.5,
+        "unit": null,
+        "notes": "large, minced"
+      },
+      {
+        "name": "garlic",
+        "quantity": 3,
+        "unit": "clove",
+        "notes": "minced"
+      },
+      {
+        "name": "tomato paste",
+        "quantity": 1,
+        "unit": "tablespoon",
+        "notes": null
+      },
+      {
+        "name": "ketchup",
+        "quantity": 0.67,
+        "unit": "cup",
+        "notes": null
+      },
+      {
+        "name": "water",
+        "quantity": 0.33,
+        "unit": "cup",
+        "notes": null
+      },
+      {
+        "name": "brown sugar",
+        "quantity": 1,
+        "unit": "tablespoon",
+        "notes": "or less"
+      },
+      {
+        "name": "yellow mustard",
+        "quantity": 1,
+        "unit": "teaspoon",
+        "notes": null
+      },
+      {
+        "name": "chili powder",
+        "quantity": 0.75,
+        "unit": "teaspoon",
+        "notes": null
+      },
+      {
+        "name": "worcestershire sauce",
+        "quantity": 0.5,
+        "unit": "teaspoon",
+        "notes": null
+      },
+      {
+        "name": "kosher salt",
+        "quantity": 0.5,
+        "unit": "teaspoon",
+        "notes": null
+      },
+      {
+        "name": "red pepper flakes",
+        "quantity": 0.25,
+        "unit": "teaspoon",
+        "notes": "optional"
+      },
+      {
+        "name": "black pepper",
+        "quantity": 0.25,
+        "unit": "teaspoon",
+        "notes": null
+      },
+      {
+        "name": "hot sauce",
+        "quantity": 1,
+        "unit": "dash",
+        "notes": "optional"
+      },
+      {
+        "name": "hamburger bun",
+        "quantity": 6,
+        "unit": null,
+        "notes": "toasted"
+      }
+    ],
+    "instructions": "Heat the butter and oil in a large skillet over medium to medium-high heat. Brown the beef, breaking it into crumbles, about 5 minutes, then drain it in a colander.\nCook the onion and bell pepper in the same skillet for 2-3 minutes until soft, then the garlic for about 30 seconds.\nReturn the beef, add the tomato paste and stir well.\nStir in the ketchup, water, brown sugar, mustard, chili powder, Worcestershire, salt, pepper flakes and black pepper.\nSimmer over medium heat for 10-15 minutes, until as thick as you like, and serve on toasted buns.",
+    "tags": ["main", "beef", "sandwich", "quick"]
+  }
+]

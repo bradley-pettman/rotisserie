@@ -53,6 +53,19 @@ export async function listHouseholdsWithoutMembers(): Promise<{ id: string; name
   )
 }
 
+export async function listHouseholds(): Promise<{ id: string; name: string }[]> {
+  return DB.query<{ id: string; name: string }>(`SELECT id, name FROM households ORDER BY created_at, id`)
+}
+
+export async function createEmptyHousehold(name: string): Promise<{ id: string; name: string }> {
+  const household = await DB.queryOne<{ id: string; name: string }>(
+    `INSERT INTO households (name) VALUES ($1) RETURNING id, name`,
+    [name]
+  )
+  if (household === null) throw new Error(`Household ${name} missing after insert`)
+  return household
+}
+
 export async function findMembership(userId: string): Promise<{ householdId: string; role: HouseholdRole } | null> {
   return DB.queryOne<{ householdId: string; role: HouseholdRole }>(
     `SELECT household_id AS "householdId", role FROM household_members WHERE user_id = $1`,
