@@ -282,14 +282,18 @@ restore has been tested.
   (`expo-keep-awake`), started from a recipe or a planned meal's dish. Needs
   `instructions` split into steps first
 
-## Open decisions
+## Decisions
 
 1. ~~**One user or a household?**~~ Decided: households. See Accounts and
    households above.
-2. **"Cooked" or "eaten"?** If takeout belongs in history, `cooked_meals` is
-   slightly misnamed. Renaming before there's data is cheap; renaming later isn't.
-3. **One meal per slot?** `planned_meals_one_per_slot` says yes, per household.
-   Drop it if you want separate kids' and adults' dinners.
+2. ~~**"Cooked" or "eaten"?**~~ Decided: keep `cooked_meals`, even though
+   takeout belongs in history too.
+3. ~~**One meal per slot?**~~ Decided: keep `planned_meals_one_per_slot`. A
+   meal already holds any number of dishes; the constraint only stops two
+   separate planned meals in the same day and slot (say, kids' and adults'
+   dinners with their own headcounts). Dropping it later needs no data
+   migration, and the work would be in the app: the day picker, the Meals
+   rows and Pick from Planned.
 
 ## The old app
 
