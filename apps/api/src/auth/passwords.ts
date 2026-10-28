@@ -38,6 +38,8 @@ export async function verifyPassword(password: string, stored: string): Promise<
 
 let decoy: Promise<string> | undefined
 
+// Runs a real scrypt check for an unknown email so sign-in takes as long as for a known one.
+// This protects against timing-based user enumeration attacks.
 export async function verifyNoPassword(password: string): Promise<false> {
   decoy ??= hashPassword(randomBytes(SALT_BYTES).toString('hex'))
   await verifyPassword(password, await decoy)
