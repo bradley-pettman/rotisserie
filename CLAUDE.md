@@ -6,8 +6,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 A fresh start toward a mobile app. The database, the domain layer and the HTTP
 API are in place, with accounts and households, and the Expo app in
-`apps/mobile` plans and logs meals. Phase 6, deploying to AWS, is in progress
-in `apps/infra`. The plan is in `docs/ROADMAP.md`.
+`apps/mobile` plans and logs meals. Phase 6 is deployed: `apps/infra` runs the
+API at api.rotisserieapp.com (the restore drill is still to run). Phase 7,
+real builds through EAS, is in progress. The plan is in `docs/ROADMAP.md`.
 
 ## Ownership — read before writing code
 
@@ -41,6 +42,8 @@ npm run load-recipes -w @rotisserie/api -- <email> [apiUrl]   # PUT recipes.json
 
 npm start -w @rotisserie/mobile          # Expo dev server; open it in Expo Go on the phone
 npx expo install <pkg>                   # From apps/mobile: adds an SDK-compatible version
+eas build --profile preview --platform android   # From apps/mobile, signed in to EAS; apps/mobile/README.md has the release runbook
+eas update --channel production --environment production --message "..."   # Over-the-air JavaScript update
 
 npm test -w @rotisserie/infra            # CDK assertions; no AWS account needed
 npm run synth -w @rotisserie/infra       # cdk synth of both stacks into apps/infra/cdk.out
@@ -70,7 +73,10 @@ apps/api/             @rotisserie/api
   src/scripts/        One-off scripts (invite-to-household.ts; load-recipes.ts goes through the API, so it works on prod)
   src/server.ts       Starts the API locally; src/lambda.ts is the same app as a Lambda handler
   src/test/           Vitest global setup, per-test reset, factories, accounts (default member), API request helper
-apps/mobile/          @rotisserie/mobile: Expo SDK 57, Expo Router
+apps/mobile/          @rotisserie/mobile: Expo SDK 58, Expo Router. app.json holds the bundle id and package
+                      (com.bradleypettman.rotisserie), the icons and the splash; eas.json the EAS Build profiles
+                      (preview: installable APK and ad hoc iOS; production: store builds) and their EAS Update
+                      channels; README.md the release runbook
   src/app/            Routes: sign-in, sign-up, welcome (start or join a household); (tabs) for Meals and
                       Recipes; create, plan, log, recipe-editor, household are modals. _layout.tsx guards
                       each group with Stack.Protected on the auth state
@@ -79,6 +85,7 @@ apps/mobile/          @rotisserie/mobile: Expo SDK 57, Expo Router
   src/components/     UI building blocks; colors come from useColors()
   src/lib/            Pure helpers (dates, meals, quantities, recipes); quantities has Vitest tests
   src/theme/          Golden hour tokens: light and dark palettes, Figtree type scale
+  assets/             icon.png (iOS), adaptive-icon*.png (Android) and splash-icon.png, all generated from docs/logo.png
 apps/infra/           @rotisserie/infra: AWS CDK, pinned to us-east-2
   bin/rotisserie.ts   The CDK app (cdk.json runs it); src/app.ts builds the stacks
   src/stacks/         Rotisserie-bootstrap (GitHub OIDC deploy role, budget; deployed by hand once) and
