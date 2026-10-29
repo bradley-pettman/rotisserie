@@ -7,11 +7,23 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.bradleypettman.rotisserie"
+      "bundleIdentifier": "com.bradleypettman.rotisserie",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
+      "package": "com.bradleypettman.rotisserie",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "monochromeImage": "./assets/adaptive-icon-monochrome.png",
+        "backgroundColor": "#FBF8F2"
+      },
       "predictiveBackGestureEnabled": false
     },
     "web": {
