@@ -80,10 +80,18 @@ apps/mobile/          @rotisserie/mobile: Expo SDK 57, Expo Router
 apps/infra/           @rotisserie/infra: AWS CDK, pinned to us-east-2
   bin/rotisserie.ts   The CDK app (cdk.json runs it); src/app.ts builds the stacks
   src/stacks/         Rotisserie-bootstrap (GitHub OIDC deploy role, budget; deployed by hand once) and
-                      Rotisserie-prod (deployed by CI on pushes to main; takes a stage name)
+                      Rotisserie-prod (deployed by CI on pushes to main; takes a stage name): a Vpc, the
+                      PostgresDatabase and its DbBootstrap
   src/recipes/        Copy-and-own constructs: one file, one class, props in a declare namespace beside it,
-                      a transform hook per child resource, safe and cheap defaults; tests in CDK assertions
+                      a transform hook per child resource, safe and cheap defaults; tests in CDK assertions.
+                      Vpc (isolated subnets, no NAT), PostgresDatabase (IAM auth; grantConnect opens the port
+                      and allows rds-db:connect together), LambdaFunction (esbuild ESM bundle, arm64, Node 22,
+                      own log group), GitHubOidcRole, Budget
+  src/db-bootstrap/   A LambdaFunction run once by a CDK Trigger after the database exists: creates the
+                      Postgres role `app` (IAM login) with the master password CloudFormation injects from
+                      Secrets Manager; handler.ts is its code. Every later database user signs in as `app`
   src/test/           testApp(): an App with cdk.json's feature flags, bundling off, version reporting on
+apps/api/certs/       The RDS CA bundle (rds-global-bundle.pem) that TLS connections to prod verify against
 packages/shared/      @rotisserie/shared: Zod schemas, types and pure domain helpers, one folder per area
 docs/ROADMAP.md       Phases from here to an app on a phone
 docs/SPEC.md          Product spec (features, not implementation)

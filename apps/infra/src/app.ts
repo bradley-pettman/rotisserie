@@ -1,9 +1,9 @@
-import { App } from 'aws-cdk-lib'
+import { App, type AppProps } from 'aws-cdk-lib'
 import { BootstrapStack } from './stacks/bootstrap-stack'
 import { RotisserieStack } from './stacks/rotisserie-stack'
 
-export function createApp(): App {
-  const app = new App()
+export function createApp(props?: AppProps): App {
+  const app = new App(props)
   const env = { account: process.env.CDK_DEFAULT_ACCOUNT, region: 'us-east-2' }
 
   new BootstrapStack(app, 'Rotisserie-bootstrap', {

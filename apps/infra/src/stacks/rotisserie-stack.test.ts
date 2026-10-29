@@ -12,6 +12,16 @@ describe('RotisserieStack', () => {
     expect(stack.stage).toBe('prod')
   })
 
+  it('runs one database in isolated subnets, bootstrapped once, with no way out to the internet', () => {
+    const template = Template.fromStack(new RotisserieStack(testApp(), 'Rotisserie-prod', { stage: 'prod' }))
+
+    template.resourceCountIs('AWS::RDS::DBInstance', 1)
+    template.hasResourceProperties('AWS::RDS::DBInstance', { DBName: 'rotisserie' })
+    template.resourceCountIs('Custom::Trigger', 1)
+    template.resourceCountIs('AWS::EC2::NatGateway', 0)
+    template.resourceCountIs('AWS::EC2::InternetGateway', 0)
+  })
+
   it('cannot be deleted by accident', () => {
     const stack = new RotisserieStack(testApp(), 'Rotisserie-prod', { stage: 'prod' })
 
