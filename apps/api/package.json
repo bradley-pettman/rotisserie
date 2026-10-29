@@ -12,6 +12,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@aws-sdk/rds-signer": "^3.1159.0",
     "@hono/node-server": "^2.1.4",
     "@hono/zod-validator": "^0.9.1",
     "@rotisserie/shared": "*",

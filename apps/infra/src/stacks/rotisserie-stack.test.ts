@@ -43,7 +43,35 @@ describe('RotisserieStack', () => {
       },
       Roles: [{ Ref: Match.stringLikeRegexp('^MigrationsFunctionServiceRole') }]
     })
-    template.resourceCountIs('AWS::EC2::SecurityGroupIngress', 2)
+    template.resourceCountIs('AWS::EC2::SecurityGroupIngress', 3)
+  })
+
+  it('serves the API from a Lambda in the VPC behind an HTTP API, updated only after the migrations', () => {
+    const template = Template.fromStack(new RotisserieStack(testApp(), 'Rotisserie-prod', { stage: 'prod' }))
+
+    template.resourceCountIs('AWS::ApiGatewayV2::Api', 1)
+    template.hasResource('AWS::Lambda::Function', {
+      Properties: Match.objectLike({
+        VpcConfig: Match.anyValue(),
+        Environment: {
+          Variables: Match.objectLike({ PGUSER: 'app', PGDATABASE: 'rotisserie', PGSSLROOTCERT: 'ca.pem', PGPOOL_MAX: '1' })
+        }
+      }),
+      DependsOn: Match.arrayWith([Match.stringLikeRegexp('^MigrationsTrigger')])
+    })
+    template.resourcePropertiesCountIs(
+      'AWS::IAM::Policy',
+      { PolicyDocument: { Statement: Match.arrayWith([Match.objectLike({ Action: 'rds-db:connect' })]) } },
+      2
+    )
+    template.hasResourceProperties('AWS::ApiGatewayV2::Stage', {
+      RouteSettings: {
+        'POST /auth/sign-in': { ThrottlingRateLimit: 2, ThrottlingBurstLimit: 5 },
+        'POST /auth/sign-up': { ThrottlingRateLimit: 2, ThrottlingBurstLimit: 5 },
+        'POST /household/join': { ThrottlingRateLimit: 2, ThrottlingBurstLimit: 5 }
+      }
+    })
+    template.hasOutput('ApiUrl', {})
   })
 
   it('cannot be deleted by accident', () => {

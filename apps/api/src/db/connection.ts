@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
+import { Signer } from '@aws-sdk/rds-signer'
 import pg from 'pg'
 
 const { Pool } = pg
@@ -36,6 +39,32 @@ function envInt(name: string, fallback: number): number {
   return Number.isInteger(value) && value > 0 ? value : fallback
 }
 
+function requireEnv(name: string): string {
+  const value = process.env[name]
+  if (!value) throw new Error(`${name} is not set`)
+  return value
+}
+
+function connection(): pg.PoolConfig {
+  const connectionString = process.env.DATABASE_URL
+  if (connectionString) return { connectionString }
+
+  const host = requireEnv('PGHOST')
+  const port = envInt('PGPORT', 5432)
+  const user = requireEnv('PGUSER')
+  const signer = new Signer({ hostname: host, port, username: user, region: requireEnv('AWS_REGION') })
+  const root = process.env.LAMBDA_TASK_ROOT ?? process.cwd()
+
+  return {
+    host,
+    port,
+    user,
+    database: requireEnv('PGDATABASE'),
+    password: () => signer.getAuthToken(),
+    ssl: { ca: readFileSync(resolve(root, requireEnv('PGSSLROOTCERT')), 'utf8') }
+  }
+}
+
 /**
  * The pool's defaults are all "wait forever", which is the wrong answer for
  * every one of them under load:
@@ -58,7 +87,7 @@ function envInt(name: string, fallback: number): number {
  * and a deploy should not need a rebuild to change them.
  */
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
+  ...connection(),
   max: envInt('PGPOOL_MAX', 10),
   connectionTimeoutMillis: envInt('PGPOOL_CONNECTION_TIMEOUT_MS', 5_000),
   idleTimeoutMillis: envInt('PGPOOL_IDLE_TIMEOUT_MS', 30_000),
