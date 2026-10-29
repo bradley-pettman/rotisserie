@@ -65,9 +65,12 @@ describe('HttpApi', () => {
     })
 
     template.hasResourceProperties('AWS::ApiGatewayV2::Route', { RouteKey: 'POST /auth/sign-in' })
-    template.hasResourceProperties('AWS::ApiGatewayV2::Stage', {
-      DefaultRouteSettings: { ThrottlingRateLimit: 10, ThrottlingBurstLimit: 20 },
-      RouteSettings: { 'POST /auth/sign-in': { ThrottlingRateLimit: 2, ThrottlingBurstLimit: 5 } }
+    template.hasResource('AWS::ApiGatewayV2::Stage', {
+      Properties: Match.objectLike({
+        DefaultRouteSettings: { ThrottlingRateLimit: 10, ThrottlingBurstLimit: 20 },
+        RouteSettings: { 'POST /auth/sign-in': { ThrottlingRateLimit: 2, ThrottlingBurstLimit: 5 } }
+      }),
+      DependsOn: Match.arrayWith([Match.stringLikeRegexp('^ApiPOSTauthsignin')])
     })
   })
 
