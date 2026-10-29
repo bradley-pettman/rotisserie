@@ -1,3 +1,4 @@
+import { join } from 'node:path'
 import { Duration, RemovalPolicy, Size } from 'aws-cdk-lib'
 import * as ec2 from 'aws-cdk-lib/aws-ec2'
 import * as lambda from 'aws-cdk-lib/aws-lambda'
@@ -22,6 +23,8 @@ export class LambdaFunction extends Construct {
       timeout = Duration.seconds(10),
       environment,
       vpc,
+      files,
+      external,
       logRetention = logs.RetentionDays.TWO_WEEKS,
       transform
     } = props
@@ -51,7 +54,13 @@ export class LambdaFunction extends Construct {
             format: nodejs.OutputFormat.ESM,
             target: 'node22',
             banner: ESM_REQUIRE_SHIM,
-            sourceMap: true
+            sourceMap: true,
+            externalModules: external,
+            commandHooks: files && {
+              beforeBundling: () => [],
+              beforeInstall: () => [],
+              afterBundling: (_inputDir, outputDir) => copyCommands(files, outputDir)
+            }
           }
         },
         transform?.function
@@ -68,10 +77,24 @@ export declare namespace LambdaFunction {
     timeout?: Duration
     environment?: Record<string, string>
     vpc?: ec2.IVpc
+    files?: Record<string, string | { from: string; executable?: boolean }>
+    external?: string[]
     logRetention?: logs.RetentionDays
     transform?: {
       function?: Transform<nodejs.NodejsFunctionProps>
       logGroup?: Transform<logs.LogGroupProps>
     }
   }
+}
+
+function copyCommands(files: NonNullable<LambdaFunction.Props['files']>, outputDir: string): string[] {
+  return Object.entries(files).flatMap(([target, source]) => {
+    const { from, executable = false } = typeof source === 'string' ? { from: source } : source
+    const destination = join(outputDir, target)
+    return [`cp -R ${quote(from)} ${quote(destination)}`, ...(executable ? [`chmod +x ${quote(destination)}`] : [])]
+  })
+}
+
+function quote(value: string): string {
+  return `'${value.replace(/'/g, `'\\''`)}'`
 }

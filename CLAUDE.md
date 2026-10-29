@@ -37,6 +37,7 @@ npm test -w @rotisserie/api      # One workspace (also @rotisserie/shared)
 npm install <pkg> -w @rotisserie/api   # Add a dependency to one workspace
 npx tsx <file.ts>        # Run a TypeScript file directly
 npm run invite -w @rotisserie/api [householdId]   # Print an invite code (default: the household with no members)
+npm run load-recipes -w @rotisserie/api -- <email> [apiUrl]   # PUT recipes.json through the API as you; asks for the password
 
 npm start -w @rotisserie/mobile          # Expo dev server; open it in Expo Go on the phone
 npx expo install <pkg>                   # From apps/mobile: adds an SDK-compatible version
@@ -60,13 +61,14 @@ db/migrations/        SQL migrations (dbmate)
 db/seeds/             Units and ingredient vocabulary
 db/seed.mjs           Applies the seeds
 apps/api/             @rotisserie/api
-  src/db/connection.ts  pg pool, DB.query / queryOne / withTransaction, checkDatabase
+  src/db/connection.ts  pg pool, DB.query / queryOne / withTransaction, checkDatabase. DATABASE_URL, or without it the
+                      PG* variables with an IAM token per connection and TLS verified against PGSSLROOTCERT
   src/auth/           scrypt password hashing, session tokens and invite codes (node:crypto only)
   src/providers/      SQL query functions, one file per area (sql.ts: generic SQL helpers; errors.ts: NotFoundError and strict)
   src/use-cases/      One file per use case, built with defineUseCase (actors.ts: UserActor, MemberActor; errors.ts: 401/403/409 errors)
   src/api/            Hono app, error envelope, auth.ts (requireUser, requireMember), routes/ (one file per resource)
-  src/scripts/        One-off scripts (invite-to-household.ts)
-  src/server.ts       Starts the API
+  src/scripts/        One-off scripts (invite-to-household.ts; load-recipes.ts goes through the API, so it works on prod)
+  src/server.ts       Starts the API locally; src/lambda.ts is the same app as a Lambda handler
   src/test/           Vitest global setup, per-test reset, factories, accounts (default member), API request helper
 apps/mobile/          @rotisserie/mobile: Expo SDK 57, Expo Router
   src/app/            Routes: sign-in, sign-up, welcome (start or join a household); (tabs) for Meals and
@@ -81,12 +83,16 @@ apps/infra/           @rotisserie/infra: AWS CDK, pinned to us-east-2
   bin/rotisserie.ts   The CDK app (cdk.json runs it); src/app.ts builds the stacks
   src/stacks/         Rotisserie-bootstrap (GitHub OIDC deploy role, budget; deployed by hand once) and
                       Rotisserie-prod (deployed by CI on pushes to main; takes a stage name): a Vpc, the
-                      PostgresDatabase, its DbBootstrap, then DbmateMigrations as `app`
+                      PostgresDatabase, its DbBootstrap, DbmateMigrations as `app`, then the Api
+                      LambdaFunction (apps/api/src/lambda.ts) behind HttpApi; ApiUrl is an output
   src/recipes/        Copy-and-own constructs: one file, one class, props in a declare namespace beside it,
                       a transform hook per child resource, safe and cheap defaults; tests in CDK assertions.
                       Vpc (isolated subnets, no NAT), PostgresDatabase (IAM auth; grantConnect opens the port
                       and allows rds-db:connect together), LambdaFunction (esbuild ESM bundle, arm64, Node 22,
-                      own log group), DbmateMigrations (a LambdaFunction bundling a pinned dbmate linux-arm64
+                      own log group; `files` copies extra files into the bundle, `external` keeps modules out),
+                      HttpApi (one $default route to a Lambda, named routes with their own throttle, JSON
+                      access logs; a domain, certificate and alias record when given a domain),
+                      DbmateMigrations (a LambdaFunction bundling a pinned dbmate linux-arm64
                       binary, downloaded and checksummed at synth, with db/migrations, db/seeds and the CA
                       bundle; a CDK Trigger runs `dbmate migrate` then the seeds with a fresh IAM token;
                       its code is dbmate-migrations.handler.ts), GitHubOidcRole, Budget

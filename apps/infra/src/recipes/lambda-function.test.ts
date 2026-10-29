@@ -2,7 +2,8 @@ import { fileURLToPath } from 'node:url'
 import { Duration, Size, Stack } from 'aws-cdk-lib'
 import { Match, Template } from 'aws-cdk-lib/assertions'
 import * as ec2 from 'aws-cdk-lib/aws-ec2'
-import { describe, it } from 'vitest'
+import type * as nodejs from 'aws-cdk-lib/aws-lambda-nodejs'
+import { describe, expect, it } from 'vitest'
 import { testApp } from '../test/app'
 import { LambdaFunction } from './lambda-function'
 
@@ -83,6 +84,42 @@ describe('LambdaFunction', () => {
       Timeout: 30,
       Environment: { Variables: { NODE_OPTIONS: '--enable-source-maps', STAGE: 'test' } }
     })
+  })
+
+  it('copies extra files into the bundle and leaves modules out of it when asked', () => {
+    let captured: nodejs.NodejsFunctionProps | undefined
+    build({
+      files: { 'ca.pem': '/certs/ca.pem', tool: { from: '/bin/tool', executable: true } },
+      external: ['pg-native'],
+      transform: {
+        function: (fn) => {
+          captured = fn
+          return fn
+        }
+      }
+    })
+
+    expect(captured?.bundling?.externalModules).toEqual(['pg-native'])
+    expect(captured?.bundling?.commandHooks?.afterBundling('/in', '/out')).toEqual([
+      "cp -R '/certs/ca.pem' '/out/ca.pem'",
+      "cp -R '/bin/tool' '/out/tool'",
+      "chmod +x '/out/tool'"
+    ])
+  })
+
+  it('bundles nothing extra by default', () => {
+    let captured: nodejs.NodejsFunctionProps | undefined
+    build({
+      transform: {
+        function: (fn) => {
+          captured = fn
+          return fn
+        }
+      }
+    })
+
+    expect(captured?.bundling?.commandHooks).toBeUndefined()
+    expect(captured?.bundling?.externalModules).toBeUndefined()
   })
 
   it('lets a transform change the function before it is built', () => {

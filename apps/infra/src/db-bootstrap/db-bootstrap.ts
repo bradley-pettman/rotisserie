@@ -12,7 +12,7 @@ export class DbBootstrap extends Construct {
   constructor(scope: Construct, id: string, props: DbBootstrap.Props) {
     super(scope, id)
 
-    const { database, appRole } = props
+    const { database, appRole, caBundle } = props
     const { instance, secret } = database
 
     this.function = new LambdaFunction(this, 'Function', {
@@ -26,14 +26,11 @@ export class DbBootstrap extends Construct {
         PGDATABASE: database.databaseName,
         PGUSER: secret.secretValueFromJson('username').unsafeUnwrap(),
         PGPASSWORD: secret.secretValueFromJson('password').unsafeUnwrap(),
+        PGSSLROOTCERT: 'ca.pem',
         DB_APP_ROLE: appRole
       },
-      transform: {
-        function: (fn) => ({
-          ...fn,
-          bundling: { ...fn.bundling, externalModules: ['@aws-sdk/*', 'pg-native'], loader: { '.pem': 'text' } }
-        })
-      }
+      files: { 'ca.pem': caBundle },
+      external: ['pg-native']
     })
 
     instance.connections.allowDefaultPortFrom(this.function.function)
@@ -50,5 +47,6 @@ export declare namespace DbBootstrap {
   interface Props {
     database: PostgresDatabase
     appRole: string
+    caBundle: string
   }
 }

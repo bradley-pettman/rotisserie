@@ -1,9 +1,12 @@
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import pg from 'pg'
-import ca from '../../../api/certs/rds-global-bundle.pem'
 
 export async function handler(): Promise<void> {
+  const root = process.env.LAMBDA_TASK_ROOT ?? process.cwd()
   const role = required('DB_APP_ROLE')
   const database = required('PGDATABASE')
+  const ca = readFileSync(resolve(root, required('PGSSLROOTCERT')), 'utf8')
 
   const client = new pg.Client({ ssl: { ca } })
   await client.connect()

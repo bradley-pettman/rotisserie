@@ -10,7 +10,7 @@ describe('DbBootstrap', () => {
   const stack = new Stack(testApp(), 'Test')
   const network = new Vpc(stack, 'Vpc')
   const database = new PostgresDatabase(stack, 'Database', { vpc: network.vpc, databaseName: 'app' })
-  new DbBootstrap(stack, 'DbBootstrap', { database, appRole: 'app' })
+  new DbBootstrap(stack, 'DbBootstrap', { database, appRole: 'app', caBundle: '/repo/ca.pem' })
   const template = Template.fromStack(stack)
 
   it('runs its function once the database exists', () => {
@@ -36,6 +36,7 @@ describe('DbBootstrap', () => {
           PGDATABASE: 'app',
           PGUSER: { 'Fn::Join': ['', Match.arrayWith(['{{resolve:secretsmanager:', ':SecretString:username::}}'])] },
           PGPASSWORD: { 'Fn::Join': ['', Match.arrayWith(['{{resolve:secretsmanager:', ':SecretString:password::}}'])] },
+          PGSSLROOTCERT: 'ca.pem',
           DB_APP_ROLE: 'app'
         })
       }

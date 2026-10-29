@@ -52,26 +52,13 @@ export class DbmateMigrations extends Construct {
         DBMATE_MIGRATIONS_DIR: 'migrations',
         ...(seeds ? { SEEDS_DIR: 'seeds' } : {})
       },
-      transform: {
-        function: (fn) => ({
-          ...fn,
-          bundling: {
-            ...fn.bundling,
-            externalModules: ['pg-native'],
-            commandHooks: {
-              beforeBundling: () => [],
-              beforeInstall: () => [],
-              afterBundling: (_inputDir, outputDir) => [
-                `cp ${quote(bundle ?? '')} ${quote(join(outputDir, 'dbmate'))}`,
-                `chmod +x ${quote(join(outputDir, 'dbmate'))}`,
-                `cp ${quote(caBundle)} ${quote(join(outputDir, 'ca.pem'))}`,
-                `cp -R ${quote(migrations)} ${quote(join(outputDir, 'migrations'))}`,
-                ...(seeds ? [`cp -R ${quote(seeds)} ${quote(join(outputDir, 'seeds'))}`] : [])
-              ]
-            }
-          }
-        })
-      }
+      files: {
+        dbmate: { from: bundle ?? '', executable: true },
+        'ca.pem': caBundle,
+        migrations,
+        ...(seeds ? { seeds } : {})
+      },
+      external: ['pg-native']
     })
 
     this.trigger = new triggers.Trigger(
@@ -127,8 +114,4 @@ function dbmateBinary({ version, sha256 }: DbmateMigrations.Props['dbmate'], cac
 
 function digest(file: string): string {
   return createHash('sha256').update(readFileSync(file)).digest('hex')
-}
-
-function quote(value: string): string {
-  return `'${value.replace(/'/g, `'\\''`)}'`
 }

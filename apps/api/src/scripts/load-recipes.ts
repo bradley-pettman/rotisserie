@@ -1,46 +1,75 @@
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
+import { AccountSchemas } from '@rotisserie/shared/accounts'
 import { RecipeSchemas } from '@rotisserie/shared/recipes'
-import { pool } from '~/db/connection'
-import { createEmptyHousehold, getHousehold, listHouseholds } from '~/providers/households'
-import { upsertRecipe } from '~/providers/recipes'
 
 const RECIPES_FILE = join(import.meta.dirname, 'recipes.json')
 
-async function findHousehold(householdId: string | undefined): Promise<{ id: string; name: string } | null> {
-  if (householdId !== undefined) return getHousehold(householdId)
+type Headers = Record<string, string>
 
-  const households = await listHouseholds()
-  if (households.length === 0) {
-    const created = await createEmptyHousehold('Home')
-    console.log(`Created household "Home". Run npm run invite -w @rotisserie/api for a code to join it.`)
-    return created
-  }
-  if (households.length > 1) {
-    console.error('More than one household. Pass one of these ids:')
-    for (const candidate of households) console.error(`  ${candidate.id}  ${candidate.name}`)
-    return null
-  }
-  return households[0] ?? null
+async function request(base: string, method: string, path: string, body?: unknown, headers: Headers = {}): Promise<unknown> {
+  const response = await fetch(new URL(path, base), {
+    method,
+    headers: { 'content-type': 'application/json', ...headers },
+    body: body === undefined ? undefined : JSON.stringify(body)
+  })
+  if (!response.ok) throw new Error(`${method} ${path} failed with ${response.status}: ${await response.text()}`)
+  return response.status === 204 ? null : response.json()
 }
 
-async function main(householdId: string | undefined): Promise<void> {
-  const recipes = RecipeSchemas.UpsertRecipeInput.array().parse(JSON.parse(await readFile(RECIPES_FILE, 'utf8')))
-  const household = await findHousehold(householdId)
-  if (household === null) {
+function promptHidden(label: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const { stdin, stdout } = process
+    let value = ''
+    const finish = (outcome: () => void) => {
+      stdin.setRawMode?.(false)
+      stdin.pause()
+      stdin.off('data', onData)
+      stdout.write('\n')
+      outcome()
+    }
+    const onData = (chunk: string) => {
+      for (const char of chunk) {
+        if (char === '\r' || char === '\n') return finish(() => resolve(value))
+        if (char === '\u0003') return finish(() => reject(new Error('Cancelled')))
+        value = char === '\u007f' || char === '\b' ? value.slice(0, -1) : value + char
+      }
+    }
+    stdout.write(label)
+    stdin.setEncoding('utf8')
+    stdin.setRawMode?.(true)
+    stdin.resume()
+    stdin.on('data', onData)
+  })
+}
+
+async function main(email: string | undefined, apiUrl = 'http://localhost:3000'): Promise<void> {
+  if (email === undefined) {
+    console.error('Usage: npm run load-recipes -w @rotisserie/api -- <email> [apiUrl]')
     process.exitCode = 1
     return
   }
 
-  for (const recipe of recipes) {
-    const saved = await upsertRecipe(household.id, recipe)
-    console.log(saved === null ? `skipped ${recipe.name}: its id belongs to another household` : `saved ${recipe.name}`)
+  const recipes = RecipeSchemas.UpsertRecipeInput.array().parse(JSON.parse(await readFile(RECIPES_FILE, 'utf8')))
+  const password = process.env.ROTISSERIE_PASSWORD ?? (await promptHidden(`Password for ${email} at ${apiUrl}: `))
+  const session = AccountSchemas.AuthSession.parse(await request(apiUrl, 'POST', '/auth/sign-in', { email, password }))
+  const headers = { authorization: `Bearer ${session.token}` }
+
+  try {
+    if (session.me.household === null) {
+      console.error(`${email} is not in a household yet. Start or join one in the app, then run this again.`)
+      process.exitCode = 1
+      return
+    }
+
+    for (const { id, ...recipe } of recipes) {
+      await request(apiUrl, 'PUT', `/recipes/${id}`, recipe, headers)
+      console.log(`saved ${recipe.name}`)
+    }
+    console.log(`${recipes.length} recipes in "${session.me.household.name}"`)
+  } finally {
+    await request(apiUrl, 'POST', '/auth/sign-out', undefined, headers)
   }
-  console.log(`${recipes.length} recipes in "${household.name}"`)
 }
 
-try {
-  await main(process.argv[2])
-} finally {
-  await pool.end()
-}
+await main(process.argv[2], process.argv[3])
