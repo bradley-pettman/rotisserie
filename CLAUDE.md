@@ -84,7 +84,8 @@ apps/infra/           @rotisserie/infra: AWS CDK, pinned to us-east-2
   src/stacks/         Rotisserie-bootstrap (GitHub OIDC deploy role, budget; deployed by hand once) and
                       Rotisserie-prod (deployed by CI on pushes to main; takes a stage name): a Vpc, the
                       PostgresDatabase, its DbBootstrap, DbmateMigrations as `app`, then the Api
-                      LambdaFunction (apps/api/src/lambda.ts) behind HttpApi; ApiUrl is an output
+                      LambdaFunction (apps/api/src/lambda.ts) behind HttpApi at api.rotisserieapp.com (the
+                      hosted zone id is pinned in src/app.ts); ApiUrl is an output
   src/recipes/        Copy-and-own constructs: one file, one class, props in a declare namespace beside it,
                       a transform hook per child resource, safe and cheap defaults; tests in CDK assertions.
                       Vpc (isolated subnets, no NAT), PostgresDatabase (IAM auth; grantConnect opens the port

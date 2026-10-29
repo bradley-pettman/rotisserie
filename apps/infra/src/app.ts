@@ -12,7 +12,11 @@ export function createApp(props?: AppProps): App {
     monthlyBudgetUsd: 25
   })
 
-  new RotisserieStack(app, 'Rotisserie-prod', { env, stage: 'prod' })
+  new RotisserieStack(app, 'Rotisserie-prod', {
+    env,
+    stage: 'prod',
+    domain: { name: 'api.rotisserieapp.com', zoneName: 'rotisserieapp.com', hostedZoneId: 'Z0591068E5HS2ICK51GU' }
+  })
 
   return app
 }
