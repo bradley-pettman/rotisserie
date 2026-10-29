@@ -97,6 +97,8 @@ apps/infra/           @rotisserie/infra: AWS CDK, pinned to us-east-2
                       binary, downloaded and checksummed at synth, with db/migrations, db/seeds and the CA
                       bundle; a CDK Trigger runs `dbmate migrate` then the seeds with a fresh IAM token;
                       its code is dbmate-migrations.handler.ts), GitHubOidcRole, Budget
+  src/alerts/         One SNS topic emailing the AlertEmail stack parameter, and five CloudWatch alarms on
+                      it: API Lambda errors and throttles, HTTP API 5xx, database free storage and CPU
   src/db-bootstrap/   A LambdaFunction run once by a CDK Trigger after the database exists: creates the
                       Postgres role `app` (IAM login) with the master password CloudFormation injects from
                       Secrets Manager; handler.ts is its code. Every later database user signs in as `app`

@@ -1,8 +1,9 @@
 import { fileURLToPath } from 'node:url'
-import { CfnOutput, Duration, Stack, Tags, type StackProps } from 'aws-cdk-lib'
+import { CfnOutput, CfnParameter, Duration, Stack, Tags, type StackProps } from 'aws-cdk-lib'
 import { HttpMethod } from 'aws-cdk-lib/aws-apigatewayv2'
 import * as route53 from 'aws-cdk-lib/aws-route53'
 import type { Construct } from 'constructs'
+import { Alerts } from '../alerts/alerts'
 import { DbBootstrap } from '../db-bootstrap/db-bootstrap'
 import { DbmateMigrations } from '../recipes/dbmate-migrations'
 import { HttpApi } from '../recipes/http-api'
@@ -85,6 +86,19 @@ export class RotisserieStack extends Stack {
         { method: HttpMethod.POST, path: '/auth/sign-up', throttle: SIGN_IN_THROTTLE },
         { method: HttpMethod.POST, path: '/household/join', throttle: SIGN_IN_THROTTLE }
       ]
+    })
+
+    const alertEmail = new CfnParameter(this, 'AlertEmail', {
+      type: 'String',
+      noEcho: true,
+      allowedPattern: '.+@.+',
+      description: 'Where alarms are sent'
+    })
+    new Alerts(this, 'Alerts', {
+      email: alertEmail.valueAsString,
+      api: this.api.function,
+      httpApi: this.httpApi.api,
+      database: instance
     })
 
     new CfnOutput(this, 'ApiUrl', { value: this.httpApi.url })

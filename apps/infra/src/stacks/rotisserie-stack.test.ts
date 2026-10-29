@@ -91,6 +91,14 @@ describe('RotisserieStack', () => {
     template.hasOutput('ApiUrl', { Value: 'https://api.example.com' })
   })
 
+  it('sends five alarms and their recoveries to the address given at deploy time', () => {
+    const template = Template.fromStack(new RotisserieStack(testApp(), 'Rotisserie-prod', { stage: 'prod' }))
+
+    template.hasParameter('AlertEmail', { Type: 'String', NoEcho: true })
+    template.hasResourceProperties('AWS::SNS::Subscription', { Protocol: 'email', Endpoint: { Ref: 'AlertEmail' } })
+    template.resourceCountIs('AWS::CloudWatch::Alarm', 5)
+  })
+
   it('cannot be deleted by accident', () => {
     const stack = new RotisserieStack(testApp(), 'Rotisserie-prod', { stage: 'prod' })
 

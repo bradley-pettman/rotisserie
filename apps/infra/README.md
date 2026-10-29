@@ -25,8 +25,10 @@ npx cdk deploy Rotisserie-bootstrap --parameters AlertEmail=you@example.com
 
 The deploy prints a `DeployRoleArn` output. Save it as a repository secret
 named `AWS_DEPLOY_ROLE_ARN` (GitHub: Settings, Secrets and variables,
-Actions). From then on every push to `main` runs the `deploy` job, which
-assumes that role and deploys `Rotisserie-prod`.
+Actions), and add a second secret, `ALERT_EMAIL`, with the inbox for the
+production alarms. From then on every push to `main` runs the `deploy`
+job, which assumes that role and deploys `Rotisserie-prod`. The first
+deploy subscribes that inbox to the alarm topic; confirm the email SNS sends.
 
 The role is trusted by `main` of this repository alone, and may only assume
 the `cdk-*` roles that `cdk bootstrap` created. The email is a stack
