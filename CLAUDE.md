@@ -5,8 +5,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Status
 
 A fresh start toward a mobile app. The database, the domain layer and the HTTP
-API are in place, with accounts and households; the Expo app (Phase 4) is in
-progress in `apps/mobile`. The plan is in `docs/ROADMAP.md`.
+API are in place, with accounts and households, and the Expo app in
+`apps/mobile` plans and logs meals. Phase 6, deploying to AWS, is in progress
+in `apps/infra`. The plan is in `docs/ROADMAP.md`.
 
 ## Ownership — read before writing code
 
@@ -39,6 +40,10 @@ npm run invite -w @rotisserie/api [householdId]   # Print an invite code (defaul
 
 npm start -w @rotisserie/mobile          # Expo dev server; open it in Expo Go on the phone
 npx expo install <pkg>                   # From apps/mobile: adds an SDK-compatible version
+
+npm test -w @rotisserie/infra            # CDK assertions; no AWS account needed
+npm run synth -w @rotisserie/infra       # cdk synth of both stacks into apps/infra/cdk.out
+npx cdk diff Rotisserie-prod             # From apps/infra, signed in to AWS
 ```
 
 The app reads `EXPO_PUBLIC_API_URL` from `apps/mobile/.env.local` (copy
@@ -72,6 +77,13 @@ apps/mobile/          @rotisserie/mobile: Expo SDK 57, Expo Router
   src/components/     UI building blocks; colors come from useColors()
   src/lib/            Pure helpers (dates, meals, quantities, recipes); quantities has Vitest tests
   src/theme/          Golden hour tokens: light and dark palettes, Figtree type scale
+apps/infra/           @rotisserie/infra: AWS CDK, pinned to us-east-2
+  bin/rotisserie.ts   The CDK app (cdk.json runs it); src/app.ts builds the stacks
+  src/stacks/         Rotisserie-bootstrap (GitHub OIDC deploy role, budget; deployed by hand once) and
+                      Rotisserie-prod (deployed by CI on pushes to main; takes a stage name)
+  src/recipes/        Copy-and-own constructs: one file, one class, props in a declare namespace beside it,
+                      a transform hook per child resource, safe and cheap defaults; tests in CDK assertions
+  src/test/           testApp(): an App with cdk.json's feature flags, bundling off, version reporting on
 packages/shared/      @rotisserie/shared: Zod schemas, types and pure domain helpers, one folder per area
 docs/ROADMAP.md       Phases from here to an app on a phone
 docs/SPEC.md          Product spec (features, not implementation)

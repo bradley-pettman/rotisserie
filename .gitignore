@@ -159,3 +159,6 @@ __pycache__/
 .pytest_cache/
 .ruff_cache/
 .mypy_cache/
+
+# AWS CDK
+cdk.out/
