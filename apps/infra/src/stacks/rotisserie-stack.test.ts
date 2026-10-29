@@ -74,6 +74,23 @@ describe('RotisserieStack', () => {
     template.hasOutput('ApiUrl', {})
   })
 
+  it('answers on its own domain when given one', () => {
+    const template = Template.fromStack(
+      new RotisserieStack(testApp(), 'Rotisserie-prod', {
+        stage: 'prod',
+        domain: { name: 'api.example.com', zoneName: 'example.com', hostedZoneId: 'Z123' }
+      })
+    )
+
+    template.hasResourceProperties('AWS::CertificateManager::Certificate', {
+      DomainName: 'api.example.com',
+      DomainValidationOptions: [{ DomainName: 'api.example.com', HostedZoneId: 'Z123' }]
+    })
+    template.hasResourceProperties('AWS::ApiGatewayV2::DomainName', { DomainName: 'api.example.com' })
+    template.hasResourceProperties('AWS::Route53::RecordSet', { Name: 'api.example.com.', HostedZoneId: 'Z123' })
+    template.hasOutput('ApiUrl', { Value: 'https://api.example.com' })
+  })
+
   it('cannot be deleted by accident', () => {
     const stack = new RotisserieStack(testApp(), 'Rotisserie-prod', { stage: 'prod' })
 

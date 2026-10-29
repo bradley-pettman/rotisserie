@@ -1,6 +1,7 @@
 import { fileURLToPath } from 'node:url'
 import { CfnOutput, Duration, Stack, Tags, type StackProps } from 'aws-cdk-lib'
 import { HttpMethod } from 'aws-cdk-lib/aws-apigatewayv2'
+import * as route53 from 'aws-cdk-lib/aws-route53'
 import type { Construct } from 'constructs'
 import { DbBootstrap } from '../db-bootstrap/db-bootstrap'
 import { DbmateMigrations } from '../recipes/dbmate-migrations'
@@ -16,6 +17,7 @@ const repoPath = (relative: string): string => fileURLToPath(new URL(`../../../.
 
 export interface RotisserieStackProps extends StackProps {
   stage: string
+  domain?: { name: string; zoneName: string; hostedZoneId: string }
 }
 
 export class RotisserieStack extends Stack {
@@ -68,8 +70,16 @@ export class RotisserieStack extends Stack {
     })
     this.database.grantConnect(this.migrations.function.function, 'app')
 
+    const { domain } = props
     this.httpApi = new HttpApi(this, 'HttpApi', {
       handler: this.api.function,
+      domain: domain && {
+        name: domain.name,
+        zone: route53.HostedZone.fromHostedZoneAttributes(this, 'Zone', {
+          hostedZoneId: domain.hostedZoneId,
+          zoneName: domain.zoneName
+        })
+      },
       routes: [
         { method: HttpMethod.POST, path: '/auth/sign-in', throttle: SIGN_IN_THROTTLE },
         { method: HttpMethod.POST, path: '/auth/sign-up', throttle: SIGN_IN_THROTTLE },
