@@ -81,12 +81,15 @@ apps/infra/           @rotisserie/infra: AWS CDK, pinned to us-east-2
   bin/rotisserie.ts   The CDK app (cdk.json runs it); src/app.ts builds the stacks
   src/stacks/         Rotisserie-bootstrap (GitHub OIDC deploy role, budget; deployed by hand once) and
                       Rotisserie-prod (deployed by CI on pushes to main; takes a stage name): a Vpc, the
-                      PostgresDatabase and its DbBootstrap
+                      PostgresDatabase, its DbBootstrap, then DbmateMigrations as `app`
   src/recipes/        Copy-and-own constructs: one file, one class, props in a declare namespace beside it,
                       a transform hook per child resource, safe and cheap defaults; tests in CDK assertions.
                       Vpc (isolated subnets, no NAT), PostgresDatabase (IAM auth; grantConnect opens the port
                       and allows rds-db:connect together), LambdaFunction (esbuild ESM bundle, arm64, Node 22,
-                      own log group), GitHubOidcRole, Budget
+                      own log group), DbmateMigrations (a LambdaFunction bundling a pinned dbmate linux-arm64
+                      binary, downloaded and checksummed at synth, with db/migrations, db/seeds and the CA
+                      bundle; a CDK Trigger runs `dbmate migrate` then the seeds with a fresh IAM token;
+                      its code is dbmate-migrations.handler.ts), GitHubOidcRole, Budget
   src/db-bootstrap/   A LambdaFunction run once by a CDK Trigger after the database exists: creates the
                       Postgres role `app` (IAM login) with the master password CloudFormation injects from
                       Secrets Manager; handler.ts is its code. Every later database user signs in as `app`

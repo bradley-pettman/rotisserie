@@ -10,6 +10,7 @@
     "deploy": "cdk deploy Rotisserie-prod --require-approval never"
   },
   "dependencies": {
+    "@aws-sdk/rds-signer": "^3.1159.0",
     "aws-cdk-lib": "^2.275.0",
     "constructs": "^10.8.1",
     "pg": "^8.17.2"

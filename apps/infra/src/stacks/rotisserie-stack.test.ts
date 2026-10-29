@@ -1,4 +1,4 @@
-import { Template } from 'aws-cdk-lib/assertions'
+import { Match, Template } from 'aws-cdk-lib/assertions'
 import * as sns from 'aws-cdk-lib/aws-sns'
 import { describe, expect, it } from 'vitest'
 import { testApp } from '../test/app'
@@ -12,14 +12,38 @@ describe('RotisserieStack', () => {
     expect(stack.stage).toBe('prod')
   })
 
-  it('runs one database in isolated subnets, bootstrapped once, with no way out to the internet', () => {
+  it('runs one database in isolated subnets with no way out to the internet', () => {
     const template = Template.fromStack(new RotisserieStack(testApp(), 'Rotisserie-prod', { stage: 'prod' }))
 
     template.resourceCountIs('AWS::RDS::DBInstance', 1)
     template.hasResourceProperties('AWS::RDS::DBInstance', { DBName: 'rotisserie' })
-    template.resourceCountIs('Custom::Trigger', 1)
     template.resourceCountIs('AWS::EC2::NatGateway', 0)
     template.resourceCountIs('AWS::EC2::InternetGateway', 0)
+  })
+
+  it('bootstraps the app role, then migrates and seeds as that role', () => {
+    const template = Template.fromStack(new RotisserieStack(testApp(), 'Rotisserie-prod', { stage: 'prod' }))
+
+    template.resourceCountIs('Custom::Trigger', 2)
+    template.hasResource('Custom::Trigger', {
+      Properties: Match.objectLike({ HandlerArn: { Ref: Match.stringLikeRegexp('^MigrationsFunction') } }),
+      DependsOn: Match.arrayWith([Match.stringLikeRegexp('^DbBootstrapTrigger')])
+    })
+    template.hasResourceProperties('AWS::Lambda::Function', {
+      Environment: { Variables: Match.objectLike({ PGUSER: 'app', PGDATABASE: 'rotisserie', SEEDS_DIR: 'seeds' }) }
+    })
+    template.hasResourceProperties('AWS::IAM::Policy', {
+      PolicyDocument: {
+        Statement: [
+          Match.objectLike({
+            Action: 'rds-db:connect',
+            Resource: { 'Fn::Join': ['', Match.arrayWith([':dbuser:', '/app'])] }
+          })
+        ]
+      },
+      Roles: [{ Ref: Match.stringLikeRegexp('^MigrationsFunctionServiceRole') }]
+    })
+    template.resourceCountIs('AWS::EC2::SecurityGroupIngress', 2)
   })
 
   it('cannot be deleted by accident', () => {
