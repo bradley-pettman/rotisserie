@@ -59,7 +59,9 @@ export class HttpApi extends Construct {
       'Resource',
       transformed({ defaultIntegration: integration, createDefaultStage: false }, transform?.api)
     )
-    for (const route of routes) this.api.addRoutes({ path: route.path, methods: [route.method], integration })
+    const throttled = routes.flatMap((route) =>
+      this.api.addRoutes({ path: route.path, methods: [route.method], integration })
+    )
 
     if (domain) {
       this.certificate = new acm.Certificate(
@@ -97,6 +99,7 @@ export class HttpApi extends Construct {
     )
 
     if (routes.length > 0) {
+      for (const route of throttled) this.stage.node.addDependency(route)
       const stage = this.stage.node.defaultChild as apigwv2.CfnStage
       stage.routeSettings = Object.fromEntries(
         routes.map((route) => [
