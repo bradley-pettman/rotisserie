@@ -7,7 +7,7 @@ Exports of the claude.ai artifacts made for Rotisserie since the fresh start
 | --- | --- | --- | --- |
 | 2026-10-09 | [Rotisserie Blueprint](https://claude.ai/artifact/1v72DWzBy4swHtP1ZvjYaL) | HTML page | [index.html](2026-10-09-rotisserie-blueprint/index.html), opens as is |
 | 2026-10-09 | [Rotisserie App Map](https://claude.ai/artifact/MxAeVQVxcGtLTYXfCdsZTE) | Design | [2026-10-09-rotisserie-app-map/](2026-10-09-rotisserie-app-map/): the sitemap, wireframes and Golden hour boards as `.dc.html` files, and `canvas.json` for their titles and layout |
-| 2026-10-10 | [Rotisserie auth story](https://claude.ai/artifact/SerC1GhwUu6Q1iKWDQvrc9) | Doc | [auth-story.pdf](2026-10-10-rotisserie-auth-story/auth-story.pdf) with its two diagrams; [auth-story.md](2026-10-10-rotisserie-auth-story/auth-story.md) has placeholders where they were |
+| 2026-10-10 | [Rotisserie auth story](https://claude.ai/artifact/SerC1GhwUu6Q1iKWDQvrc9) | Doc | [auth-story.pdf](2026-10-10-rotisserie-auth-story/auth-story.pdf) as rendered; [auth-story.md](2026-10-10-rotisserie-auth-story/auth-story.md) for the text, with placeholders where the diagrams sit; the diagrams' widget source in [app-states.jsx](2026-10-10-rotisserie-auth-story/app-states.jsx) and [request-checks.jsx](2026-10-10-rotisserie-auth-story/request-checks.jsx). The doc has no comments |
 
 The App Map boards load `support.js` from the Design type's runtime, which is
 not exported, so a board opened from disk shows its markup without the canvas
