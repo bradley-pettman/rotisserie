@@ -81,7 +81,8 @@ apps/mobile/          @rotisserie/mobile: Expo SDK 58, Expo Router. app.json hol
                       Recipes; create, plan, log, recipe-editor, household are modals. _layout.tsx guards
                       each group with Stack.Protected on the auth state
   src/api/            fetch client (Bearer token, parses responses with the shared schemas), auth.tsx
-                      (AuthProvider, useAuth, token in expo-secure-store) and TanStack Query hooks
+                      (AuthProvider, useAuth, token in expo-secure-store), TanStack Query hooks and
+                      import.ts, which fetches a recipe page from the phone and extracts the recipe
   src/components/     UI building blocks; colors come from useColors()
   src/lib/            Pure helpers (dates, meals, quantities, recipes); quantities has Vitest tests
   src/theme/          Golden hour tokens: light and dark palettes, Figtree type scale
@@ -111,7 +112,8 @@ apps/infra/           @rotisserie/infra: AWS CDK, pinned to us-east-2
                       Secrets Manager; handler.ts is its code. Every later database user signs in as `app`
   src/test/           testApp(): an App with cdk.json's feature flags, bundling off, version reporting on
 apps/api/certs/       The RDS CA bundle (rds-global-bundle.pem) that TLS connections to prod verify against
-packages/shared/      @rotisserie/shared: Zod schemas, types and pure domain helpers, one folder per area
+packages/shared/      @rotisserie/shared: Zod schemas, types and pure domain helpers, one folder per area;
+                      recipes/import.ts reads a recipe out of a page's JSON-LD or microdata (no fetching)
 docs/ROADMAP.md       Phases from here to an app on a phone
 docs/SPEC.md          Product spec (features, not implementation)
 ```

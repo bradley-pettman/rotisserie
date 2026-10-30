@@ -8,7 +8,13 @@ import { radius, useColors } from '~/theme'
 const OPTIONS: { label: string; detail: string; icon: IconName; href: Href }[] = [
   { label: 'Log a meal', detail: 'Record what you ate', icon: 'check', href: '/log' },
   { label: 'Plan a meal', detail: 'For a day, or for Planned', icon: 'calendar', href: '/plan' },
-  { label: 'Create a recipe', detail: 'Add one to the book', icon: 'book', href: '/recipe-editor' }
+  { label: 'Create a recipe', detail: 'Add one to the book', icon: 'book', href: '/recipe-editor' },
+  {
+    label: 'Import a recipe',
+    detail: 'Paste a link from a website',
+    icon: 'link',
+    href: { pathname: '/recipe-editor', params: { mode: 'import' } }
+  }
 ]
 
 export default function CreateMenu() {
