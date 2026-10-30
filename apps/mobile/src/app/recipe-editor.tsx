@@ -1,9 +1,11 @@
 import { canonicalizeName } from '@rotisserie/shared/base'
 import { randomUUID } from 'expo-crypto'
 import { useLocalSearchParams, useRouter } from 'expo-router'
+import { useMutation } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, View } from 'react-native'
 import { api } from '~/api/client'
+import { importRecipe, importUrlFrom, type ImportedRecipeDraft } from '~/api/import'
 import {
   useDeleteRecipe,
   useIngredientSearch,
@@ -18,10 +20,10 @@ import { FormSection, ModalHeader, useDismiss } from '~/components/ModalHeader'
 import { HeaderButton } from '~/components/ScreenHeader'
 import { TagSheet } from '~/components/TagSheet'
 import { useToast } from '~/components/Toast'
-import { Chip, Text } from '~/components/ui'
+import { Button, Chip, Text } from '~/components/ui'
 import { toPlannedInput } from '~/lib/meals'
 import { amountLabel, formatIngredientLine, parseIngredientLine, type ParsedIngredient } from '~/lib/quantities'
-import { instructionSteps } from '~/lib/recipes'
+import { hostname, instructionSteps } from '~/lib/recipes'
 import { PlannedMealSchemas } from '@rotisserie/shared/meals'
 import { useColors } from '~/theme'
 
@@ -43,12 +45,20 @@ export default function RecipeEditor() {
   const router = useRouter()
   const dismiss = useDismiss()
   const toast = useToast()
-  const params = useLocalSearchParams<{ id?: string; name?: string; plannedMealId?: string; dishId?: string }>()
+  const params = useLocalSearchParams<{
+    id?: string
+    name?: string
+    plannedMealId?: string
+    dishId?: string
+    mode?: string
+    url?: string
+  }>()
   const existing = useRecipe(params.id)
   const units = useUnits()
   const upsert = useUpsertRecipe()
   const upsertPlanned = useUpsertPlannedMeal()
   const remove = useDeleteRecipe()
+  const importer = useMutation({ mutationFn: importRecipe })
 
   const [recipeId] = useState(() => params.id ?? randomUUID())
   const [name, setName] = useState(params.name ?? '')
@@ -65,6 +75,9 @@ export default function RecipeEditor() {
   const [loaded, setLoaded] = useState(false)
   const [saving, setSaving] = useState(false)
   const [confirmingDelete, setConfirmingDelete] = useState(false)
+  const [importUrl, setImportUrl] = useState(params.url ?? '')
+  const [pendingImport, setPendingImport] = useState<ImportedRecipeDraft | null>(null)
+  const [imported, setImported] = useState<ImportedRecipeDraft | null>(null)
 
   useEffect(() => {
     if (loaded || !existing.data) return
@@ -92,6 +105,41 @@ export default function RecipeEditor() {
     setNotes(recipe.notes ?? '')
     setLoaded(true)
   }, [existing.data, loaded])
+
+  useEffect(() => {
+    if (!pendingImport || !units.data) return
+    const recipe = pendingImport
+    const unitNames = units.data.map((unit) => unit.name)
+    if (recipe.name) setName(recipe.name)
+    if (recipe.servings !== null) setServings(String(recipe.servings))
+    const cookMinutes = recipe.cookTimeMinutes ?? (recipe.prepTimeMinutes === null ? recipe.totalTimeMinutes : null)
+    if (recipe.prepTimeMinutes !== null) setPrep(String(recipe.prepTimeMinutes))
+    if (cookMinutes !== null) setCook(String(cookMinutes))
+    setLines(
+      recipe.ingredients
+        .map((text) => ({ ...parseIngredientLine(text, unitNames), key: randomUUID() }))
+        .filter((line) => line.name)
+    )
+    setDraft('')
+    setInstructions(recipe.steps.map((step, index) => `${index + 1}. ${step}`).join('\n'))
+    setWebsite(recipe.url)
+    setImported(recipe)
+    setPendingImport(null)
+  }, [pendingImport, units.data])
+
+  async function runImport() {
+    const url = importUrlFrom(importUrl)
+    if (!url || importer.isPending) return
+    try {
+      setPendingImport(await importer.mutateAsync(url))
+    } catch {
+      setWebsite((current) => current || url)
+    }
+  }
+
+  useEffect(() => {
+    if (params.url && !params.id) runImport()
+  }, [])
 
   const unitList = units.data ?? []
   const unitNames = unitList.map((unit) => unit.name)
@@ -175,6 +223,44 @@ export default function RecipeEditor() {
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={{ gap: 24, paddingHorizontal: 20, paddingTop: 16, paddingBottom: 48 }}
       >
+        {params.id ? null : (
+          <FormSection
+            title="Import from a website"
+            detail={
+              imported
+                ? `Imported from ${hostname(imported.url)}. Check the name, the ingredients and the steps before saving.`
+                : 'Paste a link to a recipe and the fields below fill in.'
+            }
+          >
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              <Field
+                style={{ flex: 1 }}
+                placeholder="Paste a link"
+                value={importUrl}
+                onChangeText={setImportUrl}
+                keyboardType="url"
+                autoCapitalize="none"
+                autoCorrect={false}
+                autoFocus={params.mode === 'import'}
+                returnKeyType="go"
+                onSubmitEditing={runImport}
+              />
+              <Button
+                label="Import"
+                kind="secondary"
+                busy={importer.isPending}
+                disabled={importUrlFrom(importUrl) === null}
+                onPress={runImport}
+              />
+            </View>
+            {importer.error ? (
+              <Text variant="caption" tone="danger">
+                {importer.error.message}
+              </Text>
+            ) : null}
+          </FormSection>
+        )}
+
         <Field label="Name" value={name} onChangeText={setName} placeholder="Turkey chili" autoCapitalize="words" />
 
         <View style={{ flexDirection: 'row', gap: 10 }}>

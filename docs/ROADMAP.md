@@ -426,11 +426,47 @@ restore has been tested.
 - App icon from `docs/logo.png`
 - EAS Update for over-the-air JavaScript updates without a rebuild
 
+## Recipe import ✅
+
+Paste a link, get a draft. The phone fetches the page itself, so nothing in
+AWS changes: the API Lambda has no route to the internet, and a phone on home
+Wi-Fi or cellular gets past the publishers that refuse datacenter addresses
+(Allrecipes, Serious Eats and the rest of that family answer 402 to a Lambda).
+
+- [x] `extractRecipe(html)` in `packages/shared/src/recipes/import.ts`: the
+      schema.org Recipe from JSON-LD (bare, in an array, in `@graph`, or nested),
+      with microdata as the fallback. Name, ingredient strings, steps (HowToStep,
+      HowToSection, list markup, one numbered string), prep, cook and total time
+      (ISO 8601 including Food Network's `P0Y0M0DT0H20M0.000S`, or "1 hr 30
+      min") and servings ("6–8 servings" is 6). Pure string code, no fetching,
+      so it runs on the phone today and in a Lambda the day one gets outbound
+      network
+- [x] `apps/mobile/src/api/import.ts` fetches the page with a timeout and a
+      size cap and turns HTTP failures into a sentence
+- [x] The New recipe screen has "Import from a website" at the top; the Create
+      menu's "Import a recipe" opens it with the link field focused. The
+      ingredient strings go through the editor's own line parser, the steps
+      become numbered lines, the URL lands in Website, and nothing is saved
+      until Save. Only total time known: it goes in Cook
+- [x] The editor's line parser learned what recipe sites write: parentheses
+      become notes (including the doubled "((Note 1))" kind), "1 14.5-oz. can
+      tomato sauce" reads the size as a note and the can as the unit, a
+      trailing "finely chopped" or "to taste" moves to notes, and a price in
+      parentheses is dropped. Typed lines get the same treatment
+- [x] Checked against 22 real pages in October 2026, all of which produced a
+      draft; the one site without JSON-LD (Smitten Kitchen) gave ingredients
+      but no steps. The extractor and the line parser both compile under
+      Hermes (`hermesc` from `hermes-compiler`)
+
+Follow-ups: the share sheet (a native extension, so a new build), a WebView
+fetch for sites that block plain requests, suggesting `recipeCategory` and
+`recipeCuisine` as tags, and a model-backed fallback for pages with no
+structured data once the API has outbound network.
+
 ## Later
 
 - **Offline:** persist the TanStack Query cache, then consider local SQLite if
   the kitchen has bad signal
-- **Recipe import from a URL:** the old scraper and parsers are in git history
 - **Grocery list** generated from a week of planned meals
 - **Tags UI**, a web client (just another API client)
 - **Cook mode:** one dish and one step at a time, large text, screen kept awake
