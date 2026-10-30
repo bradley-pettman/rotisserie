@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Recipe editor B: paste a list</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;600&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#222222}a:hover{color:#000000}
+</style>
+</helmet>
+<div style="position: relative; width: 390px; height: 844px; overflow: hidden; background: #6f6f6f; font-family: 'IBM Plex Sans', 'Helvetica Neue', sans-serif; color: #222222">
+<div style="position: absolute; left: 0; right: 0; top: 54px; bottom: 0; overflow: hidden; background: #ffffff; border-radius: 16px 16px 0 0">
+
+<div style="display: flex; align-items: center; justify-content: space-between; padding: 6px 8px; border-bottom: 1px solid #ececec">
+<a href="#" style="min-height: 44px; padding: 0 8px; display: flex; align-items: center; text-decoration: none; font-size: 16px; color: #222222">Cancel</a>
+<h1 style="margin: 0; font-size: 17px; line-height: 24px; font-weight: 600">New recipe</h1>
+<a href="#" style="min-height: 44px; padding: 0 8px; display: flex; align-items: center; text-decoration: none; font-size: 16px; font-weight: 600; color: #222222">Save</a>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 18px; padding: 16px">
+
+<div style="display: flex; flex-direction: column; gap: 6px">
+<label for="b-name" style="font-size: 13px; color: #555555">Name</label>
+<input id="b-name" value="Turkey Chili" style="height: 48px; box-sizing: border-box; padding: 0 14px; border: 1.5px solid #d0d0d0; border-radius: 10px; font: inherit; font-size: 17px">
+</div>
+
+<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px">
+<div style="display: flex; flex-direction: column; gap: 6px"><label for="b-makes" style="font-size: 13px; color: #555555">Makes</label><input id="b-makes" value="4" inputmode="numeric" style="height: 44px; box-sizing: border-box; padding: 0 12px; border: 1.5px solid #d0d0d0; border-radius: 10px; font: inherit; font-size: 16px"></div>
+<div style="display: flex; flex-direction: column; gap: 6px"><label for="b-prep" style="font-size: 13px; color: #555555">Prep, min</label><input id="b-prep" value="15" inputmode="numeric" style="height: 44px; box-sizing: border-box; padding: 0 12px; border: 1.5px solid #d0d0d0; border-radius: 10px; font: inherit; font-size: 16px"></div>
+<div style="display: flex; flex-direction: column; gap: 6px"><label for="b-cook" style="font-size: 13px; color: #555555">Cook, min</label><input id="b-cook" value="60" inputmode="numeric" style="height: 44px; box-sizing: border-box; padding: 0 12px; border: 1.5px solid #d0d0d0; border-radius: 10px; font: inherit; font-size: 16px"></div>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 8px">
+<label for="b-ingredients" style="font-size: 12px; line-height: 16px; font-weight: 600; letter-spacing: 0.06em; color: #6b6b6b">INGREDIENTS · ONE PER LINE</label>
+<textarea id="b-ingredients" style="height: 142px; box-sizing: border-box; padding: 10px 12px; border: 1.5px solid #d0d0d0; border-radius: 10px; font: inherit; font-size: 15px; line-height: 22px; resize: none">1 lb ground turkey
+1 onion, diced
+2 cloves garlic, minced
+2 tbsp chili powder
+1 can kidney beans (15 oz), drained
+1 tsp gochugaru</textarea>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 6px">
+<h2 style="margin: 0; font-size: 12px; line-height: 16px; font-weight: 600; letter-spacing: 0.06em; color: #6b6b6b">HOW WE READ IT</h2>
+<div style="display: grid; grid-template-columns: 34px 52px minmax(0, 1fr); column-gap: 8px; row-gap: 6px; font-size: 14px; line-height: 20px">
+<span style="font-weight: 600">1</span><span>lb</span><span>ground turkey</span>
+<span style="font-weight: 600">1</span><span style="color: #8a8a8a">—</span><span>onion <span style="color: #6b6b6b">· diced</span></span>
+<span style="font-weight: 600">2</span><span>cloves</span><span>garlic <span style="color: #6b6b6b">· minced</span></span>
+<span style="font-weight: 600">2</span><span>tbsp</span><span>chili powder</span>
+<span style="font-weight: 600">1</span><span>can</span><span>kidney beans <span style="color: #6b6b6b">· 15 oz, drained</span></span>
+<span style="font-weight: 600">1</span><span>tsp</span><span>gochugaru <span style="display: inline-block; margin-left: 4px; padding: 0 6px; border: 1px solid #222222; border-radius: 8px; font-size: 11px; line-height: 16px">NEW</span></span>
+</div>
+</div>
+
+</div>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,452 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Rotisserie Blueprint</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one reading column, diagrams break out to full width inside scroll boxes */
+:root {
+  --bg: #f6f7f4;
+  --surface: #ffffff;
+  --fg: #1c2420;
+  --muted: #5a665f;
+  --line: #dbe1da;
+  --accent: #2c6a4c;
+  --accent-soft: #e3efe7;
+  --warn: #9a4a12;
+  --warn-soft: #f8e9dc;
+  --font-display: "Bricolage Grotesque", "Avenir Next", system-ui, sans-serif;
+  --font-body: "IBM Plex Sans", -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #111513; --surface: #181e1b; --fg: #e4eae6; --muted: #9aa7a0; --line: #2a332e;
+    --accent: #7cc4a0; --accent-soft: #1d2d25; --warn: #f0a86e; --warn-soft: #2f2118;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #111513; --surface: #181e1b; --fg: #e4eae6; --muted: #9aa7a0; --line: #2a332e;
+  --accent: #7cc4a0; --accent-soft: #1d2d25; --warn: #f0a86e; --warn-soft: #2f2118;
+  color-scheme: dark;
+}
+body {
+  background: var(--bg); color: var(--fg);
+  font-family: var(--font-body); font-size: 16px; line-height: 1.6;
+  padding-inline: 20px; padding-block: 40px 80px;
+}
+main { max-width: 1040px; margin-inline: auto; display: grid; gap: 56px; }
+.prose { max-width: 68ch; }
+h1, h2, h3 { font-family: var(--font-display); text-wrap: balance; line-height: 1.15; margin: 0; }
+h1 { font-size: clamp(2.2rem, 5vw, 3.2rem); font-weight: 700; letter-spacing: -0.02em; }
+h2 { font-size: 1.7rem; font-weight: 700; }
+h3 { font-size: 1.15rem; font-weight: 500; }
+p { margin: 0; }
+section { display: grid; gap: 18px; }
+.eyebrow { font-family: var(--font-mono); font-size: 0.75rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); }
+.lede { font-size: 1.15rem; color: var(--muted); max-width: 62ch; }
+code, .mono { font-family: var(--font-mono); font-size: 0.88em; }
+code { background: var(--accent-soft); padding: 1px 5px; border-radius: 4px; }
+.diagram {
+  background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
+  padding: 20px; overflow-x: auto;
+}
+.diagram pre.mermaid { margin: 0; display: flex; justify-content: center; min-width: 640px; background: transparent; }
+.caption { font-size: 0.9rem; color: var(--muted); max-width: 72ch; }
+
+.groups { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
+.group { border-top: 3px solid var(--accent); padding-top: 12px; display: grid; gap: 6px; align-content: start; min-width: 0; }
+.group.fact { border-color: var(--warn); }
+.group .tables { font-family: var(--font-mono); font-size: 0.82rem; color: var(--muted); }
+.group p { font-size: 0.95rem; }
+
+.table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; font-size: 0.93rem; min-width: 560px; }
+th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-family: var(--font-mono); font-size: 0.72rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); font-weight: 500; }
+tr:last-child td { border-bottom: 0; }
+.pill { display: inline-block; font-family: var(--font-mono); font-size: 0.75rem; padding: 2px 8px; border-radius: 99px; white-space: nowrap; }
+.pill.cascade { background: var(--warn-soft); color: var(--warn); }
+.pill.keep { background: var(--accent-soft); color: var(--accent); }
+
+ol.steps { margin: 0; padding-left: 1.3em; display: grid; gap: 10px; max-width: 70ch; }
+ol.steps li::marker { font-family: var(--font-mono); color: var(--accent); }
+.rules { display: grid; gap: 14px; max-width: 72ch; margin: 0; padding: 0; list-style: none; }
+.rules li { padding-left: 16px; border-left: 2px solid var(--line); }
+.rules strong { display: block; }
+</style>
+
+<main>
+  <header style="display:grid;gap:14px">
+    <span class="eyebrow">Rotisserie · data model</span>
+    <h1>Rotisserie Blueprint</h1>
+    <p class="lede">The current schema, drawn out, and the smaller version to start from. Read the diagrams top to bottom: how the pieces talk, what the tables are, then what to build first.</p>
+  </header>
+
+  <!-- ARCHITECTURE -->
+  <section>
+    <span class="eyebrow">1 · Architecture</span>
+    <h2>The system you're building</h2>
+    <p class="prose">One backend, one database, and the phone as its first client. The web app becomes an optional second client later. It calls the same API and holds no special access to the database.</p>
+    <div class="diagram">
+<pre class="mermaid">
+flowchart LR
+  subgraph Phone["📱 Expo app (React Native)"]
+    direction TB
+    Screens["Screens: Tonight, Recipes, Recipe, Cook mode"]
+    Client["API client: fetch + typed responses"]
+    Screens --> Client
+  end
+
+  subgraph Server["Node API (Hono or Express)"]
+    direction TB
+    Routes["Routes: /recipes, /cooks, /plans"]
+    Validate["Validation: Zod schemas"]
+    Queries["Query functions: raw SQL via pg"]
+    Routes --> Validate --> Queries
+  end
+
+  DB[("PostgreSQL (migrations via dbmate)")]
+  Shared[["Shared package: Zod schemas + TS types"]]
+  Web["Web app (later, optional)"]
+
+  Client -- "HTTPS · JSON" --> Routes
+  Queries -- "SQL" --> DB
+  Shared -.-> Client
+  Shared -.-> Validate
+  Web -. "HTTPS · JSON" .-> Routes
+</pre>
+    </div>
+    <p class="caption">The shared package is what keeps the phone and the server agreeing on the shape of a recipe. Define a schema once in Zod, and the server validates with it while the app gets the TypeScript type from it.</p>
+  </section>
+
+  <!-- REQUEST LIFECYCLE -->
+  <section>
+    <span class="eyebrow">2 · One request, end to end</span>
+    <h2>"I cooked tonight's planned meal"</h2>
+    <p class="prose">This is the most interesting write in the app, because it touches all three areas of the schema. It records a fact (a cook) and links it to an intention (the plan item).</p>
+    <div class="diagram">
+<pre class="mermaid">
+sequenceDiagram
+  autonumber
+  participant App as Expo app
+  participant API as API route
+  participant Z as Zod
+  participant DB as Postgres
+
+  App->>API: POST /cooks { recipeId, cookedOn, mealSlot, planItemId }
+  API->>Z: parse(body)
+  Z-->>API: valid input (or 400 with field errors)
+  API->>DB: BEGIN
+  API->>DB: SELECT name FROM recipes WHERE id = $1
+  Note over API,DB: the name is copied into cooks.label as a snapshot
+  API->>DB: INSERT INTO cooks (...) RETURNING id
+  API->>DB: INSERT INTO cook_fulfillments (cook_id, meal_plan_item_id)
+  API->>DB: COMMIT
+  API-->>App: 201 { cook }
+</pre>
+    </div>
+  </section>
+
+  <!-- FULL SCHEMA -->
+  <section>
+    <span class="eyebrow">3 · The full schema</span>
+    <h2>Ten tables in three areas</h2>
+    <div class="groups">
+      <div class="group">
+        <h3>Recipe book</h3>
+        <span class="tables">recipes · ingredients · recipe_ingredients · units · tags · recipe_tags</span>
+        <p>What you know how to make. Ingredients, units and tags are shared vocabularies that recipes point into.</p>
+      </div>
+      <div class="group fact">
+        <h3>Cooking history</h3>
+        <span class="tables">cooks</span>
+        <p>Fact. Append-only record of what was actually made, and when. It survives deleting a recipe.</p>
+      </div>
+      <div class="group">
+        <h3>Planner</h3>
+        <span class="tables">meal_plans · meal_plan_items</span>
+        <p>Intention. Editable, and it may never happen. Moving tacos to Wednesday doesn't rewrite history.</p>
+      </div>
+      <div class="group fact">
+        <h3>The bridge</h3>
+        <span class="tables">cook_fulfillments</span>
+        <p>Which cooks fulfilled which plan items. Optional on both sides, so it's a separate table.</p>
+      </div>
+    </div>
+    <div class="diagram">
+<pre class="mermaid">
+erDiagram
+  recipes ||--o{ recipe_ingredients : "lists"
+  ingredients ||--o{ recipe_ingredients : "used in"
+  units |o--o{ recipe_ingredients : "measured in"
+  recipes ||--o{ recipe_tags : "tagged"
+  tags ||--o{ recipe_tags : "applied to"
+  recipes |o--o{ cooks : "cooked as"
+  recipes |o--o{ meal_plan_items : "planned as"
+  meal_plans ||--o{ meal_plan_items : "contains"
+  cooks ||--o{ cook_fulfillments : "fulfils"
+  meal_plan_items ||--o{ cook_fulfillments : "fulfilled by"
+
+  recipes {
+    uuid id PK
+    varchar name "required, trigram-indexed"
+    text instructions "required"
+    int prep_time_minutes
+    int cook_time_minutes
+    int servings
+    text source_url
+    text notes
+    timestamptz created_at
+    timestamptz updated_at
+  }
+  ingredients {
+    uuid id PK
+    varchar name UK "lowercase + trimmed (CHECK)"
+    timestamptz created_at
+  }
+  recipe_ingredients {
+    uuid id PK
+    uuid recipe_id FK "CASCADE"
+    uuid ingredient_id FK "RESTRICT"
+    uuid unit_id FK "nullable, RESTRICT"
+    numeric quantity "nullable"
+    text notes "e.g. divided"
+    int sort_order
+  }
+  units {
+    uuid id PK
+    varchar name UK "lowercase (CHECK)"
+    varchar abbreviation
+    varchar category "volume, weight, count..."
+    timestamptz created_at
+  }
+  tags {
+    uuid id PK
+    varchar name UK "lowercase (CHECK)"
+    timestamptz created_at
+  }
+  recipe_tags {
+    uuid recipe_id PK,FK "CASCADE"
+    uuid tag_id PK,FK "CASCADE"
+  }
+  cooks {
+    uuid id PK
+    uuid recipe_id FK "nullable, SET NULL"
+    varchar label "name snapshot, required"
+    date cooked_on
+    varchar meal_slot "breakfast|lunch|dinner|snack"
+    int servings_made
+    text notes
+    boolean is_leftovers
+    timestamptz created_at
+  }
+  meal_plans {
+    uuid id PK
+    varchar name "nullable"
+    date starts_on
+    date ends_on "CHECK >= starts_on"
+    timestamptz created_at
+    timestamptz updated_at
+  }
+  meal_plan_items {
+    uuid id PK
+    uuid meal_plan_id FK "CASCADE"
+    uuid recipe_id FK "nullable, CASCADE"
+    varchar custom_text "e.g. pizza night"
+    date planned_on
+    varchar meal_slot "breakfast|lunch|dinner|snack"
+    int sort_order
+    text notes
+  }
+  cook_fulfillments {
+    uuid cook_id PK,FK "CASCADE"
+    uuid meal_plan_item_id PK,FK "CASCADE"
+  }
+</pre>
+    </div>
+    <p class="caption">How to read the crow's feet: <span class="mono">||</span> means exactly one, <span class="mono">|o</span> zero or one, <span class="mono">o{</span> zero or many. So <span class="mono">recipes |o--o{ cooks</span> says a cook may have no recipe (takeout, improvisation), and a recipe may never have been cooked.</p>
+  </section>
+
+  <!-- DELETE BEHAVIOUR -->
+  <section>
+    <span class="eyebrow">4 · Foreign key choices</span>
+    <h2>What happens when you delete a recipe</h2>
+    <p class="prose">Most of the design lives in the <code>ON DELETE</code> rules. Each one answers the question "does this row still mean anything once the recipe is gone?"</p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Child row</th><th>Rule</th><th>Why</th></tr></thead>
+        <tbody>
+          <tr><td class="mono">recipe_ingredients</td><td><span class="pill cascade">CASCADE</span></td><td>An ingredient line is part of the recipe. It has no meaning on its own.</td></tr>
+          <tr><td class="mono">recipe_tags</td><td><span class="pill cascade">CASCADE</span></td><td>The link goes away. The tag itself stays for other recipes.</td></tr>
+          <tr><td class="mono">meal_plan_items</td><td><span class="pill cascade">CASCADE</span></td><td>A plan to cook something that no longer exists is meaningless.</td></tr>
+          <tr><td class="mono">cooks</td><td><span class="pill keep">SET NULL</span></td><td>You still made it. <code>label</code> keeps the name readable after the recipe is gone.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Parent row</th><th>Rule</th><th>Why</th></tr></thead>
+        <tbody>
+          <tr><td class="mono">ingredients</td><td><span class="pill keep">RESTRICT</span></td><td>You can't delete "flour" while a recipe still uses it.</td></tr>
+          <tr><td class="mono">units</td><td><span class="pill keep">RESTRICT</span></td><td>Same reason. A line saying "2 ___ flour" would be broken data.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- RULES -->
+  <section>
+    <span class="eyebrow">5 · Invariants</span>
+    <h2>Rules the database enforces</h2>
+    <ul class="rules">
+      <li><strong>Vocabulary is stored lowercase.</strong> <code>ingredients</code>, <code>units</code> and <code>tags</code> each have a CHECK that <span class="mono">name = lower(btrim(name))</span>. Otherwise "Flour" and "flour" become two rows that <span class="mono">ON CONFLICT (name)</span> can't tell apart. Capitalize when you display a name, not when you store it.</li>
+      <li><strong>A plan item must name something.</strong> <span class="mono">CHECK (recipe_id IS NOT NULL OR custom_text IS NOT NULL)</span>. "Pizza night" with no recipe is valid. A blank row is not.</li>
+      <li><strong>Dates are calendar days, not instants.</strong> <code>cooked_on</code>, <code>planned_on</code> and the plan range are <span class="mono">DATE</span>. Return them as <span class="mono">'YYYY-MM-DD'</span> strings, or a time zone will shift them by a day.</li>
+      <li><strong>Same four meal slots everywhere.</strong> <code>cooks</code> and <code>meal_plan_items</code> share breakfast, lunch, dinner and snack, so a cook lines up with the plan item it fulfils.</li>
+      <li><strong>A recipe can list an ingredient twice.</strong> "2 cups flour, divided" plus "1 tbsp for dusting". That's why <code>recipe_ingredients</code> has its own <code>id</code> instead of a <span class="mono">(recipe_id, ingredient_id)</span> key.</li>
+    </ul>
+  </section>
+
+  <!-- V1 -->
+  <section>
+    <span class="eyebrow">6 · Where to start</span>
+    <h2>The smaller starting schema</h2>
+    <p class="prose">Five tables. That's enough for a phone app that stores, searches and shows recipes. Every table here carries over to the full schema unchanged, so nothing gets thrown away later.</p>
+    <div class="diagram">
+<pre class="mermaid">
+erDiagram
+  recipes ||--o{ recipe_ingredients : "lists"
+  ingredients ||--o{ recipe_ingredients : "used in"
+  units |o--o{ recipe_ingredients : "measured in"
+  recipes ||--o{ cooks : "cooked as"
+
+  recipes {
+    uuid id PK
+    varchar name
+    text instructions
+    int prep_time_minutes
+    int cook_time_minutes
+    int servings
+    text source_url
+    timestamptz created_at
+    timestamptz updated_at
+  }
+  ingredients {
+    uuid id PK
+    varchar name UK "lowercase"
+  }
+  units {
+    uuid id PK
+    varchar name UK "lowercase"
+    varchar abbreviation
+  }
+  recipe_ingredients {
+    uuid id PK
+    uuid recipe_id FK
+    uuid ingredient_id FK
+    uuid unit_id FK "nullable"
+    numeric quantity "nullable"
+    text notes
+    int sort_order
+  }
+  cooks {
+    uuid id PK
+    uuid recipe_id FK "nullable"
+    varchar label
+    date cooked_on
+  }
+</pre>
+    </div>
+    <p class="caption"><code>cooks</code> is included early, in a stripped-down form, because "when did I last make this?" is the first question a phone app answers well. Tags, meal plans and fulfillments come later.</p>
+
+    <h3 style="margin-top:12px">Build order</h3>
+    <ol class="steps">
+      <li><strong>Migrations for the five tables.</strong> Write the SQL yourself, run <code>dbmate up</code>, then insert a few rows by hand in <span class="mono">psql</span>.</li>
+      <li><strong>Read endpoints.</strong> <span class="mono">GET /recipes?q=</span> and <span class="mono">GET /recipes/:id</span>, the second with ingredients joined in. Test with curl.</li>
+      <li><strong>Write endpoints.</strong> <span class="mono">POST /recipes</span> saving the recipe and its ingredient lines in one transaction. This is where the lowercase rule and the ingredient upsert live.</li>
+      <li><strong>Expo app, read-only.</strong> A recipe list and a recipe screen, pointed at your laptop's IP.</li>
+      <li><strong>Log a cook.</strong> One button, one <span class="mono">POST /cooks</span>. Show "last made" on the recipe screen.</li>
+      <li><strong>Add the next area.</strong> Tags, or meal plans plus <code>cook_fulfillments</code>, whichever you miss first.</li>
+    </ol>
+  </section>
+</main>
+
+<!--claude-mermaid-runtime-begin:3477-->
+<style>.mermaid-diagram{margin-block:4px}.mermaid-diagram svg{display:block;margin:0 auto;max-width:100%;height:auto}</style>
+<script src="/_runtime/mermaid-11.16.1.min.js"></script>
+<script>(function(){
+var CFG={"palettes":{"light":{"surface":"#f4efe4","text":"#42392e","line":"#8a7f6d","border":"#7a6c52","bg":"#fffdf8"},"dark":{"surface":"#262b34","text":"#f2f3f5","line":"#a8adb8","border":"#9aa4b8","bg":"#1f232b"}}};
+if(typeof mermaid==='undefined')return;
+var pres=Array.prototype.slice.call(document.querySelectorAll('pre.mermaid')).filter(function(p){if(p.hasAttribute('data-claude-mermaid-claimed'))return false;p.setAttribute('data-claude-mermaid-claimed','1');return true;});
+if(!pres.length)return;
+var mq=window.matchMedia?window.matchMedia('(prefers-color-scheme: dark)'):null;
+var root=document.documentElement;
+var items=pres.map(function(pre){
+var mount=document.createElement('div');mount.className='mermaid-diagram';
+return {pre:pre,mount:mount,src:pre.textContent||''};
+});
+var seq=0;
+var renderGen=0;
+var lastKey='';
+function pageBg(fallback){
+var els=[document.body,document.documentElement];
+for(var i=0;i<els.length;i++){
+var c=els[i]&&getComputedStyle(els[i]).backgroundColor;
+if(c&&c!=='transparent'&&c!=='rgba(0, 0, 0, 0)')return c;
+}
+return fallback;
+}
+function render(){
+var theme=root.getAttribute('data-theme');
+var dark=theme==='dark'||(!!(mq&&mq.matches)&&theme!=='light');
+var pal=dark?CFG.palettes.dark:CFG.palettes.light;
+var bg=pageBg(pal.bg);
+var key=(dark?'d':'l')+'|'+bg;
+if(key===lastKey)return;
+lastKey=key;
+var gen=++renderGen;
+var font=getComputedStyle(document.body).fontFamily||'sans-serif';
+var nat={useMaxWidth:false};
+mermaid.initialize({
+startOnLoad:false,securityLevel:'strict',theme:'base',
+flowchart:nat,sequence:nat,er:nat,state:nat,class:nat,pie:nat,
+gantt:nat,journey:nat,timeline:nat,gitGraph:nat,mindmap:nat,xyChart:nat,
+quadrantChart:nat,sankey:nat,c4:nat,requirement:nat,block:nat,
+packet:nat,kanban:nat,architecture:nat,radar:nat,
+themeVariables:{background:bg,mainBkg:pal.surface,primaryColor:pal.surface,
+primaryTextColor:pal.text,lineColor:pal.line,primaryBorderColor:pal.border,
+nodeBorder:pal.border,clusterBorder:pal.border,edgeLabelBackground:bg,
+clusterBkg:'rgba(127,127,127,0.07)',titleColor:pal.text,
+darkMode:dark,rowOdd:bg,rowEven:'rgba(127,127,127,0.07)',
+attributeBackgroundColorOdd:bg,attributeBackgroundColorEven:'rgba(127,127,127,0.07)',
+fontSize:'16px',fontFamily:font},
+themeCSS:'.node rect, .node circle, .node polygon, .node path, .cluster rect { stroke-width: 2px; }'
+});
+items.forEach(function(it){
+var id='claude-mermaid-'+seq++;
+mermaid.render(id,it.src).then(function(r){
+if(gen!==renderGen)return;
+var prev=it.pre.previousElementSibling;
+if(prev&&prev.className==='mermaid-diagram'&&prev!==it.mount)return;
+it.mount.innerHTML=r.svg;
+if(!it.mount.parentNode)it.pre.parentNode.insertBefore(it.mount,it.pre);
+it.pre.style.display='none';
+},function(){
+var scratch=document.getElementById(id);
+if(scratch)scratch.parentNode.removeChild(scratch);
+scratch=document.getElementById('d'+id);
+if(scratch)scratch.parentNode.removeChild(scratch);
+if(gen!==renderGen)return;
+if(it.mount.parentNode)it.mount.parentNode.removeChild(it.mount);
+it.pre.style.display='';
+});
+});
+}
+render();
+if(mq&&mq.addEventListener)mq.addEventListener('change',render);
+if(typeof MutationObserver!=='undefined')new MutationObserver(render).observe(root,{attributes:true,attributeFilter:['data-theme']});
+})();</script>
+<!--claude-mermaid-runtime-end-->
+
+</body></html>

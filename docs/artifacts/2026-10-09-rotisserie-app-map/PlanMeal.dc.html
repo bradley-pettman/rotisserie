@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Plan a meal: to Planned</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;600&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#222222}a:hover{color:#000000}
+input::placeholder{color:#8a8a8a}
+</style>
+</helmet>
+<div style="position: relative; width: 390px; height: 844px; overflow: hidden; background: #6f6f6f; font-family: 'IBM Plex Sans', 'Helvetica Neue', sans-serif; color: #222222">
+<div style="position: absolute; left: 0; right: 0; top: 54px; bottom: 0; overflow: hidden; background: #ffffff; border-radius: 16px 16px 0 0">
+
+<div style="display: flex; align-items: center; justify-content: space-between; padding: 6px 8px; border-bottom: 1px solid #ececec">
+<a href="CreateMenu.dc.html" style="min-height: 44px; padding: 0 8px; display: flex; align-items: center; text-decoration: none; font-size: 16px; color: #222222">Cancel</a>
+<h1 style="margin: 0; font-size: 17px; line-height: 24px; font-weight: 600">Plan a meal</h1>
+<span style="width: 64px"></span>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 20px; padding: 16px 16px 160px">
+<details open style="padding: 0 12px; border: 1px solid #e2e2e2; border-radius: 12px; background: #fafafa">
+<summary style="min-height: 48px; display: flex; align-items: center; justify-content: space-between; list-style: none; cursor: pointer; font-size: 15px"><span><span style="font-weight: 600">Already planned</span> <span style="color: #555555">· 4 meals without a day</span></span><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 15l6-6 6 6"></path></svg></summary>
+<div style="display: flex; align-items: center; gap: 10px; min-height: 36px; border-top: 1px solid #ececec; font-size: 14px"><span style="width: 52px; flex: none; font-size: 12px; color: #6b6b6b">Dinner</span><span style="flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis"><span style="font-weight: 600">Spaghetti</span> <span style="color: #6b6b6b">· garlic bread</span></span></div>
+<div style="display: flex; align-items: center; gap: 10px; min-height: 36px; border-top: 1px solid #ececec; font-size: 14px"><span style="width: 52px; flex: none; font-size: 12px; color: #6b6b6b">Dinner</span><span style="flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis"><span style="font-weight: 600">Tacos</span></span></div>
+<div style="display: flex; align-items: center; gap: 10px; min-height: 36px; border-top: 1px solid #ececec; font-size: 14px"><span style="width: 52px; flex: none; font-size: 12px; color: #6b6b6b">Dinner</span><span style="flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis"><span style="font-weight: 600">Beef &amp; broccoli</span> <span style="color: #6b6b6b">· rice</span></span></div>
+<div style="display: flex; align-items: center; gap: 10px; min-height: 36px; border-top: 1px solid #ececec; font-size: 14px"><span style="width: 52px; flex: none; font-size: 12px; color: #6b6b6b">Lunch</span><span style="flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis"><span style="font-weight: 600">BLTs</span></span></div>
+<span style="display: block; height: 6px"></span>
+</details>
+
+
+<div style="display: flex; flex-direction: column; gap: 8px">
+<h2 style="margin: 0; font-size: 12px; line-height: 16px; font-weight: 600; letter-spacing: 0.06em; color: #6b6b6b">DISHES</h2>
+<div style="display: flex; flex-wrap: wrap; gap: 8px">
+<span style="display: inline-flex; align-items: center; padding-left: 14px; border-radius: 20px; background: #222222; color: #ffffff; font-size: 15px">Chili<button aria-label="Remove chili" style="width: 40px; height: 40px; border: 0; background: transparent; font: inherit; font-size: 17px; color: #ffffff">×</button></span>
+<span style="display: inline-flex; align-items: center; padding-left: 14px; border-radius: 20px; background: #222222; color: #ffffff; font-size: 15px">Cornbread<button aria-label="Remove cornbread" style="width: 40px; height: 40px; border: 0; background: transparent; font: inherit; font-size: 17px; color: #ffffff">×</button></span>
+<span style="display: inline-flex; align-items: center; padding-left: 14px; border-radius: 20px; border: 1.5px dashed #222222; font-size: 15px">bag salad mix<button aria-label="Remove bag salad mix" style="width: 40px; height: 37px; border: 0; background: transparent; font: inherit; font-size: 17px; color: #222222">×</button></span>
+</div>
+<input aria-label="Add a dish" placeholder="Search recipes or type a dish" style="height: 48px; box-sizing: border-box; padding: 0 12px; border: 1.5px solid #d0d0d0; border-radius: 10px; font: inherit; font-size: 16px">
+<span style="font-size: 12px; color: #6b6b6b">Solid chips are recipes; dashed ones are free text.</span>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 8px">
+<h2 style="margin: 0; font-size: 12px; line-height: 16px; font-weight: 600; letter-spacing: 0.06em; color: #6b6b6b">WHEN</h2>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 2px; padding: 3px; background: #efefef; border-radius: 10px">
+<button aria-pressed="true" style="height: 42px; border: 0; border-radius: 8px; background: #ffffff; font: inherit; font-size: 14px; font-weight: 600; color: #222222; box-shadow: 0 1px 2px rgba(0,0,0,0.15)">No day yet</button>
+<a href="PlanMealDay.dc.html" style="height: 42px; border-radius: 8px; display: flex; align-items: center; justify-content: center; text-decoration: none; font-size: 14px; color: #555555">Pick a day</a>
+</div>
+<span style="font-size: 13px; color: #555555">Goes to Planned. Pick its day later, or on the night.</span>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 8px">
+<h2 style="margin: 0; font-size: 12px; line-height: 16px; font-weight: 600; letter-spacing: 0.06em; color: #6b6b6b">MEAL</h2>
+<div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 2px; padding: 3px; background: #efefef; border-radius: 10px">
+<button style="height: 40px; border: 0; border-radius: 8px; background: transparent; font: inherit; font-size: 13px; color: #555555">Breakfast</button>
+<button style="height: 40px; border: 0; border-radius: 8px; background: transparent; font: inherit; font-size: 13px; color: #555555">Lunch</button>
+<button aria-pressed="true" style="height: 40px; border: 0; border-radius: 8px; background: #ffffff; font: inherit; font-size: 13px; font-weight: 600; color: #222222; box-shadow: 0 1px 2px rgba(0,0,0,0.15)">Dinner</button>
+<button style="height: 40px; border: 0; border-radius: 8px; background: transparent; font: inherit; font-size: 13px; color: #555555">Snack</button>
+</div>
+</div>
+
+<div style="display: flex; align-items: center; justify-content: space-between; min-height: 44px">
+<span style="font-size: 15px">People</span>
+<div style="display: flex; align-items: center; gap: 4px; border: 1.5px solid #d0d0d0; border-radius: 12px">
+<button aria-label="Fewer people" style="width: 44px; height: 44px; border: 0; background: transparent; font: inherit; font-size: 20px; color: #222222">−</button>
+<span style="min-width: 24px; text-align: center; font-size: 17px; font-weight: 600">4</span>
+<button aria-label="More people" style="width: 44px; height: 44px; border: 0; background: transparent; font: inherit; font-size: 20px; color: #222222">+</button>
+</div>
+</div>
+
+</div>
+
+<div style="position: absolute; left: 0; right: 0; bottom: 0; box-sizing: border-box; padding: 12px 16px 34px; border-top: 1px solid #dddddd; background: #ffffff; display: flex; flex-direction: column; gap: 8px">
+<a href="MealsD1.dc.html" style="height: 52px; border-radius: 12px; background: #222222; color: #ffffff; display: flex; align-items: center; justify-content: center; text-decoration: none; font-size: 16px; font-weight: 600">Add to Planned</a>
+<a href="PlanMeal.dc.html" style="height: 48px; border-radius: 12px; border: 1.5px solid #222222; box-sizing: border-box; color: #222222; display: flex; align-items: center; justify-content: center; text-decoration: none; font-size: 15px">Add and plan another</a>
+</div>
+
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>

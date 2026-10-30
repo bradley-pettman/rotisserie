@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Log a meal: Made something else</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;600&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#222222}a:hover{color:#000000}
+</style>
+</helmet>
+<div style="position: relative; width: 390px; height: 844px; overflow: hidden; background: #6f6f6f; font-family: 'IBM Plex Sans', 'Helvetica Neue', sans-serif; color: #222222">
+
+<div style="position: absolute; left: 0; right: 0; top: 54px; bottom: 0; background: #ffffff; border-radius: 16px 16px 0 0; display: flex; flex-direction: column">
+
+<div style="display: flex; align-items: center; justify-content: space-between; padding: 6px 8px; border-bottom: 1px solid #ececec">
+<a href="PlannedMeal.dc.html" style="min-height: 44px; padding: 0 8px; display: flex; align-items: center; text-decoration: none; font-size: 16px; color: #222222">Cancel</a>
+<h1 style="margin: 0; font-size: 17px; line-height: 24px; font-weight: 600">What did you make?</h1>
+<span style="width: 64px"></span>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 22px; padding: 16px 16px 140px">
+
+<div style="display: flex; align-items: center; justify-content: space-between; min-height: 44px">
+<span style="font-size: 15px">Dinner</span>
+<button style="height: 40px; padding: 0 14px; border: 1.5px solid #d0d0d0; border-radius: 10px; background: #ffffff; font: inherit; font-size: 15px; color: #222222">Today, Fri Oct 9</button>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 10px">
+<h2 style="margin: 0; font-size: 12px; line-height: 16px; font-weight: 600; letter-spacing: 0.06em; color: #6b6b6b">FROM PLANNED</h2>
+<div style="display: flex; flex-wrap: wrap; gap: 8px">
+<button aria-pressed="true" style="min-height: 44px; padding: 0 16px; border: 1.5px solid #222222; border-radius: 22px; background: #222222; font: inherit; font-size: 15px; color: #ffffff">Spaghetti</button>
+<button aria-pressed="false" style="min-height: 44px; padding: 0 16px; border: 1.5px solid #222222; border-radius: 22px; background: #ffffff; font: inherit; font-size: 15px; color: #222222">Tacos</button>
+<button aria-pressed="false" style="min-height: 44px; padding: 0 16px; border: 1.5px solid #222222; border-radius: 22px; background: #ffffff; font: inherit; font-size: 15px; color: #222222">Beef &amp; broccoli</button>
+</div>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 6px">
+<label for="dish-search" style="font-size: 12px; line-height: 16px; font-weight: 600; letter-spacing: 0.06em; color: #6b6b6b">OR SOMETHING NOT PLANNED</label>
+<input id="dish-search" type="search" placeholder="Search recipes or type a dish" style="height: 48px; box-sizing: border-box; padding: 0 14px; border: 1.5px solid #d0d0d0; border-radius: 10px; font: inherit; font-size: 15px">
+</div>
+
+<div style="display: flex; flex-direction: column">
+<h2 style="margin: 0 0 4px; font-size: 12px; line-height: 16px; font-weight: 600; letter-spacing: 0.06em; color: #6b6b6b">WHAT YOU ATE</h2>
+<div style="display: flex; align-items: center; gap: 12px; min-height: 56px; border-bottom: 1px solid #ececec">
+<input id="dish-spaghetti" type="checkbox" checked style="width: 22px; height: 22px; margin: 0; accent-color: #222222">
+<label for="dish-spaghetti" style="flex: 1; font-size: 17px; font-weight: 600">Spaghetti</label>
+</div>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 4px">
+<span style="font-size: 15px">How was it?</span>
+<div style="display: flex; gap: 4px; margin-left: -6px">
+<button aria-label="1 star" style="width: 44px; height: 44px; border: 0; background: transparent; padding: 0; color: #222222; display: flex; align-items: center; justify-content: center"><svg width="30" height="30" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"></path></svg></button>
+<button aria-label="2 stars" style="width: 44px; height: 44px; border: 0; background: transparent; padding: 0; color: #222222; display: flex; align-items: center; justify-content: center"><svg width="30" height="30" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"></path></svg></button>
+<button aria-label="3 stars" style="width: 44px; height: 44px; border: 0; background: transparent; padding: 0; color: #222222; display: flex; align-items: center; justify-content: center"><svg width="30" height="30" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"></path></svg></button>
+<button aria-label="4 stars" style="width: 44px; height: 44px; border: 0; background: transparent; padding: 0; color: #222222; display: flex; align-items: center; justify-content: center"><svg width="30" height="30" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"></path></svg></button>
+<button aria-label="5 stars" style="width: 44px; height: 44px; border: 0; background: transparent; padding: 0; color: #222222; display: flex; align-items: center; justify-content: center"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"></path></svg></button>
+</div>
+</div>
+
+<div style="display: flex; align-items: flex-start; gap: 12px; padding: 12px; background: #f3f3f3; border-radius: 12px">
+<input id="return-plan" type="checkbox" checked style="width: 22px; height: 22px; margin: 1px 0 0; flex: none; accent-color: #222222">
+<label for="return-plan" style="display: flex; flex-direction: column; gap: 2px; font-size: 15px; line-height: 20px"><span style="font-weight: 600">Put chili and cornbread back in Planned</span><span style="font-size: 13px; color: #555555">Untick if you're not making them after all</span></label>
+</div>
+
+</div>
+
+<div style="position: absolute; left: 0; right: 0; bottom: 0; box-sizing: border-box; padding: 12px 16px 34px; border-top: 1px solid #dddddd; background: #ffffff">
+<a href="MealsD1.dc.html" style="height: 52px; border-radius: 12px; background: #222222; color: #ffffff; display: flex; align-items: center; justify-content: center; text-decoration: none; font-size: 16px; font-weight: 600">Save</a>
+</div>
+
+</div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>

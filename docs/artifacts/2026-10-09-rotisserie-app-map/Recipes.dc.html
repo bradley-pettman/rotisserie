@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Recipes</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;600&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#222222}a:hover{color:#000000}
+input::placeholder{color:#8a8a8a}
+</style>
+</helmet>
+<div style="position: relative; width: 390px; height: 844px; overflow: hidden; background: #ffffff; font-family: 'IBM Plex Sans', 'Helvetica Neue', sans-serif; color: #222222">
+
+<div style="padding: 56px 16px 8px; display: flex; align-items: center; justify-content: space-between">
+<h1 style="margin: 0; font-size: 28px; line-height: 36px; font-weight: 600">Recipes</h1>
+<button aria-label="Sort" style="height: 40px; padding: 0 12px; border: 1.5px solid #d0d0d0; border-radius: 10px; background: #ffffff; font: inherit; font-size: 14px; color: #222222">Recently made ▾</button>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 10px; padding: 0 16px 10px; border-bottom: 1px solid #ececec">
+<div style="position: relative">
+<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6b6b6b" stroke-width="2.2" stroke-linecap="round" aria-hidden="true" style="position: absolute; left: 12px; top: 13px"><circle cx="11" cy="11" r="6.5"></circle><path d="M16 16l4 4"></path></svg>
+<input aria-label="Search recipes" type="search" placeholder="Search recipes or ingredients" style="width: 100%; height: 44px; box-sizing: border-box; padding: 0 12px 0 38px; border: 0; border-radius: 10px; background: #f0f0f0; font: inherit; font-size: 16px">
+</div>
+<div style="display: flex; gap: 8px; overflow: hidden">
+<button aria-pressed="true" style="flex: none; min-height: 36px; padding: 0 14px; border: 1.5px solid #222222; border-radius: 18px; background: #222222; font: inherit; font-size: 14px; color: #ffffff">All</button>
+<button aria-pressed="false" style="flex: none; min-height: 36px; padding: 0 14px; border: 1.5px solid #c8c8c8; border-radius: 18px; background: #ffffff; font: inherit; font-size: 14px; color: #222222">weeknight</button>
+<button aria-pressed="false" style="flex: none; min-height: 36px; padding: 0 14px; border: 1.5px solid #c8c8c8; border-radius: 18px; background: #ffffff; font: inherit; font-size: 14px; color: #222222">kid favorite</button>
+<button aria-pressed="false" style="flex: none; min-height: 36px; padding: 0 14px; border: 1.5px solid #c8c8c8; border-radius: 18px; background: #ffffff; font: inherit; font-size: 14px; color: #222222">freezer-friendly</button>
+<button aria-pressed="false" style="flex: none; min-height: 36px; padding: 0 14px; border: 1.5px solid #c8c8c8; border-radius: 18px; background: #ffffff; font: inherit; font-size: 14px; color: #222222">spicy</button>
+</div>
+</div>
+
+<div style="display: flex; flex-direction: column; padding: 0 16px 100px">
+<a href="Recipe.dc.html" style="display: flex; flex-direction: column; gap: 2px; padding: 12px 0; border-bottom: 1px solid #ececec; text-decoration: none; color: #222222"><span style="font-size: 17px; line-height: 24px; font-weight: 600">Turkey Chili</span><span style="font-size: 13px; color: #555555"><span style="font-weight: 600; color: #222222">★ 4.3</span> · made 6 times · last Oct 8</span></a>
+<a href="#" style="display: flex; flex-direction: column; gap: 2px; padding: 12px 0; border-bottom: 1px solid #ececec; text-decoration: none; color: #222222"><span style="font-size: 17px; line-height: 24px; font-weight: 600">Cornbread</span><span style="font-size: 13px; color: #555555"><span style="font-weight: 600; color: #222222">★ 4.5</span> · made 4 times · last Oct 8</span></a>
+<a href="#" style="display: flex; flex-direction: column; gap: 2px; padding: 12px 0; border-bottom: 1px solid #ececec; text-decoration: none; color: #222222"><span style="font-size: 17px; line-height: 24px; font-weight: 600">Spaghetti and meatballs</span><span style="font-size: 13px; color: #555555"><span style="font-weight: 600; color: #222222">★ 4.0</span> · made 9 times · last Sep 30</span></a>
+<a href="#" style="display: flex; flex-direction: column; gap: 2px; padding: 12px 0; border-bottom: 1px solid #ececec; text-decoration: none; color: #222222"><span style="font-size: 17px; line-height: 24px; font-weight: 600">Beef &amp; broccoli</span><span style="font-size: 13px; color: #555555"><span style="font-weight: 600; color: #222222">★ 3.7</span> · made 3 times · last Sep 21</span></a>
+<a href="#" style="display: flex; flex-direction: column; gap: 2px; padding: 12px 0; border-bottom: 1px solid #ececec; text-decoration: none; color: #222222"><span style="font-size: 17px; line-height: 24px; font-weight: 600">Chicken wings</span><span style="font-size: 13px; color: #555555"><span style="font-weight: 600; color: #222222">★ 5.0</span> · made 2 times · last Sep 12</span></a>
+<a href="#" style="display: flex; flex-direction: column; gap: 2px; padding: 12px 0; border-bottom: 1px solid #ececec; text-decoration: none; color: #222222"><span style="font-size: 17px; line-height: 24px; font-weight: 600">Sheet-pan salmon</span><span style="font-size: 13px; color: #555555">Made once, not rated · last Aug 29</span></a>
+<a href="#" style="display: flex; flex-direction: column; gap: 2px; padding: 12px 0; border-bottom: 1px solid #ececec; text-decoration: none; color: #222222"><span style="font-size: 17px; line-height: 24px; font-weight: 600">Gochujang noodles</span><span style="font-size: 13px; color: #555555">Never made · added Oct 2</span></a>
+</div>
+
+<nav style="position: absolute; left: 0; right: 0; bottom: 0; height: 84px; box-sizing: border-box; padding: 6px 40px 22px; border-top: 1px solid #dddddd; background: #ffffff; display: flex; align-items: center; justify-content: space-between">
+<a href="MealsD1.dc.html" style="display: flex; flex-direction: column; align-items: center; gap: 2px; width: 72px; text-decoration: none; color: #6b6b6b; font-size: 11px"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10"></path></svg>Meals</a>
+<a href="CreateMenu.dc.html" aria-label="Create" style="width: 56px; height: 56px; border-radius: 28px; background: #222222; color: #ffffff; display: flex; align-items: center; justify-content: center"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg></a>
+<a href="#" style="display: flex; flex-direction: column; align-items: center; gap: 2px; width: 72px; text-decoration: none; color: #222222; font-size: 11px; font-weight: 600"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3z"></path><path d="M5 17a3 3 0 0 1 3-3h11"></path></svg>Recipes</a>
+</nav>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>
