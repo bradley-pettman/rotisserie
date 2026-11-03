@@ -151,3 +151,66 @@ jobs:
         env:
           ALERT_EMAIL: ${{ secrets.ALERT_EMAIL }}
         run: npm run deploy -w @rotisserie/infra -- --parameters "AlertEmail=$ALERT_EMAIL"
+
+  app:
+    name: Publish the app
+    needs: deploy
+    runs-on: ubuntu-latest
+
+    concurrency:
+      group: app-production
+      cancel-in-progress: false
+
+    defaults:
+      run:
+        working-directory: apps/mobile
+
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+      EXPO_PUBLIC_API_URL: https://api.rotisserieapp.com
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies
+        working-directory: .
+        run: npm ci
+
+      - name: Set up EAS
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Check for a version change
+        id: version
+        env:
+          BEFORE: ${{ github.event.before }}
+        run: |
+          current=$(node -p "require('./app.json').expo.version")
+          previous=""
+          if git fetch --quiet --depth=1 origin "$BEFORE" 2>/dev/null; then
+            previous=$(git show "$BEFORE:apps/mobile/app.json" | node -p "JSON.parse(require('fs').readFileSync(0, 'utf8')).expo.version")
+          fi
+          echo "current=$current" >> "$GITHUB_OUTPUT"
+          if [ -n "$previous" ] && [ "$current" != "$previous" ]; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Publish an over-the-air update
+        env:
+          MESSAGE: ${{ github.event.head_commit.message }}
+        run: eas update --channel production --environment production --message "$(printf '%s' "$MESSAGE" | head -n 1)" --non-interactive
+
+      - name: Start production builds
+        if: steps.version.outputs.changed == 'true'
+        run: eas build --profile production --platform android --non-interactive --no-wait

@@ -16,9 +16,6 @@ Claude may write code in every layer. The owner will say when they want to
 implement a piece themselves; leave that piece alone and explain or review
 instead.
 
-**Never commit, push or open a PR in this project.** The owner reviews every
-change first and commits it themselves.
-
 **Never write code comments** (TS, SQL, YAML, config). The owner writes them or
 asks for a specific one. Explain in the conversation instead. Tool-required
 markers such as dbmate's `-- migrate:up` / `-- migrate:down` stay.
