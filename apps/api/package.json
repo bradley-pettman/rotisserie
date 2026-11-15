@@ -7,6 +7,7 @@
     "start": "tsx --env-file-if-exists=../../.env src/server.ts",
     "invite": "tsx --env-file-if-exists=../../.env src/scripts/invite-to-household.ts",
     "load-recipes": "tsx --env-file-if-exists=../../.env src/scripts/load-recipes.ts",
+    "import-report": "tsx --env-file-if-exists=../../.env src/scripts/import-report.ts",
     "typecheck": "tsc",
     "test": "vitest run",
     "test:watch": "vitest"

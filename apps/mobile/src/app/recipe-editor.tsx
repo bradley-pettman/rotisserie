@@ -5,7 +5,7 @@ import { useMutation } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, View } from 'react-native'
 import { api } from '~/api/client'
-import { importRecipe, importUrlFrom, type ImportedRecipeDraft } from '~/api/import'
+import { importAttemptFor, importRecipe, importUrlFrom, reportImport, type ImportedRecipeDraft } from '~/api/import'
 import {
   useDeleteRecipe,
   useIngredientSearch,
@@ -131,8 +131,11 @@ export default function RecipeEditor() {
     const url = importUrlFrom(importUrl)
     if (!url || importer.isPending) return
     try {
-      setPendingImport(await importer.mutateAsync(url))
-    } catch {
+      const draft = await importer.mutateAsync(url)
+      reportImport(importAttemptFor(url, { draft }))
+      setPendingImport(draft)
+    } catch (error) {
+      reportImport(importAttemptFor(url, { error }))
       setWebsite((current) => current || url)
     }
   }

@@ -457,6 +457,13 @@ Wi-Fi or cellular gets past the publishers that refuse datacenter addresses
       draft; the one site without JSON-LD (Smitten Kitchen) gave ingredients
       but no steps. The extractor and the line parser both compile under
       Hermes (`hermesc` from `hermes-compiler`)
+- [x] Every import is reported: the app posts the URL, an outcome (`imported`,
+      `partial`, `no_recipe`, `refused`, `not_found`, `http_error`, `timeout`
+      or `unreachable`), the HTTP status and the empty fields to
+      `POST /recipe-imports`, fire and forget, into `recipe_import_attempts`.
+      A draft missing its name, ingredients or steps counts as partial.
+      `npm run import-report -w @rotisserie/api -- <email> [apiUrl]` lists the
+      failed and partial ones by site, through the API, so it works on prod
 
 Follow-ups: the share sheet (a native extension, so a new build), a WebView
 fetch for sites that block plain requests, suggesting `recipeCategory` and
