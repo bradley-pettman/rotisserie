@@ -30,6 +30,7 @@ export default function RecipesScreen() {
   const tags = useTags()
 
   const rows = recipes.data?.pages.flatMap((page) => page.recipes) ?? []
+  const sortLabel = SORTS.find((option) => option.value === sort)?.label
   const tagNames = [...(tags.data ?? []).map((option) => option.name)].sort()
 
   return (
@@ -41,14 +42,20 @@ export default function RecipesScreen() {
           </Text>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel={`Sort: ${SORTS.find((option) => option.value === sort)?.label}`}
-            onPress={() => setChoosingSort(true)}
-            style={{ minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 4 }}
+            accessibilityLabel="Create a recipe"
+            onPress={() => router.push('/recipe-editor')}
+            hitSlop={6}
+            style={({ pressed }) => ({
+              width: 40,
+              height: 40,
+              borderRadius: 20,
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: colors.chip,
+              opacity: pressed ? 0.6 : 1
+            })}
           >
-            <Text variant="label" tone="accent">
-              {SORTS.find((option) => option.value === sort)?.label}
-            </Text>
-            <Icon name="chevronDown" size={16} color={colors.accent} strokeWidth={2.5} />
+            <Icon name="plus" size={22} color={colors.accent} strokeWidth={2.5} />
           </Pressable>
         </View>
         <Field
@@ -61,38 +68,57 @@ export default function RecipesScreen() {
         />
       </View>
 
-      {tagNames.length > 0 ? (
-        <View>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ gap: 8, paddingHorizontal: 20, paddingVertical: 8 }}
+      <View>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ gap: 8, paddingHorizontal: 20, paddingVertical: 8, alignItems: 'center' }}
+        >
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`Sort: ${sortLabel}`}
+            onPress={() => setChoosingSort(true)}
+            style={{
+              minHeight: 36,
+              paddingHorizontal: 14,
+              borderRadius: 18,
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 4,
+              borderWidth: 1,
+              borderColor: colors.line
+            }}
           >
-            {['', ...tagNames].map((name) => {
-              const selected = name === tag
-              return (
-                <Pressable
-                  key={name || 'all'}
-                  accessibilityRole="radio"
-                  accessibilityState={{ selected }}
-                  onPress={() => setTag(name)}
-                  style={{
-                    minHeight: 36,
-                    paddingHorizontal: 14,
-                    borderRadius: 18,
-                    justifyContent: 'center',
-                    backgroundColor: selected ? colors.gold : colors.chip
-                  }}
-                >
-                  <Text variant="captionStrong" tone={selected ? 'onGold' : 'chipInk'}>
-                    {name || 'All'}
-                  </Text>
-                </Pressable>
-              )
-            })}
-          </ScrollView>
-        </View>
-      ) : null}
+            <Text variant="captionStrong" tone="accent">
+              {sortLabel}
+            </Text>
+            <Icon name="chevronDown" size={14} color={colors.accent} strokeWidth={2.5} />
+          </Pressable>
+          {tagNames.length > 0 ? <View style={{ width: 1, height: 20, backgroundColor: colors.line }} /> : null}
+          {(tagNames.length > 0 ? ['', ...tagNames] : []).map((name) => {
+            const selected = name === tag
+            return (
+              <Pressable
+                key={name || 'all'}
+                accessibilityRole="radio"
+                accessibilityState={{ selected }}
+                onPress={() => setTag(name)}
+                style={{
+                  minHeight: 36,
+                  paddingHorizontal: 14,
+                  borderRadius: 18,
+                  justifyContent: 'center',
+                  backgroundColor: selected ? colors.gold : colors.chip
+                }}
+              >
+                <Text variant="captionStrong" tone={selected ? 'onGold' : 'chipInk'}>
+                  {name || 'All'}
+                </Text>
+              </Pressable>
+            )
+          })}
+        </ScrollView>
+      </View>
 
       {recipes.isPending ? (
         <Loading />
