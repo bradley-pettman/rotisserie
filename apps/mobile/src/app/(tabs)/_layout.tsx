@@ -50,7 +50,7 @@ export default function TabLayout() {
             }}
           >
             {tabs[0]}
-            <Link href="/create" asChild>
+            <Link href={{ pathname: '/create', params: { from: state.routes[state.index]?.name } }} asChild>
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel="Create"
