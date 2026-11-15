@@ -7,6 +7,7 @@ import { household } from './routes/household'
 import { me } from './routes/me'
 import { meals } from './routes/meals'
 import { plannedMeals } from './routes/planned-meals'
+import { recipeImports } from './routes/recipe-imports'
 import { recipes } from './routes/recipes'
 import { vocabulary } from './routes/vocabulary'
 
@@ -16,6 +17,7 @@ export const app = new Hono()
   .route('/me', me)
   .route('/household', household)
   .route('/recipes', recipes)
+  .route('/recipe-imports', recipeImports)
   .route('/', vocabulary)
   .route('/meals', meals)
   .route('/planned-meals', plannedMeals)

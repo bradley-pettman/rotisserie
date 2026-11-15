@@ -62,11 +62,56 @@ function parseNumber(text: string): number {
 
 export type ParsedIngredient = { quantity: number | null; unit: string | null; name: string; notes: string | null }
 
+const PRICE = /^[$£€]\s?\d+(?:[.,]\d+)?$/
+const SIZE_BEFORE_CONTAINER =
+  /^(\d+(?:[.,]\d+)?\s*-?\s*(?:fl\.?\s*oz|oz|ounces?|g|grams?|kg|ml|l|lbs?|pounds?)\.?)\s+(?=(?:cans?|jars?|packages?|pkgs?|bags?|box(?:es)?|bottles?|containers?|cartons?|tins?|packets?|blocks?|sticks?)\b)/i
+const PREP_WORDS =
+  'chopped|diced|minced|grated|sliced|crushed|peeled|halved|quartered|cubed|shredded|softened|beaten|torn|trimmed|rinsed|drained|crumbled|toasted|juiced|zested|melted|mashed|sifted|chilled|cooled|cored|seeded|pitted|deveined|divided|cut'
+const TRAILING_PREP = new RegExp(
+  String.raw`^(.*?\S)\s+((?:(?:very\s+)?(?:finely|roughly|thinly|thickly|coarsely|freshly|lightly)\s+)?(?:${PREP_WORDS})(?:\s+(?:into|in)\s+.+)?|to taste|for serving|for garnish|optional)$`,
+  'i'
+)
+
+function firstTopLevelComma(text: string): number {
+  let depth = 0
+  for (let index = 0; index < text.length; index++) {
+    const char = text[index]
+    if (char === '(') depth += 1
+    else if (char === ')') depth = Math.max(0, depth - 1)
+    else if (char === ',' && depth === 0) return index
+  }
+  return -1
+}
+
+function liftParentheses(line: string): { bare: string; asides: string[] } {
+  const asides: string[] = []
+  let text = line
+  for (let pass = 0; pass < 6 && text.includes('('); pass++) {
+    const comma = firstTopLevelComma(text)
+    const next = text.replace(/\(([^()]*)\)/g, (_, inside: string, offset: number) => {
+      const note = inside.replace(/^[\s,;:]+|[\s,;:]+$/g, '')
+      if (!note || PRICE.test(note)) return ' '
+      if (comma !== -1 && offset > comma) return `, ${note},`
+      asides.push(note)
+      return ' '
+    })
+    if (next === text) break
+    text = next
+  }
+  const bare = text
+    .replace(/\*+/g, '')
+    .replace(/\s*,(?:\s*,)*\s*/g, ', ')
+    .replace(/\s+/g, ' ')
+    .replace(/^[,\s]+|[,\s]+$/g, '')
+  return { bare, asides }
+}
+
 export function parseIngredientLine(line: string, knownUnits: string[]): ParsedIngredient {
   const units = new Set(knownUnits)
-  const commaAt = line.indexOf(',')
-  const main = (commaAt === -1 ? line : line.slice(0, commaAt)).trim()
-  const notes = commaAt === -1 ? null : line.slice(commaAt + 1).trim() || null
+  const { bare, asides } = liftParentheses(line.replace(/^[-•*]\s*/, ''))
+  const commaAt = bare.indexOf(',')
+  const main = (commaAt === -1 ? bare : bare.slice(0, commaAt)).trim()
+  const afterComma = commaAt === -1 ? '' : bare.slice(commaAt + 1).trim()
 
   const match = QUANTITY.exec(main)
   const numberText = match?.[1]
@@ -74,6 +119,12 @@ export function parseIngredientLine(line: string, knownUnits: string[]): ParsedI
   const hasQuantity = numberText !== undefined || glyph !== undefined
   const quantity = hasQuantity ? (numberText ? parseNumber(numberText) : 0) + (glyph ? (VULGAR[glyph] ?? 0) : 0) : null
   let rest = hasQuantity ? main.slice(match?.[0].length ?? 0) : main
+
+  const size = hasQuantity ? SIZE_BEFORE_CONTAINER.exec(rest) : null
+  if (size) {
+    asides.unshift(size[1] ?? '')
+    rest = rest.slice(size[0].length)
+  }
 
   let unit: string | null = null
   const words = rest.split(/\s+/).filter(Boolean)
@@ -87,7 +138,10 @@ export function parseIngredientLine(line: string, knownUnits: string[]): ParsedI
     }
   }
 
+  const prep = TRAILING_PREP.exec(rest)
+  if (prep) rest = prep[1] ?? rest
   const name = canonicalizeName(rest.replace(/^of\s+/i, ''))
+  const notes = [prep?.[2], ...asides, afterComma].filter((note) => note?.trim()).join(', ') || null
   return { quantity: quantity && quantity > 0 ? quantity : null, unit, name, notes }
 }
 

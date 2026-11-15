@@ -39,6 +39,7 @@ npm install <pkg> -w @rotisserie/api   # Add a dependency to one workspace
 npx tsx <file.ts>        # Run a TypeScript file directly
 npm run invite -w @rotisserie/api [householdId]   # Print an invite code (default: the household with no members)
 npm run load-recipes -w @rotisserie/api -- <email> [apiUrl]   # PUT recipes.json through the API as you; asks for the password
+npm run import-report -w @rotisserie/api -- <email> [apiUrl]  # Failed and partial recipe imports by site, through the API
 
 npm start -w @rotisserie/mobile          # Expo dev server; open it in Expo Go on the phone
 npx expo install <pkg>                   # From apps/mobile: adds an SDK-compatible version
@@ -70,7 +71,8 @@ apps/api/             @rotisserie/api
   src/providers/      SQL query functions, one file per area (sql.ts: generic SQL helpers; errors.ts: NotFoundError and strict)
   src/use-cases/      One file per use case, built with defineUseCase (actors.ts: UserActor, MemberActor; errors.ts: 401/403/409 errors)
   src/api/            Hono app, error envelope, auth.ts (requireUser, requireMember), routes/ (one file per resource)
-  src/scripts/        One-off scripts (invite-to-household.ts; load-recipes.ts goes through the API, so it works on prod)
+  src/scripts/        One-off scripts (invite-to-household.ts; load-recipes.ts and import-report.ts go through the API
+                      with api-client.ts, so they work on prod)
   src/server.ts       Starts the API locally; src/lambda.ts is the same app as a Lambda handler
   src/test/           Vitest global setup, per-test reset, factories, accounts (default member), API request helper
 apps/mobile/          @rotisserie/mobile: Expo SDK 58, Expo Router. app.json holds the bundle id and package
@@ -81,7 +83,8 @@ apps/mobile/          @rotisserie/mobile: Expo SDK 58, Expo Router. app.json hol
                       Recipes; create, plan, log, recipe-editor, household are modals. _layout.tsx guards
                       each group with Stack.Protected on the auth state
   src/api/            fetch client (Bearer token, parses responses with the shared schemas), auth.tsx
-                      (AuthProvider, useAuth, token in expo-secure-store) and TanStack Query hooks
+                      (AuthProvider, useAuth, token in expo-secure-store), TanStack Query hooks and
+                      import.ts, which fetches a recipe page from the phone and extracts the recipe
   src/components/     UI building blocks; colors come from useColors()
   src/lib/            Pure helpers (dates, meals, quantities, recipes); quantities has Vitest tests
   src/theme/          Golden hour tokens: light and dark palettes, Figtree type scale
@@ -111,7 +114,8 @@ apps/infra/           @rotisserie/infra: AWS CDK, pinned to us-east-2
                       Secrets Manager; handler.ts is its code. Every later database user signs in as `app`
   src/test/           testApp(): an App with cdk.json's feature flags, bundling off, version reporting on
 apps/api/certs/       The RDS CA bundle (rds-global-bundle.pem) that TLS connections to prod verify against
-packages/shared/      @rotisserie/shared: Zod schemas, types and pure domain helpers, one folder per area
+packages/shared/      @rotisserie/shared: Zod schemas, types and pure domain helpers, one folder per area;
+                      recipes/import.ts reads a recipe out of a page's JSON-LD or microdata (no fetching)
 docs/ROADMAP.md       Phases from here to an app on a phone
 docs/SPEC.md          Product spec (features, not implementation)
 ```
@@ -148,7 +152,7 @@ household yet) and 403 `forbidden` (not an owner).
 
 ## Data model
 
-Four areas, fifteen tables:
+Four areas, sixteen tables:
 
 - **Accounts:** `users`, `sessions`, `households`, `household_members` and
   `household_invites`. A user belongs to at most one household
@@ -156,7 +160,8 @@ Four areas, fifteen tables:
   household always keeps an owner. Invites are single-use 8-character codes
   that last 7 days; joining a household with no members makes you its owner.
 - **Recipe book:** `recipes`, `recipe_ingredients`, `recipe_tags`, plus the
-  shared vocabularies `ingredients`, `units` and `tags`.
+  shared vocabularies `ingredients`, `units` and `tags`, and
+  `recipe_import_attempts`, one row per import the app tried (append-only).
 - **Plan (intention):** `planned_meals` and `planned_meal_dishes`. These are
   mutable. There is no plan table; a week is a date range over
   `planned_meals`. A planned meal with no `planned_on` is unscheduled: it
