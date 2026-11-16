@@ -19,7 +19,7 @@ export const UpsertGroceryItem = defineUseCase({
       storeId: input.storeId === undefined ? (fallback?.storeId ?? null) : input.storeId,
       section: input.section === undefined ? (fallback?.section ?? null) : input.section
     })
-    const name = existing?.line?.name ?? groceryNameKeys(input.text)[0]
+    const name = groceryNameKeys(existing?.line?.name ?? input.text)[0]
     if (name && (input.storeId !== undefined || input.section !== undefined)) {
       await rememberGroceryDefault(householdId, name, { storeId: input.storeId, section: input.section })
     }
