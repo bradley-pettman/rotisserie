@@ -339,6 +339,22 @@ describe('store and section', () => {
     ])
     expect(list.body.meals).toMatchObject([{ plannedMealId: meal.id, label: 'Turkey Sloppy Joes' }])
   })
+
+  it('remembers the store of an item added from a dish typed without a recipe', async () => {
+    const target = await putStore('Target')
+    const { id, ...body } = plannedMealInput({
+      dishes: [{ id: randomUUID(), recipeId: null, customText: 'Mac and Cheese', notes: null }]
+    })
+    await send('PUT', `/planned-meals/${id}`, body)
+    const added = await send('POST', '/grocery-list/meals', { plannedMealIds: [id] })
+    const item = added.body.items[0]
+
+    const moved = await putItem({ id: item.id, text: item.text, storeId: target.id })
+    await send('DELETE', `/grocery-list/items/${item.id}`)
+
+    expect(moved).toMatchObject({ status: 200, body: { text: 'Mac and Cheese', storeId: target.id } })
+    expect((await putItem({ text: 'mac and cheese' })).body).toMatchObject({ storeId: target.id })
+  })
 })
 
 describe('another household', () => {
