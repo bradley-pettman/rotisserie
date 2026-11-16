@@ -45,3 +45,5 @@ export function canonicalizeUnit(unit: string): string {
   )
   return match?.[0] ?? name
 }
+
+export const STANDARD_UNIT_NAMES: string[] = Object.keys(UNIT_SPELLINGS)

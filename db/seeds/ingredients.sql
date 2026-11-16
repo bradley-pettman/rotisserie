@@ -2,8 +2,8 @@
 -- Use INSERT ... ON CONFLICT DO NOTHING for idempotency
 
 -- Produce
-INSERT INTO ingredients (name, is_standard)
-SELECT name, TRUE FROM (VALUES
+INSERT INTO ingredients (name, is_standard, section)
+SELECT name, TRUE, 'produce' FROM (VALUES
   ('onion'),
   ('garlic'),
   ('tomato'),
@@ -38,11 +38,11 @@ SELECT name, TRUE FROM (VALUES
   ('mint'),
   ('dill')
 ) AS seed(name)
-ON CONFLICT (name) DO UPDATE SET is_standard = TRUE;
+ON CONFLICT (name) DO UPDATE SET is_standard = TRUE, section = EXCLUDED.section;
 
 -- Proteins
-INSERT INTO ingredients (name, is_standard)
-SELECT name, TRUE FROM (VALUES
+INSERT INTO ingredients (name, is_standard, section)
+SELECT name, TRUE, 'meat_seafood' FROM (VALUES
   ('chicken breast'),
   ('chicken thigh'),
   ('ground beef'),
@@ -71,11 +71,11 @@ SELECT name, TRUE FROM (VALUES
   ('tempeh'),
   ('seitan')
 ) AS seed(name)
-ON CONFLICT (name) DO UPDATE SET is_standard = TRUE;
+ON CONFLICT (name) DO UPDATE SET is_standard = TRUE, section = EXCLUDED.section;
 
 -- Dairy & Eggs
-INSERT INTO ingredients (name, is_standard)
-SELECT name, TRUE FROM (VALUES
+INSERT INTO ingredients (name, is_standard, section)
+SELECT name, TRUE, 'dairy_eggs' FROM (VALUES
   ('butter'),
   ('milk'),
   ('heavy cream'),
@@ -100,11 +100,11 @@ SELECT name, TRUE FROM (VALUES
   ('brie'),
   ('gruyère cheese')
 ) AS seed(name)
-ON CONFLICT (name) DO UPDATE SET is_standard = TRUE;
+ON CONFLICT (name) DO UPDATE SET is_standard = TRUE, section = EXCLUDED.section;
 
 -- Pantry Staples
-INSERT INTO ingredients (name, is_standard)
-SELECT name, TRUE FROM (VALUES
+INSERT INTO ingredients (name, is_standard, section)
+SELECT name, TRUE, 'pantry' FROM (VALUES
   ('olive oil'),
   ('vegetable oil'),
   ('flour'),
@@ -167,11 +167,11 @@ SELECT name, TRUE FROM (VALUES
   ('canola oil'),
   ('peanut oil')
 ) AS seed(name)
-ON CONFLICT (name) DO UPDATE SET is_standard = TRUE;
+ON CONFLICT (name) DO UPDATE SET is_standard = TRUE, section = EXCLUDED.section;
 
 -- Spices & Seasonings
-INSERT INTO ingredients (name, is_standard)
-SELECT name, TRUE FROM (VALUES
+INSERT INTO ingredients (name, is_standard, section)
+SELECT name, TRUE, 'pantry' FROM (VALUES
   ('paprika'),
   ('cumin'),
   ('oregano'),
@@ -208,11 +208,11 @@ SELECT name, TRUE FROM (VALUES
   ('sumac'),
   ('five spice powder')
 ) AS seed(name)
-ON CONFLICT (name) DO UPDATE SET is_standard = TRUE;
+ON CONFLICT (name) DO UPDATE SET is_standard = TRUE, section = EXCLUDED.section;
 
 -- Nuts & Seeds
-INSERT INTO ingredients (name, is_standard)
-SELECT name, TRUE FROM (VALUES
+INSERT INTO ingredients (name, is_standard, section)
+SELECT name, TRUE, 'pantry' FROM (VALUES
   ('almonds'),
   ('walnuts'),
   ('pecans'),
@@ -228,11 +228,11 @@ SELECT name, TRUE FROM (VALUES
   ('flax seeds'),
   ('macadamia nuts')
 ) AS seed(name)
-ON CONFLICT (name) DO UPDATE SET is_standard = TRUE;
+ON CONFLICT (name) DO UPDATE SET is_standard = TRUE, section = EXCLUDED.section;
 
 -- Fruits
-INSERT INTO ingredients (name, is_standard)
-SELECT name, TRUE FROM (VALUES
+INSERT INTO ingredients (name, is_standard, section)
+SELECT name, TRUE, 'produce' FROM (VALUES
   ('apple'),
   ('banana'),
   ('orange'),
@@ -259,4 +259,6 @@ SELECT name, TRUE FROM (VALUES
   ('plum'),
   ('grapefruit')
 ) AS seed(name)
-ON CONFLICT (name) DO UPDATE SET is_standard = TRUE;
+ON CONFLICT (name) DO UPDATE SET is_standard = TRUE, section = EXCLUDED.section;
+
+UPDATE ingredients SET section = 'produce' WHERE name IN ('tofu', 'tempeh', 'seitan');

@@ -1,4 +1,10 @@
-import { canonicalizeName } from '@rotisserie/shared/base'
+import {
+  amountLabel,
+  canonicalizeName,
+  formatIngredientLine,
+  parseIngredientLine,
+  type ParsedIngredient
+} from '@rotisserie/shared/base'
 import { randomUUID } from 'expo-crypto'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useMutation } from '@tanstack/react-query'
@@ -22,7 +28,6 @@ import { TagSheet } from '~/components/TagSheet'
 import { useToast } from '~/components/Toast'
 import { Button, Chip, Text } from '~/components/ui'
 import { toPlannedInput } from '~/lib/meals'
-import { amountLabel, formatIngredientLine, parseIngredientLine, type ParsedIngredient } from '~/lib/quantities'
 import { hostname, instructionSteps } from '~/lib/recipes'
 import { PlannedMealSchemas } from '@rotisserie/shared/meals'
 import { useColors } from '~/theme'

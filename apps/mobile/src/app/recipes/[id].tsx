@@ -9,7 +9,7 @@ import { HeaderButton, ScreenHeader } from '~/components/ScreenHeader'
 import { TagSheet } from '~/components/TagSheet'
 import { useToast } from '~/components/Toast'
 import { Button, Chip, ErrorState, Loading, Text } from '~/components/ui'
-import { amountLabel, scaleFactor } from '~/lib/quantities'
+import { amountLabel, scaleFactor } from '@rotisserie/shared/base'
 import { hostname, instructionSteps, madeLabel, ratingLabel, recipeToInput, timesLabel } from '~/lib/recipes'
 import { useColors } from '~/theme'
 

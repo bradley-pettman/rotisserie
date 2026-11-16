@@ -470,11 +470,64 @@ fetch for sites that block plain requests, suggesting `recipeCategory` and
 `recipeCuisine` as tags, and a model-backed fallback for pages with no
 structured data once the API has outbound network.
 
+## Grocery list ✅
+
+One list per household, kept like a note: each item is a line of text with a
+circle to check it off, and checked items stay on the list, struck through.
+
+- [x] The Groceries tab: tap a line to edit it, Return adds a line below it,
+      backspace on an empty line deletes it, and pasting several lines adds
+      several items. Checks and edits show at once and save in the background;
+      the list refetches every 15 seconds while it is open, so two people
+      shopping see each other's checks. The ⋯ menu unchecks everything or
+      deletes the checked items
+- [x] **Add from meals** (the list's header, the Create menu, or a planned
+      meal's "Add to groceries"): pick from this week, next week and Planned,
+      then review the lines. Each line is scaled to the meal's headcount and
+      added up across meals by ingredient and unit ("1 cup + 2 tbsp milk"),
+      says which dishes need it, and says when it will add to something
+      already on the list. Free-text dishes start unticked
+- [x] An item added from meals keeps its ingredient and amounts, so the next
+      import adds to it ("1 lb" becomes "2 lb") rather than repeating it, and an
+      item typed by hand with the same name gets the amount. Editing an item's
+      text by hand makes it plain text again. Adding a meal that is already on
+      the list adds only what changed since
+- [x] A snapshot, not a live view: `grocery_list_meals` keeps the lines each
+      meal contributed when it was added. When a recipe's ingredients or
+      servings, the meal's headcount or its dishes change, the list shows an
+      alert with what changed; "Update the list" adds the new items and the
+      extra amounts, and anything no longer needed stays for you to remove.
+      A deleted plan raises an alert too. Edits that don't change the lines
+      (instructions, tags, moving the day) stay quiet, and so do meals already
+      cooked
+
+- [x] Volumes and weights add up across units: 1 cup + 2 tbsp is 1⅛ cups,
+      3 tbsp + ¼ cup is 7 tbsp (the larger unit when it comes out tidy, else
+      the smaller), and 200 g + 1 lb is 654 g. Alerts compare amounts the same
+      way, so 1 cup becoming 16 tbsp is no change. Cans, cloves and bare
+      counts stay apart
+
+- [x] Stores and sections. A household keeps its stores (Costco, Aldi) in the
+      order it shops; every item has a store (or any store) and a section from
+      one list that covers food and the rest: produce, meat & seafood, dairy &
+      eggs, bakery, pantry, frozen, drinks, household, personal care, baby &
+      kids, pet, other. The ⋯ on the row being edited (or a long press on its
+      circle) sets them, and the choice is remembered by name, so the next
+      "ground beef", typed or imported, goes to Costco on its own. Without a
+      remembered section an item takes its ingredient's, from the seeds
+- [x] Group by none, store or section, a store filter ("Shopping at Aldi"
+      shows Aldi's items and the any-store ones) and a meal filter (what one
+      meal still needs). Group by and the store filter are kept on the phone.
+      Typing under a group header puts the item in that group; items for a
+      meal say so under their text
+
+Follow-ups: pantry staples left unticked in the review, offline edits that
+survive closing the app, and reordering sections to match a store's layout.
+
 ## Later
 
 - **Offline:** persist the TanStack Query cache, then consider local SQLite if
   the kitchen has bad signal
-- **Grocery list** generated from a week of planned meals
 - **Tags UI**, a web client (just another API client)
 - **Cook mode:** one dish and one step at a time, large text, screen kept awake
   (`expo-keep-awake`), started from a recipe or a planned meal's dish. Needs

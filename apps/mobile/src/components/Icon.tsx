@@ -4,6 +4,7 @@ const STROKES = {
   chevronLeft: ['M15 5l-7 7 7 7'],
   chevronRight: ['M9 5l7 7-7 7'],
   chevronDown: ['M6 9l6 6 6-6'],
+  chevronUp: ['M6 15l6-6 6 6'],
   plus: ['M12 5v14M5 12h14'],
   check: ['M5 12.5l4.5 4.5L19 7.5'],
   close: ['M6 6l12 12M18 6L6 18'],
@@ -20,7 +21,14 @@ const STROKES = {
   pencil: ['M4 20h4L19 9l-4-4L4 16z', 'M13.5 6.5l4 4'],
   trash: ['M4 7h16', 'M10 11v6M14 11v6', 'M6 7l1 13h10l1-13', 'M9 7V4h6v3'],
   clock: ['M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z', 'M12 7v5l3 2'],
-  home: ['M4 10.5L12 4l8 6.5', 'M6 9v11h12V9', 'M10 20v-5h4v5']
+  home: ['M4 10.5L12 4l8 6.5', 'M6 9v11h12V9', 'M10 20v-5h4v5'],
+  cart: [
+    'M3 4h2.2l2.3 11a1.5 1.5 0 0 0 1.5 1.2h8.3a1.5 1.5 0 0 0 1.5-1.1L20.5 8H6.1',
+    'M10 20.5a.5.5 0 1 1-1 0 .5.5 0 0 1 1 0z',
+    'M18 20.5a.5.5 0 1 1-1 0 .5.5 0 0 1 1 0z'
+  ],
+  more: ['M5 12h.01M12 12h.01M19 12h.01'],
+  alert: ['M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z', 'M12 7.5v5.5', 'M12 16.5h.01']
 } as const
 
 export type IconName = keyof typeof STROKES | 'star'

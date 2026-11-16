@@ -2,6 +2,7 @@ import { Hono } from 'hono'
 import { handleError, handleNotFound } from './errors'
 import { auth } from './routes/auth'
 import { cookedMeals } from './routes/cooked-meals'
+import { groceryList } from './routes/grocery-list'
 import { health } from './routes/health'
 import { household } from './routes/household'
 import { me } from './routes/me'
@@ -22,6 +23,7 @@ export const app = new Hono()
   .route('/meals', meals)
   .route('/planned-meals', plannedMeals)
   .route('/cooked-meals', cookedMeals)
+  .route('/grocery-list', groceryList)
   .onError(handleError)
   .notFound(handleNotFound)
 
