@@ -79,14 +79,18 @@ apps/mobile/          @rotisserie/mobile: Expo SDK 58, Expo Router. app.json hol
                       (com.bradleypettman.rotisserie), the icons and the splash; eas.json the EAS Build profiles
                       (preview: installable APK and ad hoc iOS; production: store builds) and their EAS Update
                       channels; README.md the release runbook
-  src/app/            Routes: sign-in, sign-up, welcome (start or join a household); (tabs) for Meals and
-                      Recipes; create, plan, log, recipe-editor, household are modals. _layout.tsx guards
-                      each group with Stack.Protected on the auth state
+  src/app/            Routes: sign-in, sign-up, welcome (start or join a household); (tabs) for Meals,
+                      Recipes and Groceries; create, plan, log, recipe-editor, household and
+                      grocery-import are modals. _layout.tsx guards each group with Stack.Protected on
+                      the auth state
   src/api/            fetch client (Bearer token, parses responses with the shared schemas), auth.tsx
                       (AuthProvider, useAuth, token in expo-secure-store), TanStack Query hooks and
-                      import.ts, which fetches a recipe page from the phone and extracts the recipe
+                      import.ts, which fetches a recipe page from the phone and extracts the recipe;
+                      groceries.ts holds the list's hooks, with optimistic edits; grocery-view.ts keeps
+                      the list's Group by and store filter on the phone
   src/components/     UI building blocks; colors come from useColors()
-  src/lib/            Pure helpers (dates, meals, quantities, recipes); quantities has Vitest tests
+  src/lib/            Pure helpers (dates, meals, recipes, groceries: filtering and grouping the list), with
+                      Vitest tests
   src/theme/          Golden hour tokens: light and dark palettes, Figtree type scale
   assets/             icon.png (iOS), adaptive-icon*.png (Android) and splash-icon.png, all generated from docs/logo.png
 apps/infra/           @rotisserie/infra: AWS CDK, pinned to us-east-2
@@ -115,7 +119,11 @@ apps/infra/           @rotisserie/infra: AWS CDK, pinned to us-east-2
   src/test/           testApp(): an App with cdk.json's feature flags, bundling off, version reporting on
 apps/api/certs/       The RDS CA bundle (rds-global-bundle.pem) that TLS connections to prod verify against
 packages/shared/      @rotisserie/shared: Zod schemas, types and pure domain helpers, one folder per area;
-                      recipes/import.ts reads a recipe out of a page's JSON-LD or microdata (no fetching)
+                      recipes/import.ts reads a recipe out of a page's JSON-LD or microdata (no fetching);
+                      base/ingredient-lines.ts parses "2 tbsp chili powder" (the recipe editor and the list
+                      share it); groceries/lines.ts turns planned meals into list lines, merges (converting
+                      volumes and weights), diffs and plans imports; groceries/defaults.ts picks an item's
+                      remembered store and section
 docs/ROADMAP.md       Phases from here to an app on a phone
 docs/SPEC.md          Product spec (features, not implementation)
 ```
@@ -152,7 +160,7 @@ household yet) and 403 `forbidden` (not an owner).
 
 ## Data model
 
-Four areas, sixteen tables:
+Five areas, twenty tables:
 
 - **Accounts:** `users`, `sessions`, `households`, `household_members` and
   `household_invites`. A user belongs to at most one household
@@ -174,8 +182,22 @@ Four areas, sixteen tables:
   plan as a cooked meal with `settled_on` set to that day; any edit through
   the upsert confirms it (`settled_on` back to NULL). To undo a settled meal,
   move or delete its plan, or settle recreates it.
+- **Groceries:** `grocery_items` and `grocery_list_meals`, one list per
+  household. An item is a line of text; one added from meals also keeps its
+  `line` (ingredient, amounts, dishes) so later imports add to it, until its
+  text is edited by hand. `grocery_list_meals` snapshots the lines each
+  planned meal contributed; reading the list recomputes them from the current
+  recipes and plan and returns an alert when they differ or the plan was
+  deleted (`planned_meal_id` is `ON DELETE SET NULL`). The list never changes
+  itself: alerts wait for someone to update or dismiss them.
+  `grocery_stores` are the household's stores, in shopping order. An item has
+  a `store_id` (NULL: any store) and a `section` (the `grocery_section`
+  domain, food and non-food alike). `grocery_item_defaults` remembers, by
+  canonical item name, the store and section someone last chose; a new or
+  imported item without an explicit choice takes them, else the section of
+  the ingredient it names (`ingredients.section`, set by the seeds).
 
-Every recipe, tag, planned meal and cooked meal belongs to one household
+Every recipe, tag, planned meal, cooked meal and grocery row belongs to one household
 (`household_id`, `ON DELETE CASCADE`). A row that points at two
 household-owned rows (`recipe_tags`, `planned_meal_dishes`,
 `cooked_meal_dishes`) carries `household_id` too, and both of its foreign keys

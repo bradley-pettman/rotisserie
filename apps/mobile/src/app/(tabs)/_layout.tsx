@@ -5,7 +5,7 @@ import { Icon, type IconName } from '~/components/Icon'
 import { Text } from '~/components/ui'
 import { useColors } from '~/theme'
 
-const TAB_ICONS: Record<string, IconName> = { index: 'list', recipes: 'book' }
+const TAB_ICONS: Record<string, IconName> = { index: 'list', recipes: 'book', groceries: 'cart' }
 
 export default function TabLayout() {
   const colors = useColors()
@@ -41,7 +41,7 @@ export default function TabLayout() {
               flexDirection: 'row',
               alignItems: 'center',
               justifyContent: 'space-between',
-              paddingHorizontal: 44,
+              paddingHorizontal: 20,
               paddingTop: 6,
               paddingBottom: Math.max(insets.bottom, 10),
               borderTopWidth: 1,
@@ -49,7 +49,7 @@ export default function TabLayout() {
               backgroundColor: colors.navBg
             }}
           >
-            {tabs[0]}
+            {tabs}
             <Link href={{ pathname: '/create', params: { from: state.routes[state.index]?.name } }} asChild>
               <Pressable
                 accessibilityRole="button"
@@ -71,13 +71,13 @@ export default function TabLayout() {
                 <Icon name="plus" size={26} color={colors.onGold} strokeWidth={2.6} />
               </Pressable>
             </Link>
-            {tabs[1]}
           </View>
         )
       }}
     >
       <Tabs.Screen name="index" options={{ title: 'Meals' }} />
       <Tabs.Screen name="recipes" options={{ title: 'Recipes' }} />
+      <Tabs.Screen name="groceries" options={{ title: 'Groceries' }} />
     </Tabs>
   )
 }

@@ -158,6 +158,17 @@ export default function PlannedMealScreen() {
               + Add a dish
             </Text>
           </Pressable>
+          {data.dishes.length > 0 ? (
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => router.push({ pathname: '/grocery-import', params: { meal: data.id } })}
+              style={{ minHeight: 48, justifyContent: 'center' }}
+            >
+              <Text variant="label" tone="accent">
+                Add to groceries
+              </Text>
+            </Pressable>
+          ) : null}
         </View>
 
         <View>

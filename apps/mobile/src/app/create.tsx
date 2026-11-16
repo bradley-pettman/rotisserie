@@ -10,7 +10,8 @@ type Option = { label: string; detail: string; icon: IconName; href: Href }
 
 const MEAL_OPTIONS: Option[] = [
   { label: 'Log a meal', detail: 'Record what you ate', icon: 'check', href: '/log' },
-  { label: 'Plan a meal', detail: 'For a day, or for Planned', icon: 'calendar', href: '/plan' }
+  { label: 'Plan a meal', detail: 'For a day, or for Planned', icon: 'calendar', href: '/plan' },
+  { label: 'Shop for meals', detail: 'Add what planned meals need', icon: 'cart', href: '/grocery-import' }
 ]
 
 const RECIPE_OPTIONS: Option[] = [
